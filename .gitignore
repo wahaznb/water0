@@ -1,0 +1,55 @@
+# Gradle
+.gradle/
+build/
+*/build/
+!*/src/main/**/build.gradle.kts
+!*/src/androidTest/**/build.gradle.kts
+
+# Local config
+local.properties
+*.iml
+.idea/
+*.iws
+*.ipr
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Android
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+*.jar
+*.so
+*.o
+*.lo
+*.a
+*.dll
+*.dylib
+*.bundle
+*.a
+*.la
+*.lib
+*.exp
+*.dll
+*.dylib
+*.bundle
+
+# Logs
+*.log
+
+# Hilt
+app/build/generated/hilt/
+
+# Keystore
+*.jks
+*.keystore
+keystore.properties
+
+# VS Code
+.vscode/
+!/.vscode/extensions.json
+!/.vscode/settings.json
