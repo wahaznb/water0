@@ -4,37 +4,68 @@ import android.content.Context
 import com.water0.hydration.data.local.HydrationDatabase
 import com.water0.hydration.data.repository.HydrationRepository
 import com.water0.hydration.data.repository.HydrationRepositoryImpl
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
-import javax.inject.Singleton
+import com.water0.hydration.domain.engine.RecommendationEngine
+import com.water0.hydration.domain.usecase.CalculateRecommendationUseCase
+import com.water0.hydration.domain.usecase.GetTodayProgressUseCase
+import com.water0.hydration.domain.usecase.LogHydrationUseCase
 
-@InstallIn(SingletonComponent::class)
-@Module
-object DatabaseModule {
+// Simple manual DI container - no Hilt
+object AppContainer {
+    @Volatile
+    private var database: HydrationDatabase? = null
+    
+    @Volatile
+    private var repository: HydrationRepository? = null
+    
+    @Volatile
+    private var recommendationEngine: RecommendationEngine? = null
+    
+    @Volatile
+    private var logHydrationUseCase: LogHydrationUseCase? = null
+    
+    @Volatile
+    private var getTodayProgressUseCase: GetTodayProgressUseCase? = null
+    
+    @Volatile
+    private var calculateRecommendationUseCase: CalculateRecommendationUseCase? = null
 
-    @Provides
-    @Singleton
-    fun provideDatabase(@dagger.hilt.android.qualifiers.ApplicationContext context: Context): HydrationDatabase {
-        return HydrationDatabase.getInstance(context)
+    fun getDatabase(context: Context): HydrationDatabase {
+        return database ?: synchronized(this) {
+            database ?: HydrationDatabase.getInstance(context).also { database = it }
+        }
     }
 
-    @Provides
-    fun provideHydrationEntryDao(database: HydrationDatabase) = database.hydrationEntryDao()
+    fun getRepository(context: Context): HydrationRepository {
+        return repository ?: synchronized(this) {
+            repository ?: HydrationRepositoryImpl(
+                entryDao = getDatabase(context).hydrationEntryDao(),
+                profileDao = getDatabase(context).userProfileDao(),
+                behaviorDao = getDatabase(context).userBehaviorDao()
+            ).also { repository = it }
+        }
+    }
 
-    @Provides
-    fun provideUserProfileDao(database: HydrationDatabase) = database.userProfileDao()
+    fun getRecommendationEngine(): RecommendationEngine {
+        return recommendationEngine ?: synchronized(this) {
+            recommendationEngine ?: RecommendationEngine().also { recommendationEngine = it }
+        }
+    }
 
-    @Provides
-    fun provideUserBehaviorDao(database: HydrationDatabase) = database.userBehaviorDao()
-}
+    fun getLogHydrationUseCase(context: Context): LogHydrationUseCase {
+        return logHydrationUseCase ?: synchronized(this) {
+            logHydrationUseCase ?: LogHydrationUseCase(getRepository(context)).also { logHydrationUseCase = it }
+        }
+    }
 
-@InstallIn(SingletonComponent::class)
-@Module
-object RepositoryModule {
+    fun getGetTodayProgressUseCase(context: Context): GetTodayProgressUseCase {
+        return getTodayProgressUseCase ?: synchronized(this) {
+            getTodayProgressUseCase ?: GetTodayProgressUseCase(getRepository(context), getRecommendationEngine()).also { getTodayProgressUseCase = it }
+        }
+    }
 
-    @Provides
-    @Singleton
-    fun provideHydrationRepository(impl: HydrationRepositoryImpl): HydrationRepository = impl
+    fun getCalculateRecommendationUseCase(): CalculateRecommendationUseCase {
+        return calculateRecommendationUseCase ?: synchronized(this) {
+            calculateRecommendationUseCase ?: CalculateRecommendationUseCase(getRecommendationEngine()).also { calculateRecommendationUseCase = it }
+        }
+    }
 }

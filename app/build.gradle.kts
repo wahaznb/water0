@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.hilt)
+    // alias(libs.plugins.hilt)  // TEMP: Disable Hilt
     id("kotlin-kapt")
 }
 
@@ -43,8 +43,8 @@ android {
         compose = true
     }
     
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.3"
+composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.13"
     }
     
     packaging {
@@ -61,11 +61,22 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     kapt(libs.androidx.room.compiler)
-    implementation(libs.hilt.android)
-    kapt(libs.hilt.compiler)
+    // implementation(libs.hilt.android)  // TEMP: Disable Hilt
+    // kapt(libs.hilt.compiler)  // TEMP: Disable Hilt
+    
+    // Use Compose BOM for all Compose dependencies
     implementation(platform(libs.compose.bom))
-    implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.material3)
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material3:material3-window-size-class")
+    implementation("androidx.activity:activity-compose")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose")
+    implementation("androidx.compose.foundation:foundation")
+    
     implementation(libs.androidx.appcompat)
     implementation(libs.datastore.preferences)
     implementation(libs.work.runtime.ktx)
@@ -74,8 +85,8 @@ dependencies {
     testImplementation(libs.mockk)
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(platform(libs.compose.bom))
-    androidTestImplementation(libs.compose.ui.test)
-    androidTestImplementation("androidx.compose.ui:ui-test-manifest:1.6.0-alpha01")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.compose.ui:ui-test-manifest")
     androidTestImplementation(libs.roborazzi)
 }
 

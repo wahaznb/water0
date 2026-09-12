@@ -1,0 +1,88 @@
+package com.water0.hydration.presentation.home.components
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+@Composable
+fun QuickAddButtons(
+    modifier: Modifier = Modifier,
+    onAdd: (Int) -> Unit,
+    amounts: List<Int> = listOf(100, 250, 500, 750),
+    enabled: Boolean = true
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            amounts.forEach { amount ->
+                QuickAddButton(
+                    amount = amount,
+                    onClick = { onAdd(amount) },
+                    modifier = Modifier.weight(1f),
+                    enabled = enabled
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun QuickAddButton(
+    amount: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    val label = when (amount) {
+        100 -> "100ml"
+        250 -> "250ml"
+        500 -> "500ml"
+        750 -> "750ml"
+        else -> "${amount}ml"
+    }
+    val color = when (amount) {
+        100 -> MaterialTheme.colorScheme.primaryContainer
+        250 -> MaterialTheme.colorScheme.secondaryContainer
+        500 -> MaterialTheme.colorScheme.tertiaryContainer
+        750 -> Color(0xFFBA68C8)
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+
+    Button(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .padding(horizontal = 4.dp),
+        enabled = enabled,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (enabled) color else MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Text(
+            text = label,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
