@@ -6,6 +6,24 @@ All notable changes to Water0 are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- Profile sex (female 31ml/kg / male 35ml/kg) with Room v1→v2 migration,
+  settings radio, and goal breakdown by sex
+- Swipeable pager shell (hold-and-slide across Home/History/Settings) with
+  glass bottom bar and motion-blur transition
+- Glass Lab in Settings: blur/tint/bevel sliders (defaults 23dp / 31% / 5%),
+  apply-on-restart with live pending state
+- Material icons throughout (tabs, recommendation reasons, drink entries,
+  delete, navigation); glass toast snackbars
+- Centered 280dp progress ring over static Canvas mesh gradient
+
+### Fixed
+- Evening "small sip before bed" no longer shows after goal met (gated to
+  90–99%); goal-met state shows a celebration instead of drink nudges
+- Background gradient banding: removed large-area blur blobs, subtle
+  ≤10% hydration overlay only
+- Time-flaky quiet-hours unit test (injected clock hour)
+
+### Added
 - History screen: per-day totals with progress, 7/14/30-day ranges,
   expandable day cards, working delete
 - Settings screen: profile, live goal breakdown, reminders, quiet hours,

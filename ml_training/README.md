@@ -14,8 +14,8 @@ generate_data.py  →  data/hydration_logs.csv  →  train_model.py  →  model/
 ```
 
 The simulator uses the **same goal formula as the app's
-`RecommendationEngine`** (`35ml × weight × activity + climate bonus`), so
-models stay consistent with rule-based v1.
+`RecommendationEngine`** (`31/35ml × weight × activity + climate bonus`,
+by sex), so models stay consistent with rule-based v1.
 
 > **Data honesty:** the training CSV is synthetic — no public dataset of
 > timestamped personal drink logs exists. Real grounding comes from
@@ -39,8 +39,8 @@ python generate_data.py --users 200 --days 60 --seed 42
 python train_model.py --data data/hydration_logs.csv --out-dir model
 ```
 
-Expected output (defaults): regression MAE ≈ 600 ml at R² ≈ 0.34,
-goal-met accuracy ≈ 0.72 (majority baseline ≈ 0.62). Exact numbers vary
+Expected output (defaults, seed 42): regression MAE ≈ 563 ml at R² ≈ 0.28,
+goal-met accuracy ≈ 0.72 (majority baseline ≈ 0.53). Exact numbers vary
 with `--seed`. Day-to-day intake is deliberately noisy — the model
 captures *habit-level* differences between users; the rest is irreducible
 daily randomness. That limitation is itself the point: it motivates
@@ -49,7 +49,7 @@ blending the model with the rule engine rather than trusting it blindly.
 ## What gets trained
 
 Same features the app knows at prediction time (`weight_kg`,
-`activity`, `climate`, `day_of_week`, `is_weekend`, `goal_ml`,
+`activity`, `climate`, `sex`, `day_of_week`, `is_weekend`, `goal_ml`,
 `prev_day_total_ml`, `avg_7d_ml`, `streak_days`, …):
 
 | Task | Target | Model |

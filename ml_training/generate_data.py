@@ -1,7 +1,8 @@
 """Generate a synthetic hydration dataset that mirrors the Water0 app domain.
 
 Each row is one user-day. The simulation uses the SAME goal formula as
-RecommendationEngine (35ml x weight x activity multiplier + climate bonus),
+RecommendationEngine (31/35ml x weight x activity multiplier + climate bonus,
+by sex),
 so models trained here stay consistent with the app's rule-based v1.
 
 Usage:

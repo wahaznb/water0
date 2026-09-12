@@ -30,7 +30,7 @@ from sklearn.model_selection import GroupShuffleSplit
 from sklearn.preprocessing import StandardScaler
 
 FEATURES = [
-    "weight_kg", "activity", "climate", "day_of_week", "is_weekend",
+    "weight_kg", "activity", "climate", "sex", "day_of_week", "is_weekend",
     "wake_hour", "sleep_hour", "goal_ml",
     "prev_day_total_ml", "avg_7d_ml", "streak_days",
 ]
@@ -193,6 +193,10 @@ def main() -> None:
 
     df = pd.read_csv(args.data)
     print(f"loaded {len(df)} rows, {df['user_id'].nunique()} users from {args.data}")
+    if "sex" not in df.columns:
+        # CSVs generated before the sex field used the male (35ml/kg) formula.
+        df["sex"] = 1
+        print("note: no 'sex' column in CSV, defaulting to 1 (male/35ml/kg)")
     train, test = split(df, args.seed)
     print(f"train users: {train['user_id'].nunique()}, test users: {test['user_id'].nunique()}")
 
