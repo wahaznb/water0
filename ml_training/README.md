@@ -22,6 +22,42 @@ by sex), so models stay consistent with rule-based v1.
 > NHANES/WWEIA (population intake stats) and Kaggle hydration sets; see
 > `DATA_SOURCES.md` for links and how each source is (or will be) used.
 
+## Real-data grounding (NHANES)
+`load_nhanes.py` downloads CDC NHANES 2017-2018 files, builds
+per-person daily totals + demographics (`data/nhanes_daily.csv`), and
+calibrates the simulator (`nhanes_calibration.json`):
+
+```bash
+python load_nhanes.py --out data/nhanes_daily.csv
+python load_nhanes.py --no-download   # reuse cached data/nhanes_raw/*.XPT
+```
+
+One recall per person means no sequences — so NHANES grounds the
+simulator, it doesn't replace it. Current result (n=4,931 adults):
+total-water mean 2,870 ml/d vs simulator 2,687 ml/d. Details in
+`DATA_SOURCES.md`.
+
+Direct training was also tried (`train_nhanes.py`, cross-sectional
+task): R² −0.08, i.e. single-recall demographics can't predict intake —
+day noise dominates and habit features don't exist in that data. The
+NHANES model is deliberately not shipped; the simulator remains the
+trainer. See `DATA_SOURCES.md` for the full negative result.
+
+## Personal data (your own longitudinal logs)
+
+The app exports opt-in training rows (Settings → Your data → Export
+training CSV): 90 days in this pipeline's schema, streaks pre-update
+(no leakage), profile snapshot documented per row. Retrain on it:
+
+```bash
+python train_model.py --data ~/water0-training-20260913.csv --out-dir model_personal
+```
+
+Single-user CSVs automatically get a time split (most recent 20% of
+days held out) instead of the group split — the future is what's
+tested. Expect noisy metrics under ~100 days; the value is personal
+calibration, not beating the population baselines.
+
 ## Setup
 
 ```bash
@@ -39,8 +75,8 @@ python generate_data.py --users 200 --days 60 --seed 42
 python train_model.py --data data/hydration_logs.csv --out-dir model
 ```
 
-Expected output (defaults, seed 42): regression MAE ≈ 563 ml at R² ≈ 0.28,
-goal-met accuracy ≈ 0.72 (majority baseline ≈ 0.53). Exact numbers vary
+Expected output (defaults, seed 42): regression MAE ≈ 507 ml at R² ≈ 0.35,
+goal-met accuracy ≈ 0.77 (majority baseline ≈ 0.66). Exact numbers vary
 with `--seed`. Day-to-day intake is deliberately noisy — the model
 captures *habit-level* differences between users; the rest is irreducible
 daily randomness. That limitation is itself the point: it motivates

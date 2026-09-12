@@ -15,6 +15,9 @@ All notable changes to Water0 are documented here. Format follows
 - Material icons throughout (tabs, recommendation reasons, drink entries,
   delete, navigation); glass toast snackbars
 - Centered 280dp progress ring over static Canvas mesh gradient
+- Single-Scaffold pager shell (content-only screens, shared glass snackbar)
+- Opt-in training-data export (Settings → Your data, 90-day simulator-schema
+  CSV, fully offline) + single-user time split in `train_model.py`
 
 ### Fixed
 - Evening "small sip before bed" no longer shows after goal met (gated to

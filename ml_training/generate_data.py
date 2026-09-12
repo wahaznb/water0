@@ -41,7 +41,12 @@ def simulate_user(rng: np.random.Generator, user_id: int, n_days: int) -> list[d
     wake = int(rng.integers(5, 9))
     sleep = int(rng.integers(21, 24))
     # Each user has a personal "discipline": fraction of their need they drink.
-    discipline = float(np.clip(rng.normal(0.90, 0.16), 0.45, 1.20))
+    # Calibrated against NHANES 2017-2018 (see load_nhanes.py): population
+    # total-water met-rate vs the app formula is ~0.28; mean 0.90 overshot
+    # it (sim met-rate 0.47). Mean 0.80 lands the simulator near ~0.34
+    # (exact match isn't the goal: the NHANES sample is heavier, so its
+    # formula goals run harder than the simulator's).
+    discipline = float(np.clip(rng.normal(0.80, 0.18), 0.40, 1.20))
 
     goal = daily_goal(weight, activity, climate, sex)
     rows: list[dict] = []

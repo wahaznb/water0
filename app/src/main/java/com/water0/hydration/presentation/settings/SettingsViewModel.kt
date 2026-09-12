@@ -13,7 +13,8 @@ import kotlinx.coroutines.launch
 class SettingsViewModel(
     private val repository: HydrationRepository,
     private val engine: RecommendationEngine,
-    private val calculateRecommendation: CalculateRecommendationUseCase
+    private val calculateRecommendation: CalculateRecommendationUseCase,
+    private val exportTrainingData: com.water0.hydration.domain.usecase.ExportTrainingDataUseCase? = null
 ) : ViewModel() {
 
     private val _profile = MutableStateFlow<UserProfile?>(null)
@@ -50,4 +51,10 @@ class SettingsViewModel(
     fun toggleUnits(useMetric: Boolean) = save { it.copy(useMetricUnits = useMetric) }
     fun updateSleepWindow(wakeHour: Int, sleepHour: Int) =
         save { it.copy(wakeUpHour = wakeHour, sleepHour = sleepHour) }
+
+    /** Builds the opt-in training export (last 90 days, simulator schema). */
+    suspend fun buildExportCsv(): String {
+        return exportTrainingData?.invoke(90)
+            ?: throw IllegalStateException("Export unavailable")
+    }
 }

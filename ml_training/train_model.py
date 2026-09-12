@@ -39,6 +39,15 @@ CLF_TARGET = "met_goal"
 
 
 def split(df: pd.DataFrame, seed: int = 42):
+    if df["user_id"].nunique() < 2:
+        # Single-user export (see ExportTrainingDataUseCase): groups can't
+        # split, so hold out the most recent 20% of days instead. This is
+        # the honest split for personal fine-tuning — the future is tested.
+        df = df.sort_values("day").reset_index(drop=True)
+        cut = max(1, int(len(df) * 0.8))
+        print(f"single user: time split at day {df.loc[cut, 'day']} "
+              f"({len(df) - cut} test days)")
+        return df.iloc[:cut], df.iloc[cut:]
     splitter = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=seed)
     train_idx, test_idx = next(splitter.split(df, groups=df["user_id"]))
     return df.iloc[train_idx], df.iloc[test_idx]

@@ -62,11 +62,44 @@ against independent recommendations.
 ## Roadmap to real data (honest order)
 
 1. ✅ Synthetic simulator (done — behavior sequences we can't get elsewhere)
-2. ⬜ NHANES loader: parse `.XPT` recalls → per-person daily totals +
-   demographics → calibration report vs simulator
-3. ⬜ Kaggle sets as secondary validation
-4. ⬜ Long-term: the app's **own on-device data** (opt-in, stays on phone;
-   personal fine-tuning beats any population dataset)
+2. ✅ NHANES loader (done — `load_nhanes.py`, CDC 2017-2018, n=4,931 adults):
+   `python load_nhanes.py --out data/nhanes_daily.csv` downloads the four
+   `.XPT` files to `data/nhanes_raw/`, merges on SEQN, keeps reliable
+   adult recalls, and writes per-person rows + `nhanes_calibration.json`.
+   Fair comparator is **total water** (`DR1TMOIS`, all food/drink
+   moisture), not plain water alone (understates intake ~40%).
+   Headline 2017-2018 result: NHANES total-water mean 2,870 ml/d
+   (F 2,626 / M 3,127) vs simulator 2,687 ml/d (F 2,550 / M 2,822) —
+   within ~10%. Population total-water met-rate vs the app formula is
+   0.28 vs the simulator's 0.34 (discipline mean tuned 0.90 → 0.80 to
+   close the original 0.47 gap). Re-run the loader to
+   reproduce; raw XPTs are gitignored, the JSON report is committed.
+3. ⏭️ Kaggle sets — skipped: NHANES proved sufficient for grounding,
+   and one-row-per-person sets can't train the sequence task anyway.
+   (A `load_kaggle.py` adapter was prototyped and removed; ask to
+   resurrect it if a longitudinal Kaggle set appears.)
+4. ✅ Long-term: the app's **own on-device data** (shipped — Settings →
+   Your data → Export training CSV; opt-in, 90 days, simulator schema,
+   never uploaded). `train_model.py` detects single-user CSVs and holds
+   out the most recent 20% of days instead of group-splitting. Personal
+   fine-tuning loop is open; on-device retraining stays future work.
+
+## Direct training on NHANES (tried — negative result, kept honest)
+
+`train_nhanes.py` trains the cross-sectional task on `nhanes_daily.csv`
+(one row per person: predict total water from weight/activity/sex/age/
+weekday/goal). Result (n=4,931, seed 42): regression MAE 1,123 ml at
+R² **−0.08** (worse than predicting the mean, MAE 1,090), classifier
+accuracy 0.70 vs majority baseline 0.72. Only `age_yr` carries signal;
+the coarse PAQ activity map carries none.
+
+Verdict: single-recall demographics cannot train intake prediction —
+one day's intake is dominated by day noise, and habit features
+(`prev_day_total_ml`, `avg_7d_ml`, `streak_days`) don't exist in
+single-recall data. The NHANES model is **not shipped**. The pipeline
+stands: simulator trains (it has behavior sequences), NHANES calibrates
+(distributions + goal formula). Real training data worth having is
+longitudinal — i.e. the app's own opt-in logs (step 4).
 
 ## What NOT to use
 

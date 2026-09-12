@@ -1,6 +1,8 @@
 package com.water0.hydration.presentation.settings
 
 import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +18,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -23,7 +26,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +46,7 @@ import com.water0.hydration.di.AppContainer
 import com.water0.hydration.ui.theme.glassCardBorder
 import com.water0.hydration.ui.theme.glassCardContainer
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 class SettingsViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
@@ -48,7 +54,8 @@ class SettingsViewModelFactory(private val context: Context) : ViewModelProvider
         return SettingsViewModel(
             AppContainer.getRepository(context),
             AppContainer.getRecommendationEngine(),
-            AppContainer.getCalculateRecommendationUseCase()
+            AppContainer.getCalculateRecommendationUseCase(),
+            AppContainer.getExportTrainingDataUseCase(context)
         ) as T
     }
 }
@@ -97,6 +104,7 @@ fun SettingsScreen(
                     UnitsSection(profile = current, viewModel = viewModel)
                     AppearanceSection(darkTheme = darkTheme, onToggleTheme = onToggleTheme)
                     GlassLabSection()
+                    DataSection(viewModel = viewModel)
                 }
             }
         }
@@ -478,6 +486,66 @@ private fun GlassLabSection() {
         } else {
             Text(
                 text = "Defaults: 23dp blur, 31% tint, 5% bevel.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun DataSection(viewModel: SettingsViewModel) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var pendingCsv by remember { mutableStateOf<String?>(null) }
+    var status by remember { mutableStateOf<String?>(null) }
+
+    val saver = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        val csv = pendingCsv
+        pendingCsv = null
+        if (uri == null || csv == null) return@rememberLauncherForActivityResult
+        status = try {
+            context.contentResolver.openOutputStream(uri)?.use { out ->
+                out.write(csv.toByteArray())
+            }
+            "Saved — fully offline, nothing leaves your phone."
+        } catch (e: Exception) {
+            "Export failed: ${e.message}"
+        }
+    }
+
+    SectionCard(title = "Your data") {
+        Text(
+            text = "Export the last 90 days as training rows (same format " +
+                "the ML pipeline uses). Opt-in, stored wherever you choose, " +
+                "never uploaded.",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        OutlinedButton(
+            onClick = {
+                status = null
+                scope.launch {
+                    status = try {
+                        pendingCsv = viewModel.buildExportCsv()
+                        val stamp = java.text.SimpleDateFormat(
+                            "yyyyMMdd", java.util.Locale.US
+                        ).format(java.util.Date())
+                        saver.launch("water0-training-$stamp.csv")
+                        null // result text arrives after the file picker
+                    } catch (e: Exception) {
+                        "Export failed: ${e.message}"
+                    }
+                }
+            }
+        ) {
+            Text("Export training CSV")
+        }
+        status?.let {
+            Text(
+                text = it,
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

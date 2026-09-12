@@ -92,6 +92,17 @@ object AppContainer {
         }
     }
 
+    @Volatile
+    private var exportTrainingDataUseCase: com.water0.hydration.domain.usecase.ExportTrainingDataUseCase? = null
+
+    fun getExportTrainingDataUseCase(context: Context): com.water0.hydration.domain.usecase.ExportTrainingDataUseCase {
+        return exportTrainingDataUseCase ?: synchronized(this) {
+            exportTrainingDataUseCase ?: com.water0.hydration.domain.usecase.ExportTrainingDataUseCase(
+                getRepository(context), getRecommendationEngine()
+            ).also { exportTrainingDataUseCase = it }
+        }
+    }
+
     fun getNotificationScheduler(context: Context): com.water0.hydration.presentation.notification.NotificationScheduler {
         return notificationScheduler ?: synchronized(this) {
             notificationScheduler ?: com.water0.hydration.presentation.notification.NotificationScheduler(
