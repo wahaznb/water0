@@ -116,21 +116,27 @@ fun SettingsScreen(
                 )
             }
         } else {
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(16.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                ProfileSection(profile = current, viewModel = viewModel)
-                GoalSection(profile = current, viewModel = viewModel)
-                RemindersSection(profile = current, viewModel = viewModel)
-                SleepSection(profile = current, viewModel = viewModel)
-                UnitsSection(profile = current, viewModel = viewModel)
-                AppearanceSection(darkTheme = darkTheme, onToggleTheme = onToggleTheme)
-                GlassLabSection()
+                com.water0.hydration.ui.theme.AuroraBackground(modifier = Modifier.fillMaxSize())
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    ProfileSection(profile = current, viewModel = viewModel)
+                    GoalSection(profile = current, viewModel = viewModel)
+                    RemindersSection(profile = current, viewModel = viewModel)
+                    SleepSection(profile = current, viewModel = viewModel)
+                    UnitsSection(profile = current, viewModel = viewModel)
+                    AppearanceSection(darkTheme = darkTheme, onToggleTheme = onToggleTheme)
+                    GlassLabSection()
+                }
             }
         }
     }
