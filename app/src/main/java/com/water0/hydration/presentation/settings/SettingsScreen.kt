@@ -15,22 +15,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -48,8 +38,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.water0.hydration.data.local.entity.UserProfile
 import com.water0.hydration.di.AppContainer
-import com.water0.hydration.presentation.navigation.BottomNavBar
-import com.water0.hydration.presentation.navigation.Routes
 import com.water0.hydration.ui.theme.glassCardBorder
 import com.water0.hydration.ui.theme.glassCardContainer
 import kotlin.math.roundToInt
@@ -65,48 +53,25 @@ class SettingsViewModelFactory(private val context: Context) : ViewModelProvider
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// Content-only: the single Scaffold (top bar, glass bottom bar) lives in
+// MainActivity.
 @Composable
 fun SettingsScreen(
-    onBackClick: () -> Unit,
-    onNavigate: (String) -> Unit = {},
-    showBottomBar: Boolean = true,
     darkTheme: Boolean = true,
     onToggleTheme: (Boolean) -> Unit = {},
+    modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = viewModel(
         factory = SettingsViewModelFactory(LocalContext.current)
     )
 ) {
     val profile by viewModel.profile.collectAsStateWithLifecycle()
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            if (showBottomBar) {
-                BottomNavBar(selected = Routes.SETTINGS, onSelect = onNavigate)
-            }
-        },
-        topBar = {
-            TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
-            )
-        }
-    ) { paddingValues ->
+    Box(modifier = modifier.fillMaxSize()) {
         val current = profile
         if (current == null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
                     .padding(top = 100.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -116,11 +81,7 @@ fun SettingsScreen(
                 )
             }
         } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
+            Box(modifier = Modifier.fillMaxSize()) {
                 com.water0.hydration.ui.theme.AuroraBackground(modifier = Modifier.fillMaxSize())
                 Column(
                     modifier = Modifier

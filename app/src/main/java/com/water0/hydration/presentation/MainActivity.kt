@@ -14,7 +14,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,7 +35,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -38,6 +51,7 @@ import com.water0.hydration.presentation.navigation.GlassBottomBar
 import com.water0.hydration.presentation.navigation.Routes
 import com.water0.hydration.presentation.settings.SettingsScreen
 import com.water0.hydration.ui.theme.GlassPrefs
+import com.water0.hydration.ui.theme.GlassSnackbar
 import com.water0.hydration.ui.theme.Water0
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
@@ -61,7 +75,10 @@ class MainActivity : ComponentActivity() {
     private val notificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* best-effort */ }
 
-    @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+    @OptIn(
+        androidx.compose.foundation.ExperimentalFoundationApi::class,
+        androidx.compose.material3.ExperimentalMaterial3Api::class
+    )
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         seedDefaults()
@@ -97,7 +114,71 @@ class MainActivity : ComponentActivity() {
                     }
                     Unit
                 }
+                // Single Scaffold for the whole pager shell: one top bar
+                // (per page), one glass bottom bar, one snackbar host.
+                // Screens are content-only and share the host.
+                val snackbarHostState = remember { SnackbarHostState() }
                 Scaffold(
+                    snackbarHost = {
+                        SnackbarHost(snackbarHostState) { data ->
+                            GlassSnackbar(message = data.visuals.message)
+                        }
+                    },
+                    containerColor = MaterialTheme.colorScheme.background,
+                    topBar = {
+                        val topColors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            titleContentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                        when (pagerState.currentPage) {
+                            1 -> TopAppBar(
+                                title = {
+                                    Text(
+                                        "History",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 20.sp
+                                    )
+                                },
+                                colors = topColors
+                            )
+                            2 -> TopAppBar(
+                                title = {
+                                    Text(
+                                        "Settings",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 20.sp
+                                    )
+                                },
+                                navigationIcon = {
+                                    IconButton(onClick = { navigate(Routes.HOME) }) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                            contentDescription = "Back"
+                                        )
+                                    }
+                                },
+                                colors = topColors
+                            )
+                            else -> TopAppBar(
+                                title = {
+                                    Text(
+                                        "Water0",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 20.sp
+                                    )
+                                },
+                                colors = topColors,
+                                actions = {
+                                    IconButton(onClick = { navigate(Routes.SETTINGS) }) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Settings,
+                                            contentDescription = "Settings"
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    },
                     bottomBar = {
                         GlassBottomBar(
                             selected = selected,
@@ -142,18 +223,12 @@ class MainActivity : ComponentActivity() {
                                 when (page) {
                                     0 -> HomeScreen(
                                         viewModel = viewModel,
-                                        onSettingsClick = { navigate(Routes.SETTINGS) },
-                                        onNavigate = navigate,
-                                        showBottomBar = false
+                                        snackbarHostState = snackbarHostState
                                     )
                                     1 -> HistoryScreen(
-                                        onNavigate = navigate,
-                                        showBottomBar = false
+                                        snackbarHostState = snackbarHostState
                                     )
                                     else -> SettingsScreen(
-                                        onBackClick = { navigate(Routes.HOME) },
-                                        onNavigate = navigate,
-                                        showBottomBar = false,
                                         darkTheme = darkTheme,
                                         onToggleTheme = { enabled ->
                                             darkTheme = enabled

@@ -18,16 +18,10 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
@@ -41,8 +35,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.water0.hydration.domain.engine.RecommendationEngine
@@ -50,23 +42,20 @@ import com.water0.hydration.presentation.home.components.ProgressRing
 import com.water0.hydration.presentation.home.components.QuickAddButtons
 import com.water0.hydration.presentation.home.components.RecommendationCard
 import com.water0.hydration.presentation.home.components.TodayEntriesList
-import com.water0.hydration.presentation.navigation.BottomNavBar
-import com.water0.hydration.presentation.navigation.Routes
 import com.water0.hydration.ui.theme.AuroraBackground
-import com.water0.hydration.ui.theme.Glass
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+// Content-only: the single Scaffold (top bar, glass bottom bar, snackbar
+// host) lives in MainActivity. The host is passed in so toasts render in
+// the shared GlassSnackbar.
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
-    onSettingsClick: () -> Unit = {},
-    onNavigate: (String) -> Unit = {},
-    showBottomBar: Boolean = true
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     fun notify(message: String) {
@@ -91,41 +80,7 @@ fun HomeScreen(
         label = "hydrationTint"
     )
 
-    Scaffold(
-        snackbarHost = {
-            SnackbarHost(snackbarHostState) { data ->
-                com.water0.hydration.ui.theme.GlassSnackbar(message = data.visuals.message)
-            }
-        },
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            if (showBottomBar) {
-                BottomNavBar(selected = Routes.HOME, onSelect = onNavigate)
-            }
-        },
-        topBar = {
-            TopAppBar(
-                title = { Text("Water0", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                ),
-                actions = {
-                    androidx.compose.material3.IconButton(onClick = onSettingsClick) {
-                        androidx.compose.material3.Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Filled.Settings,
-                            contentDescription = "Settings"
-                        )
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
+    Box(modifier = modifier.fillMaxSize()) {
             AuroraBackground(
                 modifier = Modifier.fillMaxSize(),
                 hydrationTint = hydrationTint
@@ -222,7 +177,6 @@ fun HomeScreen(
             }
         }
     }
-}
 
 // Subtle overlay tint per hydration state, drawn INSIDE the static mesh
 // (alpha <=0.10 so no banding). Behind = plum wash, ahead = teal wash,

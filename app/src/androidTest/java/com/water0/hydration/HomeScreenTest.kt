@@ -28,7 +28,16 @@ import org.junit.runner.RunWith
 // so the fake lives here. Mirrors FakeHydrationRepository.
 private class TestRepository : HydrationRepository {
     private val entries = MutableStateFlow<List<HydrationEntry>>(emptyList())
-    private val profile = MutableStateFlow(UserProfile()) // 70kg/moderate -> goal 3140
+    private val profile = MutableStateFlow(
+        // Explicit male to pin the goal: 70kg/moderate/temperate -> 3140 ml.
+        // (Default profile is female -> 2804 ml.)
+        UserProfile(
+            weightKg = 70f,
+            activityLevel = UserProfile.ActivityLevel.MODERATE,
+            climate = UserProfile.Climate.TEMPERATE,
+            sex = UserProfile.Sex.MALE
+        )
+    )
     private val behavior = MutableStateFlow(UserBehavior())
     private var nextId = 1L
 

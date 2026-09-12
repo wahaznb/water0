@@ -22,7 +22,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -30,13 +29,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,8 +53,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.water0.hydration.di.AppContainer
 import com.water0.hydration.domain.usecase.GetHistoryUseCase
 import com.water0.hydration.presentation.home.components.EntryListItem
-import com.water0.hydration.presentation.navigation.BottomNavBar
-import com.water0.hydration.presentation.navigation.Routes
 import com.water0.hydration.ui.theme.glassCardBorder
 import com.water0.hydration.ui.theme.glassCardContainer
 import kotlinx.coroutines.launch
@@ -74,43 +67,21 @@ class HistoryViewModelFactory(private val context: Context) : ViewModelProvider.
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// Content-only: the single Scaffold (top bar, glass bottom bar, snackbar
+// host) lives in MainActivity.
 @Composable
 fun HistoryScreen(
-    onNavigate: (String) -> Unit = {},
-    showBottomBar: Boolean = true,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    modifier: Modifier = Modifier,
     viewModel: HistoryViewModel = viewModel(
         factory = HistoryViewModelFactory(LocalContext.current)
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val daysBack by viewModel.daysBack.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text("History", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
-            )
-        },
-        bottomBar = {
-            if (showBottomBar) {
-                BottomNavBar(selected = Routes.HISTORY, onSelect = onNavigate)
-            }
-        }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
+    Box(modifier = modifier.fillMaxSize()) {
             com.water0.hydration.ui.theme.AuroraBackground(modifier = Modifier.fillMaxSize())
             Column(
                 modifier = Modifier
@@ -185,7 +156,6 @@ fun HistoryScreen(
                         }
                     }
                 }
-            }
             }
         }
     }
