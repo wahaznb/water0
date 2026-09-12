@@ -48,7 +48,7 @@ class RecommendationEngine {
 
     fun calculateDailyGoal(profile: UserProfile): DailyGoal {
         val base = (35f * profile.weightKg * profile.activityLevel.multiplier).roundToInt()
-        val activityExtra = base * (profile.activityLevel.multiplier - 1f).roundToInt()
+        val activityExtra = (base * (profile.activityLevel.multiplier - 1f)).roundToInt()
         val climateExtra = profile.climate.extraMlPerDay
         val total = base + climateExtra
         return DailyGoal(base, activityExtra, climateExtra, total)

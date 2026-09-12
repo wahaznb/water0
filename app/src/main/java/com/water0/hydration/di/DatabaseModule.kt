@@ -37,6 +37,9 @@ object AppContainer {
     @Volatile
     private var getHistoryUseCase: GetHistoryUseCase? = null
 
+    @Volatile
+    private var notificationScheduler: com.water0.hydration.presentation.notification.NotificationScheduler? = null
+
     fun getDatabase(context: Context): HydrationDatabase {
         return database ?: synchronized(this) {
             database ?: HydrationDatabase.getInstance(context).also { database = it }
@@ -86,6 +89,14 @@ object AppContainer {
     fun getGetHistoryUseCase(context: Context): GetHistoryUseCase {
         return getHistoryUseCase ?: synchronized(this) {
             getHistoryUseCase ?: GetHistoryUseCase(getRepository(context), getRecommendationEngine()).also { getHistoryUseCase = it }
+        }
+    }
+
+    fun getNotificationScheduler(context: Context): com.water0.hydration.presentation.notification.NotificationScheduler {
+        return notificationScheduler ?: synchronized(this) {
+            notificationScheduler ?: com.water0.hydration.presentation.notification.NotificationScheduler(
+                context.applicationContext
+            ).also { notificationScheduler = it }
         }
     }
 }

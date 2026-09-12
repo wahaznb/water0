@@ -17,6 +17,11 @@ The simulator uses the **same goal formula as the app's
 `RecommendationEngine`** (`35ml × weight × activity + climate bonus`), so
 models stay consistent with rule-based v1.
 
+> **Data honesty:** the training CSV is synthetic — no public dataset of
+> timestamped personal drink logs exists. Real grounding comes from
+> NHANES/WWEIA (population intake stats) and Kaggle hydration sets; see
+> `DATA_SOURCES.md` for links and how each source is (or will be) used.
+
 ## Setup
 
 ```bash
