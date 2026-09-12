@@ -56,3 +56,6 @@ keystore.properties
 
 # Local-only learning notes (never push)
 learning-guide/
+
+# ...except the Gradle wrapper jar, which CI needs to run ./gradlew
+!gradle-wrapper.jar
