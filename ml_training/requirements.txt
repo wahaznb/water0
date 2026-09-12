@@ -1,0 +1,8 @@
+# Core pipeline (CPU-only, verified working)
+numpy
+pandas
+scikit-learn
+
+# Optional: only needed for the Keras -> TFLite export step in train_model.py.
+# The sklearn baseline trains and evaluates without it.
+# tensorflow

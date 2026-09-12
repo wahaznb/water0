@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+# Regenerated deterministically by generate_data.py / train_model.py
+data/
+model/

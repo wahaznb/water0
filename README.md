@@ -22,5 +22,21 @@ Open-source Android app for tracking hydration with personalized recommendations
 ./gradlew assembleDebug
 ```
 
+## Machine learning (Python, offline)
+
+`ml_training/` holds the Python side: a synthetic data generator and a
+training script (scikit-learn baselines + optional Keras → TFLite export
+for future on-device use). The Android app itself stays fully offline.
+
+```bash
+cd ml_training
+pip install -r requirements.txt
+python generate_data.py
+python train_model.py
+```
+
+See `ml_training/README.md` for the pipeline, Android integration plan,
+and methodology notes.
+
 ## License
 Apache 2.0 - see LICENSE file
