@@ -6,6 +6,8 @@ import com.water0.hydration.data.repository.HydrationRepository
 import com.water0.hydration.data.repository.HydrationRepositoryImpl
 import com.water0.hydration.domain.engine.RecommendationEngine
 import com.water0.hydration.domain.usecase.CalculateRecommendationUseCase
+import com.water0.hydration.domain.usecase.DeleteHydrationUseCase
+import com.water0.hydration.domain.usecase.GetHistoryUseCase
 import com.water0.hydration.domain.usecase.GetTodayProgressUseCase
 import com.water0.hydration.domain.usecase.LogHydrationUseCase
 
@@ -28,6 +30,12 @@ object AppContainer {
     
     @Volatile
     private var calculateRecommendationUseCase: CalculateRecommendationUseCase? = null
+
+    @Volatile
+    private var deleteHydrationUseCase: DeleteHydrationUseCase? = null
+
+    @Volatile
+    private var getHistoryUseCase: GetHistoryUseCase? = null
 
     fun getDatabase(context: Context): HydrationDatabase {
         return database ?: synchronized(this) {
@@ -66,6 +74,18 @@ object AppContainer {
     fun getCalculateRecommendationUseCase(): CalculateRecommendationUseCase {
         return calculateRecommendationUseCase ?: synchronized(this) {
             calculateRecommendationUseCase ?: CalculateRecommendationUseCase(getRecommendationEngine()).also { calculateRecommendationUseCase = it }
+        }
+    }
+
+    fun getDeleteHydrationUseCase(context: Context): DeleteHydrationUseCase {
+        return deleteHydrationUseCase ?: synchronized(this) {
+            deleteHydrationUseCase ?: DeleteHydrationUseCase(getRepository(context)).also { deleteHydrationUseCase = it }
+        }
+    }
+
+    fun getGetHistoryUseCase(context: Context): GetHistoryUseCase {
+        return getHistoryUseCase ?: synchronized(this) {
+            getHistoryUseCase ?: GetHistoryUseCase(getRepository(context), getRecommendationEngine()).also { getHistoryUseCase = it }
         }
     }
 }

@@ -23,6 +23,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -42,12 +43,16 @@ import com.water0.hydration.presentation.home.components.ProgressRing
 import com.water0.hydration.presentation.home.components.QuickAddButtons
 import com.water0.hydration.presentation.home.components.RecommendationCard
 import com.water0.hydration.presentation.home.components.TodayEntriesList
+import com.water0.hydration.presentation.navigation.BottomNavBar
+import com.water0.hydration.presentation.navigation.Routes
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    onSettingsClick: () -> Unit = {},
+    onNavigate: (String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -62,13 +67,21 @@ fun HomeScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = {
+            BottomNavBar(selected = Routes.HOME, onSelect = onNavigate)
+        },
         topBar = {
             TopAppBar(
                 title = { Text("Water0", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
+                ),
+                actions = {
+                    TextButton(onClick = onSettingsClick) {
+                        Text(text = "⚙️", fontSize = 20.sp)
+                    }
+                }
             )
         }
     ) { paddingValues ->
