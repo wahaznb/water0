@@ -20,8 +20,15 @@ class UseCaseTest {
 
     @Before
     fun setUp() {
-        // 70kg / moderate / temperate -> goal 3140 ml.
-        repository = FakeHydrationRepository()
+        // 70kg / moderate / temperate / male -> goal 3140 ml.
+        repository = FakeHydrationRepository(
+            initialProfile = UserProfile(
+                weightKg = 70f,
+                activityLevel = UserProfile.ActivityLevel.MODERATE,
+                climate = UserProfile.Climate.TEMPERATE,
+                sex = UserProfile.Sex.MALE
+            )
+        )
         engine = RecommendationEngine()
     }
 
@@ -74,7 +81,7 @@ class UseCaseTest {
     @Test
     fun `goal breakdown explains the total`() {
         val breakdown = CalculateRecommendationUseCase(engine)(
-            UserProfile(weightKg = 70f)
+            UserProfile(weightKg = 70f, sex = UserProfile.Sex.MALE)
         )
         assertEquals(3140, breakdown.totalMl)
         assertTrue(breakdown.explanation.contains("3140"))

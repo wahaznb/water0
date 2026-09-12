@@ -76,6 +76,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx")
     implementation("androidx.lifecycle:lifecycle-runtime-compose")
     implementation("androidx.compose.foundation:foundation")
+    implementation(libs.compose.material.icons.extended)
     
     implementation(libs.androidx.appcompat)
     implementation(libs.datastore.preferences)

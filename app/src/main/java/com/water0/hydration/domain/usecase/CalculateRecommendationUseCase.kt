@@ -28,15 +28,17 @@ class CalculateRecommendationUseCase(
     }
 
     private fun buildExplanation(profile: UserProfile, goal: RecommendationEngine.DailyGoal): String {
+        val perKg = profile.sex.baseMlPerKg.toInt()
         return buildString {
             appendLine("Your Daily Goal: ${goal.totalMl}ml")
             appendLine()
             appendLine("Breakdown:")
-            appendLine("• Base (35ml/kg × ${profile.weightKg}kg): ${goal.baseMl}ml")
+            appendLine("• Base (${perKg}ml/kg × ${profile.weightKg}kg × ${profile.activityLevel.name}, ${profile.sex.name.lowercase()}): ${goal.baseMl}ml")
             appendLine("• Activity (${profile.activityLevel.name}): +${goal.activityExtraMl}ml")
             appendLine("• Climate (${profile.climate.name}): +${goal.climateExtraMl}ml")
             appendLine()
-            appendLine("Formula: 35ml × weight × activity_multiplier + climate_bonus")
+            appendLine("Formula: ${perKg}ml × weight × activity_multiplier + climate_bonus")
+            appendLine("Base by sex: Female=31ml/kg, Male=35ml/kg")
             appendLine("Activity multipliers: Sedentary=1.0, Light=1.1, Moderate=1.2, Active=1.3, Very Active=1.4")
             appendLine("Climate bonuses: Cold=0, Temperate=200, Hot=500, Very Hot=800ml")
         }

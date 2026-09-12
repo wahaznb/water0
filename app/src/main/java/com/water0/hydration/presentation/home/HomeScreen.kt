@@ -38,10 +38,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.water0.hydration.domain.engine.RecommendationEngine
@@ -60,7 +61,8 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     viewModel: HomeViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     onSettingsClick: () -> Unit = {},
-    onNavigate: (String) -> Unit = {}
+    onNavigate: (String) -> Unit = {},
+    showBottomBar: Boolean = true
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
@@ -80,20 +82,26 @@ fun HomeScreen(
         }
     }
 
-    // Living background: drifts with hydration state so the whole screen
-    // reflects behind/ahead at a glance. Animated for smooth transitions.
-    val backgroundTarget = backgroundFor(uiState)
-    val background by animateColorAsState(
-        targetValue = backgroundTarget,
+    // Living tint: subtle overlay inside the static mesh gradient (no
+    // full-screen containerColor animation — that banded with the blobs).
+    val hydrationTarget = hydrationTintFor(uiState)
+    val hydrationTint by animateColorAsState(
+        targetValue = hydrationTarget,
         animationSpec = tween(durationMillis = 1000),
-        label = "background"
+        label = "hydrationTint"
     )
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = background,
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                com.water0.hydration.ui.theme.GlassSnackbar(message = data.visuals.message)
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            BottomNavBar(selected = Routes.HOME, onSelect = onNavigate)
+            if (showBottomBar) {
+                BottomNavBar(selected = Routes.HOME, onSelect = onNavigate)
+            }
         },
         topBar = {
             TopAppBar(
@@ -103,8 +111,11 @@ fun HomeScreen(
                     titleContentColor = MaterialTheme.colorScheme.onSurface
                 ),
                 actions = {
-                    TextButton(onClick = onSettingsClick) {
-                        Text(text = "Settings", fontSize = 14.sp)
+                    androidx.compose.material3.IconButton(onClick = onSettingsClick) {
+                        androidx.compose.material3.Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Filled.Settings,
+                            contentDescription = "Settings"
+                        )
                     }
                 }
             )
@@ -115,24 +126,27 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            AuroraBackground(modifier = Modifier.fillMaxSize())
+            AuroraBackground(
+                modifier = Modifier.fillMaxSize(),
+                hydrationTint = hydrationTint
+            )
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 when (val state = uiState) {
                     is HomeViewModel.UiState.Success -> {
                         ProgressRing(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp),
+                                .padding(top = 12.dp),
                             progress = state.percentage / 100f,
                             totalMl = state.totalEffectiveMl,
                             goalMl = state.goalMl,
-                            size = 220
+                            size = 280
                         )
 
                         StatusIndicator(status = state.status)
@@ -210,26 +224,25 @@ fun HomeScreen(
     }
 }
 
-// Background tint per hydration state. Behind = muted plum deepening the
-// further behind; on track = plain theme background; ahead = deep teal
-// that strengthens past the goal; over the cap = dark maroon warning.
+// Subtle overlay tint per hydration state, drawn INSIDE the static mesh
+// (alpha <=0.10 so no banding). Behind = plum wash, ahead = teal wash,
+// over = maroon wash, on-track = transparent.
 @Composable
-private fun backgroundFor(uiState: HomeViewModel.UiState): Color {
-    val base = MaterialTheme.colorScheme.background
-    val state = uiState as? HomeViewModel.UiState.Success ?: return base
+private fun hydrationTintFor(uiState: HomeViewModel.UiState): Color {
+    val state = uiState as? HomeViewModel.UiState.Success ?: return Color.Transparent
     return when (state.status) {
         RecommendationEngine.HydrationStatus.Status.OVER ->
-            Color(0xFF3D1A24)
+            Color(0xFF3D1A24).copy(alpha = 0.10f)
         RecommendationEngine.HydrationStatus.Status.BEHIND -> {
-            val depth = ((70 - state.percentage.coerceAtMost(70)) / 70f * 0.55f)
-                .coerceIn(0f, 0.55f)
-            lerp(base, Color(0xFF33202E), depth)
+            val depth = ((70 - state.percentage.coerceAtMost(70)) / 70f * 0.10f)
+                .coerceIn(0f, 0.10f)
+            Color(0xFF33202E).copy(alpha = depth)
         }
-        RecommendationEngine.HydrationStatus.Status.ON_TRACK -> base
+        RecommendationEngine.HydrationStatus.Status.ON_TRACK -> Color.Transparent
         RecommendationEngine.HydrationStatus.Status.AHEAD -> {
-            val glow = (((state.percentage - 100).coerceAtLeast(0)) / 40f * 0.6f)
-                .coerceIn(0f, 0.6f)
-            lerp(base, Color(0xFF12333B), glow)
+            val glow = (((state.percentage - 100).coerceAtLeast(0)) / 40f * 0.10f)
+                .coerceIn(0f, 0.10f)
+            Color(0xFF12333B).copy(alpha = glow)
         }
     }
 }

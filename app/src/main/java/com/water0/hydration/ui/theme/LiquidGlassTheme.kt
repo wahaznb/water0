@@ -1,22 +1,12 @@
 package com.water0.hydration.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -104,10 +94,9 @@ object GlassColors {
     )
 }
 
-// Shared glass constants + helpers. Frosted-glass look = translucent fill
-// + hairline border + layered shadow. Real backdrop blur is deliberately
-// limited to two static decorative blobs (AuroraBackground): blur is a GPU
-// effect and stays cheap only on small, non-animated areas.
+// Shared glass constants + helpers. Frosted-glass look = Haze behind-blur
+// (small chrome only) + translucent tint + hairline border + top bevel
+// highlight. Full-screen blur is never used — it bands and drops frames.
 object Glass {
     const val CARD_ALPHA = 0.72f
     const val BORDER_ALPHA = 0.22f
@@ -119,49 +108,79 @@ fun glassCardContainer(): Color =
     MaterialTheme.colorScheme.surface.copy(alpha = Glass.CARD_ALPHA)
 
 @Composable
-fun glassCardBorder(): BorderStroke =
+fun glassCardBorder(bevelAlpha: Float = GlassConfig.Defaults.BEVEL_ALPHA): BorderStroke =
     BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = Glass.BORDER_ALPHA))
 
-// Two soft color blobs behind content. Blur applies only on API 31+;
-// below that the blobs render unblurred (still translucent, still cheap).
+// BlockAds-style state tint for cards: subtle, never full-screen flash.
 @Composable
-fun AuroraBackground(modifier: Modifier = Modifier) {
-    val soft: Modifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        Modifier.blur(64.dp)
-    } else {
-        Modifier
+fun statusTint(
+    percentage: Int,
+    status: com.water0.hydration.domain.engine.RecommendationEngine.HydrationStatus.Status?
+): Color {
+    return when (status) {
+        com.water0.hydration.domain.engine.RecommendationEngine.HydrationStatus.Status.BEHIND ->
+            MaterialTheme.colorScheme.error.copy(alpha = 0.08f)
+        com.water0.hydration.domain.engine.RecommendationEngine.HydrationStatus.Status.AHEAD ->
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+        com.water0.hydration.domain.engine.RecommendationEngine.HydrationStatus.Status.OVER ->
+            MaterialTheme.colorScheme.error.copy(alpha = 0.14f)
+        else -> Color.Transparent
     }
-    Box(modifier = modifier) {
-        Box(
-            modifier = Modifier
-                .size(280.dp)
-                .offset(x = (-80).dp, y = (-60).dp)
-                .then(soft)
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.30f),
-                            Color.Transparent
-                        )
-                    )
-                )
+}
+
+// Fixed mesh background: 3 Canvas-drawn radial gradients, NO Modifier.blur
+// on large areas (that caused banding/artifacts + GPU cost). Haze blur is
+// reserved for the small bottom bar / dialogs. Drift is via slow offset
+// animation in the caller if desired — this composable itself is static.
+@Composable
+fun AuroraBackground(
+    modifier: Modifier = Modifier,
+    hydrationTint: Color = Color.Transparent
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    val secondary = MaterialTheme.colorScheme.secondary
+    val tertiary = MaterialTheme.colorScheme.tertiary
+    androidx.compose.foundation.Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        // Top-left water-blue wash.
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    primary.copy(alpha = 0.22f),
+                    Color.Transparent
+                ),
+                center = androidx.compose.ui.geometry.Offset(w * 0.12f, h * 0.06f),
+                radius = w * 0.75f
+            ),
+            size = size
         )
-        Box(
-            modifier = Modifier
-                .size(240.dp)
-                .align(Alignment.BottomEnd)
-                .offset(x = 70.dp, y = 80.dp)
-                .then(soft)
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.secondary.copy(alpha = 0.24f),
-                            Color.Transparent
-                        )
-                    )
-                )
+        // Bottom-right cyan wash.
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    secondary.copy(alpha = 0.16f),
+                    Color.Transparent
+                ),
+                center = androidx.compose.ui.geometry.Offset(w * 0.92f, h * 0.94f),
+                radius = w * 0.70f
+            ),
+            size = size
         )
+        // Faint violet core to avoid flat mid-tone.
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    tertiary.copy(alpha = 0.10f),
+                    Color.Transparent
+                ),
+                center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.45f),
+                radius = w * 0.55f
+            ),
+            size = size
+        )
+        if (hydrationTint != Color.Transparent) {
+            drawRect(color = hydrationTint, size = size)
+        }
     }
 }

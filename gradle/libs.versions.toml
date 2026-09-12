@@ -40,6 +40,7 @@ junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.r
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
 compose-ui-test = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

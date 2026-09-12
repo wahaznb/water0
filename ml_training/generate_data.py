@@ -27,20 +27,22 @@ HOURLY_P = np.array([
 ])
 
 
-def daily_goal(weight_kg: float, activity: int, climate: int) -> float:
-    return 35.0 * weight_kg * ACTIVITY_MULT[activity] + CLIMATE_BONUS[climate]
+def daily_goal(weight_kg: float, activity: int, climate: int, sex: int = 1) -> float:
+    per_kg = 35.0 if sex == 1 else 31.0
+    return per_kg * weight_kg * ACTIVITY_MULT[activity] + CLIMATE_BONUS[climate]
 
 
 def simulate_user(rng: np.random.Generator, user_id: int, n_days: int) -> list[dict]:
     weight = float(np.clip(rng.normal(72, 14), 45, 120))
     activity = int(rng.choice(5, p=[0.25, 0.25, 0.25, 0.15, 0.10]))
     climate = int(rng.choice(4, p=[0.15, 0.45, 0.30, 0.10]))
+    sex = int(rng.choice(2, p=[0.5, 0.5]))  # 0=female (31ml/kg), 1=male (35ml/kg)
     wake = int(rng.integers(5, 9))
     sleep = int(rng.integers(21, 24))
     # Each user has a personal "discipline": fraction of their need they drink.
     discipline = float(np.clip(rng.normal(0.90, 0.16), 0.45, 1.20))
 
-    goal = daily_goal(weight, activity, climate)
+    goal = daily_goal(weight, activity, climate, sex)
     rows: list[dict] = []
     prev_total = goal  # warm start
     recent = [goal] * 7
@@ -75,6 +77,7 @@ def simulate_user(rng: np.random.Generator, user_id: int, n_days: int) -> list[d
             "weight_kg": round(weight, 1),
             "activity": activity,
             "climate": climate,
+            "sex": sex,
             "wake_hour": wake,
             "sleep_hour": sleep,
             "goal_ml": round(goal),

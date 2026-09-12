@@ -12,13 +12,24 @@ import com.water0.hydration.data.local.entity.HydrationEntry
 import com.water0.hydration.data.local.entity.UserBehavior
 import com.water0.hydration.data.local.entity.UserProfile
 
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Sex column added in v2; existing rows default to FEMALE (31ml/kg)
+        // to avoid inflating stored goals.
+        db.execSQL("ALTER TABLE user_profile ADD COLUMN sex TEXT NOT NULL DEFAULT 'FEMALE'")
+    }
+}
+
 @Database(
     entities = [
         HydrationEntry::class,
         UserProfile::class,
         UserBehavior::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -39,6 +50,7 @@ abstract class HydrationDatabase : RoomDatabase() {
                     HydrationDatabase::class.java,
                     "water0_database"
                 )
+                    .addMigrations(MIGRATION_1_2)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
@@ -88,5 +100,17 @@ class Converters {
     @androidx.room.TypeConverter
     fun toClimate(value: String?): UserProfile.Climate? {
         return value?.let { UserProfile.Climate.valueOf(it) }
+    }
+
+    @androidx.room.TypeConverter
+    fun fromSex(value: UserProfile.Sex?): String? {
+        return value?.name
+    }
+
+    @androidx.room.TypeConverter
+    fun toSex(value: String?): UserProfile.Sex? {
+        // Older DBs / nulls default to FEMALE (conservative goal).
+        return if (value == null) UserProfile.Sex.FEMALE
+        else try { UserProfile.Sex.valueOf(value) } catch (_: IllegalArgumentException) { UserProfile.Sex.FEMALE }
     }
 }

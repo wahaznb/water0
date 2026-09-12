@@ -20,7 +20,8 @@ class RecommendationEngineTest {
         sleepHour = 23,
         reminderIntervalMinutes = 60,
         quietHoursStart = 22,
-        quietHoursEnd = 7
+        quietHoursEnd = 7,
+        sex = UserProfile.Sex.MALE // 35ml/kg -> base 2940
     )
 
     @Before
@@ -131,8 +132,8 @@ class RecommendationEngineTest {
         val behind = engine.calculateStatus(500, 3140)
         val ahead = engine.calculateStatus(3400, 3140)
 
-        val behindMs = engine.calculateNextReminderInterval(profile, behavior, behind)
-        val aheadMs = engine.calculateNextReminderInterval(profile, behavior, ahead)
+        val behindMs = engine.calculateNextReminderInterval(profile, behavior, behind, currentHour = 12)
+        val aheadMs = engine.calculateNextReminderInterval(profile, behavior, ahead, currentHour = 12)
 
         assertTrue(behindMs < aheadMs)
         val minute = 60 * 1000L
@@ -180,10 +181,55 @@ class RecommendationEngineTest {
         val behavior = UserBehavior(averageResponseRate = 0.5f)
         val status = engine.calculateStatus(2500, 3140) // 79% -> ON_TRACK
 
-        val normal = engine.calculateNextReminderInterval(profile, behavior, status)
-        val quietMs = engine.calculateNextReminderInterval(quiet, behavior, status)
+        // Pin to noon: normal profile (quiet 22-7) is awake, quiet profile sleeps.
+        val normal = engine.calculateNextReminderInterval(profile, behavior, status, currentHour = 12)
+        val quietMs = engine.calculateNextReminderInterval(quiet, behavior, status, currentHour = 12)
 
         assertEquals(60 * 60 * 1000L, normal)
         assertEquals(180 * 60 * 1000L, quietMs)
+    }
+
+    @Test
+    fun `female base uses 31ml per kg`() {
+        val female = profile.copy(sex = UserProfile.Sex.FEMALE)
+        // base = 31 * 70 * 1.2 = 2604; extra = 2604 * 0.2 = 521 (rounded)
+        val goal = engine.calculateDailyGoal(female)
+        assertEquals(2604, goal.baseMl)
+        assertEquals(521, goal.activityExtraMl)
+        assertEquals(200, goal.climateExtraMl)
+        assertEquals(2804, goal.totalMl)
+    }
+
+    @Test
+    fun `male base uses 35ml per kg`() {
+        val male = profile.copy(sex = UserProfile.Sex.MALE)
+        val goal = engine.calculateDailyGoal(male)
+        assertEquals(2940, goal.baseMl)
+        assertEquals(3140, goal.totalMl)
+    }
+
+    @Test
+    fun `evening sip shows at 95 percent but not after goal met`() {
+        // 95% at sleepHour-1 -> evening nudge expected.
+        val almost = engine.calculateStatus(2983, 3140) // 95%
+        val recsAlmost = engine.generateRecommendations(
+            profile, UserBehavior(), almost, emptyList(), currentHour = 22
+        )
+        assertTrue(recsAlmost.any { it.reason == RecommendationEngine.Recommendation.Reason.EVENING_WIND_DOWN })
+
+        // 100% at same hour -> no evening sip, GOAL_MET instead.
+        val met = engine.calculateStatus(3140, 3140)
+        val recsMet = engine.generateRecommendations(
+            profile, UserBehavior(), met, emptyList(), currentHour = 22
+        )
+        assertTrue(recsMet.none { it.reason == RecommendationEngine.Recommendation.Reason.EVENING_WIND_DOWN })
+        assertTrue(recsMet.any { it.reason == RecommendationEngine.Recommendation.Reason.GOAL_MET })
+
+        // 120% (AHEAD) -> no evening sip either.
+        val ahead = engine.calculateStatus(3768, 3140)
+        val recsAhead = engine.generateRecommendations(
+            profile, UserBehavior(), ahead, emptyList(), currentHour = 22
+        )
+        assertTrue(recsAhead.none { it.reason == RecommendationEngine.Recommendation.Reason.EVENING_WIND_DOWN })
     }
 }

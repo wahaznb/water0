@@ -52,12 +52,13 @@ class RecommendationEngine {
             EVENING_WIND_DOWN,
             STREAK_MAINTENANCE,
             OVER_LIMIT,
-            PACING
+            PACING,
+            GOAL_MET
         }
     }
 
     fun calculateDailyGoal(profile: UserProfile): DailyGoal {
-        val base = (35f * profile.weightKg * profile.activityLevel.multiplier).roundToInt()
+        val base = (profile.sex.baseMlPerKg * profile.weightKg * profile.activityLevel.multiplier).roundToInt()
         val activityExtra = (base * (profile.activityLevel.multiplier - 1f)).roundToInt()
         val climateExtra = profile.climate.extraMlPerDay
         val total = base + climateExtra
@@ -84,7 +85,6 @@ class RecommendationEngine {
         currentHour: Int
     ): List<Recommendation> {
         val recommendations = mutableListOf<Recommendation>()
-        val goal = calculateDailyGoal(profile).totalMl
 
         // Morning: Start the day
         if (currentHour >= profile.wakeUpHour && currentHour < profile.wakeUpHour + 2 && status.consumedMl < 250) {
@@ -150,14 +150,42 @@ class RecommendationEngine {
             ))
         }
 
-        // Evening wind down
-        if (currentHour >= profile.sleepHour - 2 && currentHour < profile.sleepHour && status.percentage > 90) {
+        // Evening wind down: only when close but NOT yet at goal.
+        // Previously `percentage > 90` with no upper bound, so it kept
+        // showing "small sip before bed" at 100%+ even after goal met.
+        if (currentHour >= profile.sleepHour - 2 && currentHour < profile.sleepHour &&
+            status.percentage in 90..99
+        ) {
             recommendations.add(Recommendation(
                 message = "Almost at goal! Small sip before bed if needed.",
                 priority = Recommendation.Priority.LOW,
                 suggestedAmountMl = 100,
                 reason = Recommendation.Reason.EVENING_WIND_DOWN
             ))
+        }
+
+        // Goal met: celebrate instead of nudging more water. Suppresses the
+        // evening sip and any other drink nudges below (except OVER which
+        // already returned). Diuretic/pacing/exercise nudges are also
+        // suppressed once at/over goal — no more water needed.
+        if (status.percentage >= 100 && status.status != HydrationStatus.Status.OVER) {
+            // Drop any drink-nudges accumulated above (evening/diuretic/etc
+            // if hour windows overlapped) and show only the celebration.
+            recommendations.removeAll {
+                it.reason == Recommendation.Reason.EVENING_WIND_DOWN ||
+                    it.reason == Recommendation.Reason.BEHIND_GOAL ||
+                    it.reason == Recommendation.Reason.DIURETIC_OFFSET ||
+                    it.reason == Recommendation.Reason.PACING ||
+                    it.reason == Recommendation.Reason.AFTER_EXERCISE ||
+                    it.reason == Recommendation.Reason.HOT_WEATHER
+            }
+            recommendations.add(Recommendation(
+                message = "Goal reached! Nice work — no more needed unless thirsty.",
+                priority = Recommendation.Priority.LOW,
+                suggestedAmountMl = 0,
+                reason = Recommendation.Reason.GOAL_MET
+            ))
+            return recommendations.sortedByDescending { it.priority.ordinal }
         }
 
         // Over the safe limit: stop, don't nudge further.
@@ -206,7 +234,8 @@ class RecommendationEngine {
     fun calculateNextReminderInterval(
         profile: UserProfile,
         behavior: UserBehavior,
-        status: HydrationStatus
+        status: HydrationStatus,
+        currentHour: Int = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
     ): Long {
         var intervalMinutes = profile.reminderIntervalMinutes.toLong()
 
@@ -222,9 +251,8 @@ class RecommendationEngine {
             status.status == HydrationStatus.Status.AHEAD -> intervalMinutes = (intervalMinutes * 1.3).toLong()
         }
 
-        // Quiet hours
-        val now = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-        if (now >= profile.quietHoursStart || now < profile.quietHoursEnd) {
+        // Quiet hours (injected hour keeps unit tests deterministic).
+        if (currentHour >= profile.quietHoursStart || currentHour < profile.quietHoursEnd) {
             intervalMinutes = (intervalMinutes * 3).toLong() // Much longer during sleep
         }
 

@@ -23,6 +23,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -74,6 +78,7 @@ class HistoryViewModelFactory(private val context: Context) : ViewModelProvider.
 @Composable
 fun HistoryScreen(
     onNavigate: (String) -> Unit = {},
+    showBottomBar: Boolean = true,
     viewModel: HistoryViewModel = viewModel(
         factory = HistoryViewModelFactory(LocalContext.current)
     )
@@ -96,7 +101,9 @@ fun HistoryScreen(
             )
         },
         bottomBar = {
-            BottomNavBar(selected = Routes.HISTORY, onSelect = onNavigate)
+            if (showBottomBar) {
+                BottomNavBar(selected = Routes.HISTORY, onSelect = onNavigate)
+            }
         }
     ) { paddingValues ->
         Column(
@@ -233,10 +240,10 @@ private fun DayCard(
                     fontWeight = FontWeight.Bold,
                     color = statusColor
                 )
-                Text(
-                    text = if (expanded) "▾" else "▸",
-                    fontSize = 18.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 8.dp)
                 )
             }

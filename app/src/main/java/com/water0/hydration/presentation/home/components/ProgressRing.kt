@@ -61,7 +61,7 @@ fun ProgressRing(
             contentAlignment = Alignment.Center
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val stroke = 14.dp.toPx()
+                val stroke = 18.dp.toPx()
                 drawArc(
                     color = track,
                     startAngle = -90f,

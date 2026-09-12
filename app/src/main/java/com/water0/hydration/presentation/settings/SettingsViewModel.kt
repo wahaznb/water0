@@ -41,6 +41,7 @@ class SettingsViewModel(
     fun updateWeight(weightKg: Float) = save { it.copy(weightKg = weightKg) }
     fun updateActivity(level: UserProfile.ActivityLevel) = save { it.copy(activityLevel = level) }
     fun updateClimate(climate: UserProfile.Climate) = save { it.copy(climate = climate) }
+    fun updateSex(sex: UserProfile.Sex) = save { it.copy(sex = sex) }
     fun toggleReminders(enabled: Boolean) = save { it.copy(remindersEnabled = enabled) }
     fun updateReminderInterval(minutes: Int) = save { it.copy(reminderIntervalMinutes = minutes) }
     fun updateQuietHours(start: Int, end: Int) =

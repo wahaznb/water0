@@ -19,8 +19,14 @@ data class UserProfile(
     val remindersEnabled: Boolean = true,
     val reminderIntervalMinutes: Int = 60,
     val quietHoursStart: Int = 22,
-    val quietHoursEnd: Int = 7
+    val quietHoursEnd: Int = 7,
+    val sex: Sex = Sex.FEMALE
 ) : Serializable {
+
+    enum class Sex(val baseMlPerKg: Float) {
+        FEMALE(31f),
+        MALE(35f)
+    }
 
     enum class ActivityLevel(val multiplier: Float) {
         SEDENTARY(1.0f),
@@ -38,5 +44,5 @@ data class UserProfile(
     }
 
     val baseWaterNeedMl: Int
-        get() = (35f * weightKg * activityLevel.multiplier).roundToInt() + climate.extraMlPerDay
+        get() = (sex.baseMlPerKg * weightKg * activityLevel.multiplier).roundToInt() + climate.extraMlPerDay
 }

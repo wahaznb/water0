@@ -20,6 +20,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
@@ -30,6 +34,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -65,6 +70,7 @@ class SettingsViewModelFactory(private val context: Context) : ViewModelProvider
 fun SettingsScreen(
     onBackClick: () -> Unit,
     onNavigate: (String) -> Unit = {},
+    showBottomBar: Boolean = true,
     darkTheme: Boolean = true,
     onToggleTheme: (Boolean) -> Unit = {},
     viewModel: SettingsViewModel = viewModel(
@@ -76,13 +82,17 @@ fun SettingsScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            BottomNavBar(selected = Routes.SETTINGS, onSelect = onNavigate)
+            if (showBottomBar) {
+                BottomNavBar(selected = Routes.SETTINGS, onSelect = onNavigate)
+            }
         },
         topBar = {
             TopAppBar(
                 title = { Text("Settings", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
-                    TextButton(onClick = onBackClick) { Text(text = "←", fontSize = 20.sp) }
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -120,6 +130,7 @@ fun SettingsScreen(
                 SleepSection(profile = current, viewModel = viewModel)
                 UnitsSection(profile = current, viewModel = viewModel)
                 AppearanceSection(darkTheme = darkTheme, onToggleTheme = onToggleTheme)
+                GlassLabSection()
             }
         }
     }
@@ -153,6 +164,37 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
 @Composable
 private fun ProfileSection(profile: UserProfile, viewModel: SettingsViewModel) {
     SectionCard(title = "Profile") {
+        Text(
+            text = "Sex",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        UserProfile.Sex.entries.forEach { sex ->
+            val label = when (sex) {
+                UserProfile.Sex.FEMALE -> "Female (31 ml/kg)"
+                UserProfile.Sex.MALE -> "Male (35 ml/kg)"
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectable(
+                        selected = profile.sex == sex,
+                        onClick = { viewModel.updateSex(sex) },
+                        role = Role.RadioButton
+                    )
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                RadioButton(
+                    selected = profile.sex == sex,
+                    onClick = null
+                )
+                Text(text = label, fontSize = 14.sp)
+            }
+        }
+
         val weightLabel = if (profile.useMetricUnits) {
             "${profile.weightKg.roundToInt()} kg"
         } else {
@@ -370,6 +412,107 @@ private fun AppearanceSection(darkTheme: Boolean, onToggleTheme: (Boolean) -> Un
             Switch(
                 checked = darkTheme,
                 onCheckedChange = onToggleTheme
+            )
+        }
+    }
+}
+
+@Composable
+private fun GlassLabSection() {
+    val context = LocalContext.current
+    val glassPrefs = remember { com.water0.hydration.ui.theme.GlassPrefs.from(context) }
+    var draft by remember { androidx.compose.runtime.mutableStateOf(glassPrefs.draft()) }
+    var pending by remember { androidx.compose.runtime.mutableStateOf(glassPrefs.hasPendingChanges()) }
+
+    SectionCard(title = "Glass Lab (restart to apply)") {
+        Text(
+            text = "Blur: ${draft.blurRadius.value.toInt()}dp",
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Slider(
+            value = draft.blurRadius.value,
+            onValueChange = {
+                draft = draft.copy(blurRadius = it.dp)
+                glassPrefs.saveDraft(draft)
+                pending = glassPrefs.hasPendingChanges()
+            },
+            valueRange = 0f..40f
+        )
+        Text(
+            text = "Tint: ${(draft.tintAlpha * 100).roundToInt()}%",
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Slider(
+            value = draft.tintAlpha,
+            onValueChange = {
+                draft = draft.copy(tintAlpha = it)
+                glassPrefs.saveDraft(draft)
+                pending = glassPrefs.hasPendingChanges()
+            },
+            valueRange = 0f..0.60f
+        )
+        Text(
+            text = "Bevel: ${(draft.bevelAlpha * 100).roundToInt()}%",
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Slider(
+            value = draft.bevelAlpha,
+            onValueChange = {
+                draft = draft.copy(bevelAlpha = it)
+                glassPrefs.saveDraft(draft)
+                pending = glassPrefs.hasPendingChanges()
+            },
+            valueRange = 0f..0.20f
+        )
+        if (pending) {
+            Text(
+                text = "Restart app to apply glass changes.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.tertiary
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                androidx.compose.material3.OutlinedButton(
+                    onClick = {
+                        glassPrefs.applyDraft()
+                        pending = false
+                        // Cold restart: relaunch MainActivity and clear back stack.
+                        val pm = context.packageManager
+                        val intent = pm.getLaunchIntentForPackage(context.packageName)
+                        if (intent != null) {
+                            intent.addFlags(
+                                android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                                    android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            )
+                            context.startActivity(intent)
+                            if (context is android.app.Activity) {
+                                context.finishAffinity()
+                            }
+                            kotlin.system.exitProcess(0)
+                        }
+                    }
+                ) {
+                    Text("Restart now")
+                }
+                TextButton(
+                    onClick = {
+                        glassPrefs.resetToDefaults()
+                        draft = glassPrefs.draft()
+                        pending = glassPrefs.hasPendingChanges()
+                    }
+                ) {
+                    Text("Reset defaults (23 / 31% / 5%)")
+                }
+            }
+        } else {
+            Text(
+                text = "Defaults: 23dp blur, 31% tint, 5% bevel.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

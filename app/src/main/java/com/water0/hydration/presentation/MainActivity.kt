@@ -9,16 +9,22 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -28,10 +34,13 @@ import com.water0.hydration.di.AppContainer
 import com.water0.hydration.presentation.history.HistoryScreen
 import com.water0.hydration.presentation.home.HomeScreen
 import com.water0.hydration.presentation.home.HomeViewModel
+import com.water0.hydration.presentation.navigation.GlassBottomBar
 import com.water0.hydration.presentation.navigation.Routes
 import com.water0.hydration.presentation.settings.SettingsScreen
+import com.water0.hydration.ui.theme.GlassPrefs
 import com.water0.hydration.ui.theme.Water0
 import kotlinx.coroutines.launch
+import kotlin.math.absoluteValue
 
 class MainActivity : ComponentActivity() {
 
@@ -52,6 +61,7 @@ class MainActivity : ComponentActivity() {
     private val notificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* best-effort */ }
 
+    @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         seedDefaults()
@@ -61,39 +71,98 @@ class MainActivity : ComponentActivity() {
         // boolean flag is exactly what prefs are for (no DB migration).
         // Default is dark, Omarchy-style.
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val glassPrefs = GlassPrefs.from(this)
+        val glassConfig = glassPrefs.applied()
         setContent {
             var darkTheme by remember {
                 mutableStateOf(prefs.getBoolean(KEY_DARK_THEME, true))
             }
             Water0(darkTheme = darkTheme) {
-                var screen by remember { mutableStateOf(Routes.HOME) }
-                val navigate = { route: String -> screen = route }
-                AnimatedContent(
-                    targetState = screen,
-                    transitionSpec = {
-                        (fadeIn(animationSpec = androidx.compose.animation.core.tween(250)) +
-                            slideInHorizontally(animationSpec = androidx.compose.animation.core.tween(250)) { it / 5 }) togetherWith
-                            (fadeOut(animationSpec = androidx.compose.animation.core.tween(200)) +
-                                slideOutHorizontally(animationSpec = androidx.compose.animation.core.tween(200)) { -it / 5 })
-                    },
-                    label = "screen"
-                ) { current ->
-                    when (current) {
-                        Routes.HISTORY -> HistoryScreen(onNavigate = navigate)
-                        Routes.SETTINGS -> SettingsScreen(
-                            onBackClick = { screen = Routes.HOME },
-                            onNavigate = navigate,
-                            darkTheme = darkTheme,
-                            onToggleTheme = { enabled ->
-                                darkTheme = enabled
-                                prefs.edit().putBoolean(KEY_DARK_THEME, enabled).apply()
+                val pagerState = rememberPagerState(
+                    initialPage = 0,
+                    pageCount = { 3 }
+                )
+                val scope = rememberCoroutineScope()
+                // Keep bottom-bar selection in sync when user swipes.
+                var selected by remember { mutableStateOf(Routes.HOME) }
+                LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
+                    if (!pagerState.isScrollInProgress) {
+                        selected = Routes.fromIndex(pagerState.currentPage)
+                    }
+                }
+                val navigate: (String) -> Unit = { route ->
+                    selected = route
+                    scope.launch {
+                        pagerState.animateScrollToPage(Routes.indexOf(route))
+                    }
+                    Unit
+                }
+                Scaffold(
+                    bottomBar = {
+                        GlassBottomBar(
+                            selected = selected,
+                            onSelect = navigate,
+                            config = glassConfig
+                        )
+                    }
+                ) { paddingValues ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                    ) {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize()
+                        ) { page ->
+                            // Motion-blur fake: while dragging (|offset|>0),
+                            // fade + slight blur the outgoing page. At rest
+                            // offset=0 so no cost. Max blur follows the Glass
+                            // Lab setting (apply-on-restart). True motion blur
+                            // is not available in Compose; this approximates it.
+                            val pageOffset = (
+                                (pagerState.currentPage - page) +
+                                    pagerState.currentPageOffsetFraction
+                                ).absoluteValue
+                            val maxBlur = glassConfig.blurRadius.coerceAtMost(24.dp)
+                            val motionBlur = (pageOffset * maxBlur.value).dp.coerceAtMost(maxBlur)
+                            val motionModifier = if (pageOffset > 0.001f && android.os.Build.VERSION.SDK_INT >= 31) {
+                                Modifier
+                                    .graphicsLayer {
+                                        alpha = 1f - (pageOffset * 0.4f).coerceIn(0f, 0.6f)
+                                        translationX = -pagerState.currentPageOffsetFraction * 120f
+                                    }
+                                    .blur(motionBlur)
+                            } else {
+                                Modifier.graphicsLayer {
+                                    alpha = 1f - (pageOffset * 0.25f).coerceIn(0f, 0.5f)
+                                }
                             }
-                        )
-                        else -> HomeScreen(
-                            viewModel = viewModel,
-                            onSettingsClick = { screen = Routes.SETTINGS },
-                            onNavigate = navigate
-                        )
+                            Box(modifier = motionModifier.fillMaxSize()) {
+                                when (page) {
+                                    0 -> HomeScreen(
+                                        viewModel = viewModel,
+                                        onSettingsClick = { navigate(Routes.SETTINGS) },
+                                        onNavigate = navigate,
+                                        showBottomBar = false
+                                    )
+                                    1 -> HistoryScreen(
+                                        onNavigate = navigate,
+                                        showBottomBar = false
+                                    )
+                                    else -> SettingsScreen(
+                                        onBackClick = { navigate(Routes.HOME) },
+                                        onNavigate = navigate,
+                                        showBottomBar = false,
+                                        darkTheme = darkTheme,
+                                        onToggleTheme = { enabled ->
+                                            darkTheme = enabled
+                                            prefs.edit().putBoolean(KEY_DARK_THEME, enabled).apply()
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

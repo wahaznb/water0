@@ -12,8 +12,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Coffee
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.LocalBar
+import androidx.compose.material.icons.filled.LocalCafe
+import androidx.compose.material.icons.filled.SportsBar
+import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import com.water0.hydration.ui.theme.glassCardBorder
 import com.water0.hydration.ui.theme.glassCardContainer
 import androidx.compose.runtime.Composable
@@ -70,8 +78,16 @@ fun EntryListItem(
     entry: com.water0.hydration.data.local.entity.HydrationEntry,
     onDelete: (Long) -> Unit
 ) {
-    // Text avatar instead of emoji: first letter on a tinted dot.
-    val initial = entry.type.name.lowercase().replaceFirstChar { it.uppercase() }.take(1)
+    // Drink icon instead of text avatar / emoji.
+    val drinkIcon = when (entry.type) {
+        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.WATER -> Icons.Filled.WaterDrop
+        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.COFFEE -> Icons.Filled.Coffee
+        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.TEA -> Icons.Filled.LocalCafe
+        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.JUICE,
+        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.SODA -> Icons.Filled.LocalBar
+        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.ALCOHOL -> Icons.Filled.SportsBar
+        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.OTHER -> Icons.Filled.WaterDrop
+    }
     val drinkColor = when (entry.type) {
         com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.WATER -> Color(0xFF2196F3)
         com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.COFFEE -> Color(0xFF795548)
@@ -114,11 +130,11 @@ fun EntryListItem(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = initial,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = drinkColor
+                Icon(
+                    imageVector = drinkIcon,
+                    contentDescription = entry.type.name,
+                    tint = drinkColor,
+                    modifier = Modifier.size(22.dp)
                 )
             }
 
@@ -139,15 +155,14 @@ fun EntryListItem(
                 )
             }
 
-            TextButton(
+            IconButton(
                 onClick = { onDelete(entry.id) },
                 modifier = Modifier.padding(start = 8.dp)
             ) {
-                Text(
-                    text = "Delete",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.error
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = "Delete entry",
+                    tint = MaterialTheme.colorScheme.error
                 )
             }
         }
