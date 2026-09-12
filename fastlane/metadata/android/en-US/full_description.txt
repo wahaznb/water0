@@ -1,0 +1,10 @@
+Water0 is an open-source hydration tracker that respects your privacy.
+
+- Log water, coffee, tea, juice and more with one tap
+- Personalized daily goal from your weight, activity and climate
+- Smart recommendations: morning nudges, catch-up prompts, caffeine offsets, hot-weather extras
+- Adaptive reminders that adjust to your progress and quiet hours
+- History with per-day totals and trends
+- 100% offline: your data stays in a local database on your phone. No account, no tracking, no ads.
+
+Source code: https://github.com/wahaznb/water0 (Apache 2.0)

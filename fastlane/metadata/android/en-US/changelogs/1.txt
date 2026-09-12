@@ -1,0 +1,1 @@
+Initial release: water logging, personalized goals, smart recommendations, history, settings, and adaptive reminders — all offline.
