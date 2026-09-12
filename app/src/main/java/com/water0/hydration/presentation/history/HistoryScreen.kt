@@ -1,6 +1,12 @@
 package com.water0.hydration.presentation.history
 
 import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,6 +56,8 @@ import com.water0.hydration.domain.usecase.GetHistoryUseCase
 import com.water0.hydration.presentation.home.components.EntryListItem
 import com.water0.hydration.presentation.navigation.BottomNavBar
 import com.water0.hydration.presentation.navigation.Routes
+import com.water0.hydration.ui.theme.glassCardBorder
+import com.water0.hydration.ui.theme.glassCardContainer
 import kotlinx.coroutines.launch
 
 class HistoryViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
@@ -156,7 +164,7 @@ fun HistoryScreen(
                                     viewModel.deleteEntry(id)
                                     scope.launch {
                                         snackbarHostState.showSnackbar(
-                                            "Deleted 🗑️",
+                                            "Entry deleted",
                                             duration = SnackbarDuration.Short
                                         )
                                     }
@@ -185,11 +193,14 @@ private fun DayCard(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = glassCardContainer()
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        border = glassCardBorder(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -239,7 +250,11 @@ private fun DayCard(
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
 
-            if (expanded) {
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
                 if (day.entries.isEmpty()) {
                     Text(
                         text = "Nothing logged this day.",

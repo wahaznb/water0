@@ -9,6 +9,8 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
@@ -81,7 +83,7 @@ class NotificationWorker(
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Time to hydrate 💧")
+            .setContentTitle("Time to hydrate")
             .setContentText("You've had $totalMl of $goalMl ml today.")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pendingIntent)
@@ -97,10 +99,25 @@ class NotificationWorker(
         const val NOTIFICATION_ID = 1001
         private const val FALLBACK_DELAY_MILLIS = 60 * 60 * 1000L
 
+        // Battery-friendly: the OS may defer us when the battery is low,
+        // and failures back off exponentially instead of hot-looping.
+        // This is what makes the chain cheap in the background: the
+        // system batches our work with other deferred jobs (Doze).
+        fun constraints(): Constraints =
+            Constraints.Builder()
+                .setRequiresBatteryNotLow(true)
+                .build()
+
         fun nextRequest(delayMillis: Long, show: Boolean): OneTimeWorkRequest =
             OneTimeWorkRequestBuilder<NotificationWorker>()
                 .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
                 .setInputData(workDataOf(KEY_SHOW to show))
+                .setConstraints(constraints())
+                .setBackoffCriteria(
+                    BackoffPolicy.EXPONENTIAL,
+                    10,
+                    TimeUnit.MINUTES
+                )
                 .build()
 
         fun scheduleNext(context: Context, delayMillis: Long) {

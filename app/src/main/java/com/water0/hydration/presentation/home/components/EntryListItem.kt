@@ -1,5 +1,6 @@
 package com.water0.hydration.presentation.home.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,11 +8,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import com.water0.hydration.ui.theme.glassCardBorder
+import com.water0.hydration.ui.theme.glassCardContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,7 +41,6 @@ fun TodayEntriesList(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(text = "💧", fontSize = 48.sp)
                 Text(
                     text = "No water logged today",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -67,14 +70,16 @@ fun EntryListItem(
     entry: com.water0.hydration.data.local.entity.HydrationEntry,
     onDelete: (Long) -> Unit
 ) {
-    val drinkEmoji = when (entry.type) {
-        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.WATER -> "💧"
-        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.COFFEE -> "☕"
-        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.TEA -> "🍵"
-        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.JUICE -> "🧃"
-        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.SODA -> "🥤"
-        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.ALCOHOL -> "🍺"
-        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.OTHER -> "🥛"
+    // Text avatar instead of emoji: first letter on a tinted dot.
+    val initial = entry.type.name.lowercase().replaceFirstChar { it.uppercase() }.take(1)
+    val drinkColor = when (entry.type) {
+        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.WATER -> Color(0xFF2196F3)
+        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.COFFEE -> Color(0xFF795548)
+        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.TEA -> Color(0xFF8D6E63)
+        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.JUICE -> Color(0xFFFF9800)
+        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.SODA -> Color(0xFFF44336)
+        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.ALCOHOL -> Color(0xFF6D4C41)
+        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.OTHER -> Color(0xFF9E9E9E)
     }
 
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
@@ -90,20 +95,32 @@ fun EntryListItem(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = glassCardContainer()
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        border = glassCardBorder(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = drinkEmoji,
-                fontSize = 24.sp,
-                modifier = Modifier.size(48.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        drinkColor.copy(alpha = 0.18f),
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = initial,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = drinkColor
+                )
+            }
 
             Column(
                 modifier = Modifier.weight(1f),
@@ -122,14 +139,17 @@ fun EntryListItem(
                 )
             }
 
-            Text(
-                text = "🗑️",
-                fontSize = 20.sp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentSize(Alignment.CenterEnd)
-                    .padding(start = 8.dp)
-            )
+            TextButton(
+                onClick = { onDelete(entry.id) },
+                modifier = Modifier.padding(start = 8.dp)
+            ) {
+                Text(
+                    text = "Delete",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }

@@ -54,8 +54,24 @@ Same features the app knows at prediction time (`weight_kg`,
 
 | Task | Target | Model |
 |------|--------|-------|
-| Regression | tomorrow's total intake (ml) | HistGradientBoosting → optional 2-layer Keras MLP → `hydration_goal.tflite` |
-| Classification | will the user meet their goal (0/1) | HistGradientBoosting |
+| Regression | tomorrow's total intake (ml) | HistGradientBoosting → model selection over tiny MLPs → `hydration_goal.tflite` |
+| Classification | will the user meet their goal (0/1) | HistGradientBoosting (stays server-side/offline analysis) |
+
+## Model selection (no performance sacrificed)
+
+`train_model.py` compares 3 MLP sizes (tiny 16-8 / small 32-16 / base
+64-32) × 3 quantization levels (dynamic / float16 / full-int8) and
+exports the winner to `model/`:
+
+- **Winner rule:** smallest model within 5% of the best test MAE.
+- **Hard budget:** must be ≤ 100 KB (typical winner: int8, ~10–30 KB).
+- Each candidate reports test MAE, size, and per-inference latency to
+  `model/model_selection.json`.
+- Full-int8 uses a representative dataset so mobile DSPs/NPUs can run it;
+  `model/scaler.json` stores the preprocessing the app must replicate.
+
+Needs `pip install tensorflow` (Python ≤ 3.11 recommended) — without it
+the script trains/evaluates the sklearn baselines and skips export.
 
 The split is **by user** (`GroupShuffleSplit`): no user appears in both
 train and test, otherwise the model just memorizes personal habits and

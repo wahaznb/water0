@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 
 @Composable
 fun Water0(
-    darkTheme: Boolean = false,
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
     LiquidGlassTheme(

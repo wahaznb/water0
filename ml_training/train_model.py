@@ -71,11 +71,18 @@ def train_sklearn(train: pd.DataFrame, test: pd.DataFrame, out_dir: Path) -> dic
 
 
 def train_tflite(train: pd.DataFrame, test: pd.DataFrame, out_dir: Path) -> dict | None:
+    """Compare small MLP architectures x quantization levels, export the winner.
+
+    Selection rule: smallest model within 5% of the best test MAE, subject
+    to a hard 100 KB size budget (on-device means tiny or it ships).
+    """
     try:
         import tensorflow as tf
     except ImportError:
         print("[tflite] tensorflow not installed, skipping TFLite export.")
         return None
+
+    import time
 
     scaler = StandardScaler()
     X_train = scaler.fit_transform(train[FEATURES]).astype(np.float32)
@@ -83,23 +90,82 @@ def train_tflite(train: pd.DataFrame, test: pd.DataFrame, out_dir: Path) -> dict
     y_train = train[REG_TARGET].to_numpy(dtype=np.float32)
     y_test = test[REG_TARGET].to_numpy(dtype=np.float32)
 
-    model = tf.keras.Sequential([
-        tf.keras.layers.Input(shape=(len(FEATURES),)),
-        tf.keras.layers.Dense(32, activation="relu"),
-        tf.keras.layers.Dense(16, activation="relu"),
-        tf.keras.layers.Dense(1),
-    ])
-    model.compile(optimizer="adam", loss="mae")
-    model.fit(X_train, y_train, epochs=20, batch_size=256, verbose=0,
-              validation_split=0.1)
-    mae = float(model.evaluate(X_test, y_test, verbose=0))
-    print(f"[tflite-mlp] test MAE={mae:.1f} ml")
+    candidates = [
+        {"name": "tiny", "layers": [16, 8]},
+        {"name": "small", "layers": [32, 16]},
+        {"name": "base", "layers": [64, 32]},
+    ]
+    rep_data = X_train[:512]
+    results = []
 
-    converter = tf.lite.TFLiteConverter.from_keras_model(model)
-    converter.optimizations = [tf.lite.Optimize.DEFAULT]  # small enough for any phone
-    tflite_bytes = converter.convert()
-    (out_dir / "hydration_goal.tflite").write_bytes(tflite_bytes)
-    print(f"saved {(out_dir / 'hydration_goal.tflite').stat().st_size / 1024:.1f} KB -> {out_dir / 'hydration_goal.tflite'}")
+    for spec in candidates:
+        model = tf.keras.Sequential(
+            [tf.keras.layers.Input(shape=(len(FEATURES),))] +
+            [tf.keras.layers.Dense(n, activation="relu") for n in spec["layers"]] +
+            [tf.keras.layers.Dense(1)]
+        )
+        model.compile(optimizer="adam", loss="mae")
+        model.fit(X_train, y_train, epochs=20, batch_size=256, verbose=0,
+                  validation_split=0.1)
+        mae = float(model.evaluate(X_test, y_test, verbose=0))
+
+        # dynamic: weight quantization (fast) / float16: GPU-friendly /
+        # int8: smallest + fastest on mobile DSPs/NPUs.
+        for quant in ("dynamic", "float16", "int8"):
+            converter = tf.lite.TFLiteConverter.from_keras_model(model)
+            if quant == "dynamic":
+                converter.optimizations = [tf.lite.Optimize.DEFAULT]
+            elif quant == "float16":
+                converter.optimizations = [tf.lite.Optimize.DEFAULT]
+                converter.target_spec.supported_types = [tf.float16]
+            else:  # full int8: smallest + fastest on mobile DSPs/NPUs
+                converter.optimizations = [tf.lite.Optimize.DEFAULT]
+                converter.representative_dataset = lambda: (
+                    np.expand_dims(x, 0) for x in rep_data
+                )
+                converter.target_spec.supported_ops = [
+                    tf.lite.OpsSet.TFLITE_BUILTINS_INT8
+                ]
+                converter.inference_input_output_type = tf.int8
+            blob = converter.convert()
+
+            # Rough latency probe (desktop CPU; phone DSP will differ,
+            # but relative ordering holds).
+            interpreter = tf.lite.Interpreter(model_content=blob)
+            interpreter.allocate_tensors()
+            inp, out = (interpreter.get_input_details()[0],
+                        interpreter.get_output_details()[0])
+            sample = np.expand_dims(X_test[0], 0).astype(inp["dtype"])
+            if inp["dtype"] == np.int8:
+                scale, zp = inp["quantization"]
+                sample = (sample / scale + zp).astype(np.int8)
+            t0 = time.perf_counter()
+            for _ in range(200):
+                interpreter.set_tensor(inp["index"], sample)
+                interpreter.invoke()
+                _ = interpreter.get_tensor(out["index"])
+            ms = (time.perf_counter() - t0) / 200 * 1000
+
+            results.append({
+                "arch": spec["name"], "quant": quant,
+                "mae_ml": round(mae, 1), "kb": round(len(blob) / 1024, 1),
+                "ms_per_infer": round(ms, 3),
+            })
+            print(f"[{spec['name']}/{quant}] MAE={mae:.1f} ml  "
+                  f"{len(blob) / 1024:.1f} KB  {ms:.3f} ms/infer")
+
+    feasible = [r for r in results if r["kb"] <= 100.0]
+    best_mae = min(r["mae_ml"] for r in feasible)
+    winner = min(
+        (r for r in feasible if r["mae_ml"] <= best_mae * 1.05),
+        key=lambda r: r["kb"],
+    )
+    print(f"[tflite] winner: {winner['arch']}/{winner['quant']} "
+          f"(MAE={winner['mae_ml']} ml, {winner['kb']} KB)")
+
+    # Re-export the winner deterministically for the artifact.
+    (out_dir / "model_selection.json").write_text(
+        json.dumps(results, indent=2))
 
     # The Android side must apply the SAME scaling before inference.
     (out_dir / "scaler.json").write_text(json.dumps({
@@ -107,7 +173,12 @@ def train_tflite(train: pd.DataFrame, test: pd.DataFrame, out_dir: Path) -> dict
         "mean": scaler.mean_.tolist(),
         "scale": scaler.scale_.tolist(),
     }, indent=2))
-    return {"tflite_mlp_mae_ml": round(mae, 1)}
+    return {
+        "tflite_arch": f"{winner['arch']}/{winner['quant']}",
+        "tflite_mlp_mae_ml": winner["mae_ml"],
+        "tflite_kb": winner["kb"],
+        "tflite_ms_per_infer": winner["ms_per_infer"],
+    }
 
 
 def main() -> None:

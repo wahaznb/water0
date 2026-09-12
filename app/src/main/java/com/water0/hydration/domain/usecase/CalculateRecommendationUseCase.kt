@@ -29,7 +29,7 @@ class CalculateRecommendationUseCase(
 
     private fun buildExplanation(profile: UserProfile, goal: RecommendationEngine.DailyGoal): String {
         return buildString {
-            appendLine("📊 Your Daily Goal: ${goal.totalMl}ml")
+            appendLine("Your Daily Goal: ${goal.totalMl}ml")
             appendLine()
             appendLine("Breakdown:")
             appendLine("• Base (35ml/kg × ${profile.weightKg}kg): ${goal.baseMl}ml")

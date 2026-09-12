@@ -24,8 +24,16 @@ class RecommendationEngine {
         val status: Status
     ) {
         enum class Status {
-            BEHIND, ON_TRACK, AHEAD
+            BEHIND, ON_TRACK, AHEAD, OVER
         }
+    }
+
+    companion object {
+        // Safety cap: 150% of the daily goal. Past this point more water
+        // stops helping and can harm (overhydration strains the kidneys
+        // and dilutes blood sodium). This is a cautious heuristic, not
+        // medical advice — athletes or doctor-ordered plans differ.
+        fun safeMaxMl(goalMl: Int): Int = (goalMl * 1.5f).roundToInt()
     }
 
     data class Recommendation(
@@ -35,14 +43,16 @@ class RecommendationEngine {
         val reason: Reason
     ) {
         enum class Priority { LOW, MEDIUM, HIGH }
-        enum class Reason { 
-            MORNING_START, 
-            BEHIND_GOAL, 
-            AFTER_EXERCISE, 
-            HOT_WEATHER, 
-            DIURETIC_OFFSET, 
+        enum class Reason {
+            MORNING_START,
+            BEHIND_GOAL,
+            AFTER_EXERCISE,
+            HOT_WEATHER,
+            DIURETIC_OFFSET,
             EVENING_WIND_DOWN,
-            STREAK_MAINTENANCE 
+            STREAK_MAINTENANCE,
+            OVER_LIMIT,
+            PACING
         }
     }
 
@@ -58,6 +68,7 @@ class RecommendationEngine {
         val percentage = if (goalMl > 0) ((consumedMl * 100) / goalMl) else 0
         val remaining = (goalMl - consumedMl).coerceAtLeast(0)
         val status = when {
+            consumedMl > safeMaxMl(goalMl) -> HydrationStatus.Status.OVER
             percentage < 70 -> HydrationStatus.Status.BEHIND
             percentage > 110 -> HydrationStatus.Status.AHEAD
             else -> HydrationStatus.Status.ON_TRACK
@@ -78,7 +89,7 @@ class RecommendationEngine {
         // Morning: Start the day
         if (currentHour >= profile.wakeUpHour && currentHour < profile.wakeUpHour + 2 && status.consumedMl < 250) {
             recommendations.add(Recommendation(
-                message = "Start your day with a glass of water! 💧",
+                message = "Start your day with a glass of water.",
                 priority = Recommendation.Priority.HIGH,
                 suggestedAmountMl = 250,
                 reason = Recommendation.Reason.MORNING_START
@@ -149,10 +160,40 @@ class RecommendationEngine {
             ))
         }
 
+        // Over the safe limit: stop, don't nudge further.
+        if (status.status == HydrationStatus.Status.OVER) {
+            recommendations.add(Recommendation(
+                message = "Over the safe daily limit — stop here for today. " +
+                    "Too much water can be harmful; if a doctor told you " +
+                    "otherwise, follow their plan.",
+                priority = Recommendation.Priority.HIGH,
+                suggestedAmountMl = 0,
+                reason = Recommendation.Reason.OVER_LIMIT
+            ))
+            return recommendations.sortedByDescending { it.priority.ordinal }
+        }
+
+        // Pacing: the ideal pattern is steady sipping through the day, not
+        // chugging. Kidneys handle roughly 1 L per hour; a huge single gulp
+        // mostly waits its turn. Nudge only, right after it happens.
+        val bigGulp = recentEntries.firstOrNull()?.takeIf {
+            (System.currentTimeMillis() - it.timestamp) < 60 * 60 * 1000 &&
+                it.amountMl >= 750
+        }
+        if (bigGulp != null) {
+            recommendations.add(Recommendation(
+                message = "That was a big gulp. Steady sipping — about a glass " +
+                    "an hour through the day — hydrates better than chugging.",
+                priority = Recommendation.Priority.MEDIUM,
+                suggestedAmountMl = 0,
+                reason = Recommendation.Reason.PACING
+            ))
+        }
+
         // Streak maintenance
         if (behavior.streakDays > 0 && behavior.streakDays % 7 == 0 && status.percentage < 50) {
             recommendations.add(Recommendation(
-                message = "${behavior.streakDays} day streak! Don't break it now. 🔥",
+                message = "${behavior.streakDays} day streak — keep it going.",
                 priority = Recommendation.Priority.HIGH,
                 suggestedAmountMl = 300,
                 reason = Recommendation.Reason.STREAK_MAINTENANCE

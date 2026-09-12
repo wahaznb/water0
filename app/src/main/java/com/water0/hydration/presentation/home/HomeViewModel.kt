@@ -37,6 +37,14 @@ class HomeViewModel(
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState
 
+    // One-shot notices (e.g. intake cap). Null = nothing pending.
+    private val _notice = MutableStateFlow<String?>(null)
+    val notice: StateFlow<String?> = _notice
+
+    fun consumeNotice() {
+        _notice.value = null
+    }
+
     init {
         loadProgress()
     }
@@ -58,6 +66,13 @@ class HomeViewModel(
     }
 
     fun logWater(amountMl: Int, type: HydrationEntry.DrinkType = HydrationEntry.DrinkType.WATER) {
+        val state = _uiState.value
+        if (state is UiState.Success &&
+            state.totalEffectiveMl >= RecommendationEngine.safeMaxMl(state.goalMl)
+        ) {
+            _notice.value = "Over the safe daily limit — no more logging today."
+            return
+        }
         viewModelScope.launch {
             logHydration(amountMl, type)
         }

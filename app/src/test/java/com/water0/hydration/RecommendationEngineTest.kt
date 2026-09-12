@@ -141,6 +141,39 @@ class RecommendationEngineTest {
     }
 
     @Test
+    fun `cap is 150 percent of goal and exceeding it yields OVER`() {
+        assertEquals(4710, RecommendationEngine.safeMaxMl(3140))
+        assertEquals(
+            RecommendationEngine.HydrationStatus.Status.OVER,
+            engine.calculateStatus(5000, 3140).status
+        )
+    }
+
+    @Test
+    fun `over limit stops all other nudges`() {
+        val status = engine.calculateStatus(5000, 3140)
+        val recs = engine.generateRecommendations(
+            profile, UserBehavior(), status, emptyList(), currentHour = 15
+        )
+        assertTrue(recs.any { it.reason == RecommendationEngine.Recommendation.Reason.OVER_LIMIT })
+        assertTrue(recs.none { it.reason == RecommendationEngine.Recommendation.Reason.BEHIND_GOAL })
+    }
+
+    @Test
+    fun `big single gulp triggers pacing guidance`() {
+        val bigGulp = HydrationEntry(
+            amountMl = 800,
+            timestamp = System.currentTimeMillis(),
+            type = HydrationEntry.DrinkType.WATER
+        )
+        val status = engine.calculateStatus(2000, 3140)
+        val recs = engine.generateRecommendations(
+            profile, UserBehavior(), status, listOf(bigGulp), currentHour = 15
+        )
+        assertTrue(recs.any { it.reason == RecommendationEngine.Recommendation.Reason.PACING })
+    }
+
+    @Test
     fun `quiet hours stretch the interval`() {
         // 0-24 covers every possible current hour -> always quiet.
         val quiet = profile.copy(quietHoursStart = 0, quietHoursEnd = 24)

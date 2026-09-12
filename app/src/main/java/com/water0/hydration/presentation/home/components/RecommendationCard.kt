@@ -1,22 +1,27 @@
 package com.water0.hydration.presentation.home.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.water0.hydration.ui.theme.glassCardBorder
+import com.water0.hydration.ui.theme.glassCardContainer
 
 @Composable
 fun RecommendationCard(
@@ -42,28 +47,24 @@ fun RecommendationCard(
             MaterialTheme.colorScheme.primary
     }
 
-    val prefix = when (recommendation.priority) {
-        com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Priority.HIGH -> "⚠️ "
-        com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Priority.MEDIUM -> "⚡ "
-        com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Priority.LOW -> "ℹ️ "
-    }
-
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = androidx.compose.material3.CardDefaults.cardColors(
-            containerColor = bgColor
+        colors = CardDefaults.cardColors(
+            containerColor = glassCardContainer()
         ),
-        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 1.dp)
+        border = glassCardBorder(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = prefix,
-                fontSize = 24.sp,
-                modifier = Modifier.size(24.dp)
+            // Priority stripe instead of an icon.
+            Box(
+                modifier = Modifier
+                    .size(width = 4.dp, height = 48.dp)
+                    .background(textColor, RoundedCornerShape(2.dp))
             )
 
             Column(

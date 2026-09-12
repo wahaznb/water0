@@ -1,6 +1,7 @@
 package com.water0.hydration.presentation.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -26,13 +28,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,6 +51,8 @@ import com.water0.hydration.presentation.home.components.RecommendationCard
 import com.water0.hydration.presentation.home.components.TodayEntriesList
 import com.water0.hydration.presentation.navigation.BottomNavBar
 import com.water0.hydration.presentation.navigation.Routes
+import com.water0.hydration.ui.theme.AuroraBackground
+import com.water0.hydration.ui.theme.Glass
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,6 +63,7 @@ fun HomeScreen(
     onNavigate: (String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val notice by viewModel.notice.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -64,9 +73,25 @@ fun HomeScreen(
         }
     }
 
+    LaunchedEffect(notice) {
+        notice?.let {
+            snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Short)
+            viewModel.consumeNotice()
+        }
+    }
+
+    // Living background: drifts with hydration state so the whole screen
+    // reflects behind/ahead at a glance. Animated for smooth transitions.
+    val backgroundTarget = backgroundFor(uiState)
+    val background by animateColorAsState(
+        targetValue = backgroundTarget,
+        animationSpec = tween(durationMillis = 1000),
+        label = "background"
+    )
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = background,
         bottomBar = {
             BottomNavBar(selected = Routes.HOME, onSelect = onNavigate)
         },
@@ -79,7 +104,7 @@ fun HomeScreen(
                 ),
                 actions = {
                     TextButton(onClick = onSettingsClick) {
-                        Text(text = "⚙️", fontSize = 20.sp)
+                        Text(text = "Settings", fontSize = 14.sp)
                     }
                 }
             )
@@ -89,12 +114,13 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
         ) {
+            AuroraBackground(modifier = Modifier.fillMaxSize())
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 when (val state = uiState) {
@@ -114,7 +140,7 @@ fun HomeScreen(
                         QuickAddButtons(
                             onAdd = { amount ->
                                 viewModel.quickAdd(amount)
-                                notify("Added $amount ml 💧")
+                                    notify("Added $amount ml")
                             }
                         )
 
@@ -123,7 +149,7 @@ fun HomeScreen(
                                 recommendations = state.recommendations,
                                 onAction = { amount ->
                                     viewModel.quickAdd(amount)
-                                    notify("Added $amount ml 💧")
+                                notify("Added $amount ml")
                                 }
                             )
                         }
@@ -184,19 +210,49 @@ fun HomeScreen(
     }
 }
 
+// Background tint per hydration state. Behind = muted plum deepening the
+// further behind; on track = plain theme background; ahead = deep teal
+// that strengthens past the goal; over the cap = dark maroon warning.
+@Composable
+private fun backgroundFor(uiState: HomeViewModel.UiState): Color {
+    val base = MaterialTheme.colorScheme.background
+    val state = uiState as? HomeViewModel.UiState.Success ?: return base
+    return when (state.status) {
+        RecommendationEngine.HydrationStatus.Status.OVER ->
+            Color(0xFF3D1A24)
+        RecommendationEngine.HydrationStatus.Status.BEHIND -> {
+            val depth = ((70 - state.percentage.coerceAtMost(70)) / 70f * 0.55f)
+                .coerceIn(0f, 0.55f)
+            lerp(base, Color(0xFF33202E), depth)
+        }
+        RecommendationEngine.HydrationStatus.Status.ON_TRACK -> base
+        RecommendationEngine.HydrationStatus.Status.AHEAD -> {
+            val glow = (((state.percentage - 100).coerceAtLeast(0)) / 40f * 0.6f)
+                .coerceIn(0f, 0.6f)
+            lerp(base, Color(0xFF12333B), glow)
+        }
+    }
+}
+
 @Composable
 fun StatusIndicator(status: RecommendationEngine.HydrationStatus.Status) {
     val (text, color) = when (status) {
-        RecommendationEngine.HydrationStatus.Status.BEHIND -> "Behind Goal 📉" to Color(0xFFEF5350)
-        RecommendationEngine.HydrationStatus.Status.ON_TRACK -> "On Track ✅" to Color(0xFF43A047)
-        RecommendationEngine.HydrationStatus.Status.AHEAD -> "Ahead! 🎉" to Color(0xFF1E88E5)
+        RecommendationEngine.HydrationStatus.Status.BEHIND -> "Behind goal" to Color(0xFFEF5350)
+        RecommendationEngine.HydrationStatus.Status.ON_TRACK -> "On track" to Color(0xFF43A047)
+        RecommendationEngine.HydrationStatus.Status.AHEAD -> "Ahead of goal" to Color(0xFF1E88E5)
+        RecommendationEngine.HydrationStatus.Status.OVER -> "Over the safe limit" to Color(0xFFFF5252)
     }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(32.dp)
-            .background(color.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+            .height(36.dp)
+            .background(color.copy(alpha = 0.14f), RoundedCornerShape(10.dp))
+            .border(
+                1.dp,
+                color.copy(alpha = 0.35f),
+                RoundedCornerShape(10.dp)
+            )
             .padding(horizontal = 16.dp)
     ) {
         Text(
@@ -221,7 +277,7 @@ fun RecommendationsSection(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
-            text = "💡 Smart Recommendations",
+            text = "Recommendations",
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 16.dp)

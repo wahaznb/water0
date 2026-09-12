@@ -45,6 +45,8 @@ import com.water0.hydration.data.local.entity.UserProfile
 import com.water0.hydration.di.AppContainer
 import com.water0.hydration.presentation.navigation.BottomNavBar
 import com.water0.hydration.presentation.navigation.Routes
+import com.water0.hydration.ui.theme.glassCardBorder
+import com.water0.hydration.ui.theme.glassCardContainer
 import kotlin.math.roundToInt
 
 class SettingsViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
@@ -63,6 +65,8 @@ class SettingsViewModelFactory(private val context: Context) : ViewModelProvider
 fun SettingsScreen(
     onBackClick: () -> Unit,
     onNavigate: (String) -> Unit = {},
+    darkTheme: Boolean = true,
+    onToggleTheme: (Boolean) -> Unit = {},
     viewModel: SettingsViewModel = viewModel(
         factory = SettingsViewModelFactory(LocalContext.current)
     )
@@ -115,6 +119,7 @@ fun SettingsScreen(
                 RemindersSection(profile = current, viewModel = viewModel)
                 SleepSection(profile = current, viewModel = viewModel)
                 UnitsSection(profile = current, viewModel = viewModel)
+                AppearanceSection(darkTheme = darkTheme, onToggleTheme = onToggleTheme)
             }
         }
     }
@@ -125,9 +130,10 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = glassCardContainer()
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        border = glassCardBorder(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -146,7 +152,7 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
 
 @Composable
 private fun ProfileSection(profile: UserProfile, viewModel: SettingsViewModel) {
-    SectionCard(title = "👤 Profile") {
+    SectionCard(title = "Profile") {
         val weightLabel = if (profile.useMetricUnits) {
             "${profile.weightKg.roundToInt()} kg"
         } else {
@@ -231,7 +237,7 @@ private fun ProfileSection(profile: UserProfile, viewModel: SettingsViewModel) {
 @Composable
 private fun GoalSection(profile: UserProfile, viewModel: SettingsViewModel) {
     val breakdown = viewModel.breakdown(profile)
-    SectionCard(title = "🎯 Daily goal: ${breakdown.totalMl} ml") {
+    SectionCard(title = "Daily goal: ${breakdown.totalMl} ml") {
         Text(
             text = breakdown.explanation,
             fontSize = 13.sp,
@@ -242,7 +248,7 @@ private fun GoalSection(profile: UserProfile, viewModel: SettingsViewModel) {
 
 @Composable
 private fun RemindersSection(profile: UserProfile, viewModel: SettingsViewModel) {
-    SectionCard(title = "🔔 Reminders") {
+    SectionCard(title = "Reminders") {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -290,7 +296,7 @@ private fun RemindersSection(profile: UserProfile, viewModel: SettingsViewModel)
 
 @Composable
 private fun SleepSection(profile: UserProfile, viewModel: SettingsViewModel) {
-    SectionCard(title = "😴 Active hours") {
+    SectionCard(title = "Active hours") {
         Text(
             text = "Wake up: ${"%02d".format(profile.wakeUpHour)}:00",
             fontSize = 16.sp,
@@ -318,7 +324,7 @@ private fun SleepSection(profile: UserProfile, viewModel: SettingsViewModel) {
 
 @Composable
 private fun UnitsSection(profile: UserProfile, viewModel: SettingsViewModel) {
-    SectionCard(title = "📏 Units") {
+    SectionCard(title = "Units") {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -348,6 +354,23 @@ private fun UnitsSection(profile: UserProfile, viewModel: SettingsViewModel) {
         ) {
             RadioButton(selected = !profile.useMetricUnits, onClick = null)
             Text(text = "Imperial (fl oz, lb)", fontSize = 14.sp)
+        }
+    }
+}
+
+@Composable
+private fun AppearanceSection(darkTheme: Boolean, onToggleTheme: (Boolean) -> Unit) {
+    SectionCard(title = "Appearance") {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = "Dark theme", fontSize = 16.sp)
+            Switch(
+                checked = darkTheme,
+                onCheckedChange = onToggleTheme
+            )
         }
     }
 }

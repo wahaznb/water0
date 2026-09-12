@@ -9,6 +9,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,24 +57,52 @@ class MainActivity : ComponentActivity() {
         seedDefaults()
         requestNotificationPermission()
         AppContainer.getNotificationScheduler(this).ensureScheduled()
+        // Theme choice persists in plain SharedPreferences: a single
+        // boolean flag is exactly what prefs are for (no DB migration).
+        // Default is dark, Omarchy-style.
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         setContent {
-            Water0 {
+            var darkTheme by remember {
+                mutableStateOf(prefs.getBoolean(KEY_DARK_THEME, true))
+            }
+            Water0(darkTheme = darkTheme) {
                 var screen by remember { mutableStateOf(Routes.HOME) }
                 val navigate = { route: String -> screen = route }
-                when (screen) {
-                    Routes.HISTORY -> HistoryScreen(onNavigate = navigate)
-                    Routes.SETTINGS -> SettingsScreen(
-                        onBackClick = { screen = Routes.HOME },
-                        onNavigate = navigate
-                    )
-                    else -> HomeScreen(
-                        viewModel = viewModel,
-                        onSettingsClick = { screen = Routes.SETTINGS },
-                        onNavigate = navigate
-                    )
+                AnimatedContent(
+                    targetState = screen,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = androidx.compose.animation.core.tween(250)) +
+                            slideInHorizontally(animationSpec = androidx.compose.animation.core.tween(250)) { it / 5 }) togetherWith
+                            (fadeOut(animationSpec = androidx.compose.animation.core.tween(200)) +
+                                slideOutHorizontally(animationSpec = androidx.compose.animation.core.tween(200)) { -it / 5 })
+                    },
+                    label = "screen"
+                ) { current ->
+                    when (current) {
+                        Routes.HISTORY -> HistoryScreen(onNavigate = navigate)
+                        Routes.SETTINGS -> SettingsScreen(
+                            onBackClick = { screen = Routes.HOME },
+                            onNavigate = navigate,
+                            darkTheme = darkTheme,
+                            onToggleTheme = { enabled ->
+                                darkTheme = enabled
+                                prefs.edit().putBoolean(KEY_DARK_THEME, enabled).apply()
+                            }
+                        )
+                        else -> HomeScreen(
+                            viewModel = viewModel,
+                            onSettingsClick = { screen = Routes.SETTINGS },
+                            onNavigate = navigate
+                        )
+                    }
                 }
             }
         }
+    }
+
+    companion object {
+        private const val PREFS_NAME = "water0_prefs"
+        private const val KEY_DARK_THEME = "dark_theme"
     }
 
     // POST_NOTIFICATIONS is runtime-gated on API 33+. Without it the

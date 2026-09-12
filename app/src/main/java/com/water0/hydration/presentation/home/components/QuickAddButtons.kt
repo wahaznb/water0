@@ -3,6 +3,7 @@ package com.water0.hydration.presentation.home.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -74,8 +75,13 @@ fun QuickAddButton(
             .padding(horizontal = 4.dp),
         enabled = enabled,
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (enabled) color else MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+            containerColor = if (enabled) color.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            contentColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (enabled) color.copy(alpha = 0.45f)
+            else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
         ),
         shape = RoundedCornerShape(12.dp)
     ) {
