@@ -183,9 +183,13 @@ fun HomeUiFrame(
     )
 
     Box(modifier = modifier.fillMaxSize()) {
+        // Background breathes with the glass: more water, more life.
+        val energy = ((uiState as? HomeViewModel.UiState.Success)
+            ?.percentage?.div(100f) ?: 0.35f).coerceIn(0f, 1f)
         AuroraBackground(
             modifier = Modifier.fillMaxSize(),
-            hydrationTint = hydrationTint
+            hydrationTint = hydrationTint,
+            energy = energy
         )
         when (val state = uiState) {
             is HomeViewModel.UiState.Success -> {

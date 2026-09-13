@@ -1,11 +1,17 @@
 package com.water0.hydration.ui.theme
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -138,21 +144,52 @@ fun statusTint(
     }
 }
 
-// Fixed mesh background: 3 Canvas-drawn radial gradients, NO Modifier.blur
-// on large areas (that caused banding/artifacts + GPU cost). Haze blur is
-// reserved for the small bottom bar / dialogs. Drift is via slow offset
-// animation in the caller if desired — this composable itself is static.
+// Fixed mesh background with living water: three Canvas radial washes
+// that slowly swirl, plus bubble particles rising to the top. `energy`
+// (0..1, wired to hydration progress) drives bubble count, opacity, and
+// swirl speed — the background reacts to how full the glass is. NO
+// Modifier.blur on large areas (banding/GPU cost); motion comes from
+// cheap Canvas draws on one infinite clock.
 @Composable
 fun AuroraBackground(
     modifier: Modifier = Modifier,
-    hydrationTint: Color = Color.Transparent
+    hydrationTint: Color = Color.Transparent,
+    energy: Float = 0.4f
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
     val tertiary = MaterialTheme.colorScheme.tertiary
+    val drift = rememberInfiniteTransition(label = "aurora")
+    // Full swirl every ~26s; bubbles loop every ~7s.
+    val swirl by drift.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * kotlin.math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = (26000 / (0.5f + energy)).toInt(),
+                easing = LinearEasing
+            )
+        ),
+        label = "swirl"
+    )
+    val rise by drift.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 7000, easing = LinearEasing)
+        ),
+        label = "rise"
+    )
     androidx.compose.foundation.Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
+        // Each wash orbits the screen center slightly — a slow swirl,
+        // not a spin. Radius of orbit scales with wash size.
+        fun orbit(fx: Float, fy: Float, r: Float, phase: Float): androidx.compose.ui.geometry.Offset {
+            val ox = kotlin.math.cos(swirl + phase) * w * r
+            val oy = kotlin.math.sin(swirl + phase) * h * r
+            return androidx.compose.ui.geometry.Offset(w * fx + ox, h * fy + oy)
+        }
         // Top-left water-blue wash. Strong on purpose: translucent cards
         // and water drink straight from this mesh.
         drawRect(
@@ -161,7 +198,7 @@ fun AuroraBackground(
                     primary.copy(alpha = 0.24f),
                     Color.Transparent
                 ),
-                center = androidx.compose.ui.geometry.Offset(w * 0.12f, h * 0.06f),
+                center = orbit(0.12f, 0.06f, 0.05f, 0f),
                 radius = w * 0.75f
             ),
             size = size
@@ -173,7 +210,7 @@ fun AuroraBackground(
                     secondary.copy(alpha = 0.18f),
                     Color.Transparent
                 ),
-                center = androidx.compose.ui.geometry.Offset(w * 0.92f, h * 0.94f),
+                center = orbit(0.92f, 0.94f, 0.04f, 2.1f),
                 radius = w * 0.70f
             ),
             size = size
@@ -185,11 +222,26 @@ fun AuroraBackground(
                     tertiary.copy(alpha = 0.11f),
                     Color.Transparent
                 ),
-                center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.45f),
+                center = orbit(0.5f, 0.45f, 0.06f, 4.2f),
                 radius = w * 0.55f
             ),
             size = size
         )
+        // Rising bubble particles. More, brighter, and faster with energy.
+        val count = (6 + energy * 12).toInt()
+        for (i in 0 until count) {
+            val seed = ((i * 37) % 100) / 100f
+            val speed = 0.6f + (i % 4) * 0.2f
+            val t = (rise * speed + seed) % 1f
+            val x = (((i * 53) % 100) / 100f) * w +
+                kotlin.math.sin(t * 6.28f + seed * 6.28f).toFloat() * 8.dp.toPx()
+            val y = h * 1.05f - t * h * 1.1f
+            drawCircle(
+                primary.copy(alpha = (0.10f + energy * 0.14f) * (1f - t * 0.5f)),
+                (1.5f + (i % 3)).dp.toPx() * 0.5f,
+                androidx.compose.ui.geometry.Offset(x, y)
+            )
+        }
         if (hydrationTint != Color.Transparent) {
             drawRect(color = hydrationTint, size = size)
         }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,7 +58,10 @@ import kotlinx.coroutines.launch
 @Composable
 fun WaterGlass(
     modifier: Modifier = Modifier,
-    progress: Float,
+    /** Already-animated 0..1 fill (the stage owns the animation clock). */
+    level: Float,
+    /** True when intake passed the goal: foam cap instead of clipping. */
+    overfull: Boolean,
     totalMl: Int,
     goalMl: Int,
     width: Dp = 200.dp,
@@ -71,12 +75,8 @@ fun WaterGlass(
     /** True while the pour stream is running (extra turbulence + foam). */
     pouring: Boolean = false
 ) {
-    // Level glides to the new value on every log; wave drifts forever.
-    val level by animateFloatAsState(
-        targetValue = progress.coerceIn(0f, 1f),
-        animationSpec = tween(durationMillis = 900),
-        label = "level"
-    )
+    // Wave phase drifts forever; only the TOP band follows it — lower
+    // interfaces stay flat like real settled layers.
     val wave = rememberInfiniteTransition(label = "wave")
     val phase by wave.animateFloat(
         initialValue = 0f,
@@ -120,11 +120,10 @@ fun WaterGlass(
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             if (level <= 0.001f) return@Canvas
-            val overfull = progress > 1f
             val waterHeight = size.height * level
             val waterTop = size.height - waterHeight
-            // Unmixed bands, bottom-up. Each band gets its own crest with a
-            // phase offset so interfaces read as separate liquids.
+            // Unmixed bands, bottom-up. ONLY the top band waves — the
+            // interfaces below stay flat like settled liquids.
             val twoPi = (2 * PI).toFloat()
             val waveLength = size.width / 1.5f
             val amplitude = (7 + sloshBoostDp).dp.toPx()
@@ -145,13 +144,16 @@ fun WaterGlass(
                     topLeft = Offset(0f, bandTop),
                     size = Size(size.width, bandHeight)
                 )
-                // Crest fill + bright surface line (shimmer).
-                val phaseShift = phase + index * 1.3f
+                val isTop = index == bands.lastIndex
+                // Lower bands keep a flat interface; only the surface
+                // follows the drifting phase.
+                val phaseShift = if (isTop) phase + index * 1.3f else index * 1.3f
+                val amp = if (isTop) amplitude else 0f
                 val crest = Path().apply {
                     moveTo(0f, bandTop)
                     var x = 0f
                     while (x <= size.width) {
-                        lineTo(x, bandTop + sin(x / waveLength * twoPi + phaseShift) * amplitude)
+                        lineTo(x, bandTop + sin(x / waveLength * twoPi + phaseShift) * amp)
                         x += 4.dp.toPx()
                     }
                     lineTo(size.width, bandBottom)
@@ -159,21 +161,23 @@ fun WaterGlass(
                     close()
                 }
                 drawPath(crest, band.color.copy(alpha = 0.60f))
-                val crestLine = Path().apply {
-                    moveTo(0f, bandTop + sin(phaseShift) * amplitude)
-                    var x = 0f
-                    while (x <= size.width) {
-                        lineTo(x, bandTop + sin(x / waveLength * twoPi + phaseShift) * amplitude)
-                        x += 4.dp.toPx()
+                if (isTop) {
+                    val crestLine = Path().apply {
+                        moveTo(0f, bandTop + sin(phase) * amplitude)
+                        var x = 0f
+                        while (x <= size.width) {
+                            lineTo(x, bandTop + sin(x / waveLength * twoPi + phase) * amplitude)
+                            x += 4.dp.toPx()
+                        }
                     }
-                }
-                drawPath(
-                    crestLine,
-                    Color.White.copy(alpha = 0.45f),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(
-                        width = 1.5.dp.toPx()
+                    drawPath(
+                        crestLine,
+                        Color.White.copy(alpha = 0.45f),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = 1.5.dp.toPx()
+                        )
                     )
-                )
+                }
                 bandBottom = bandTop
             }
             // Depth shading over the whole column: clear top, deep bottom.
@@ -302,6 +306,7 @@ fun SloshDriver(
 val GlassStageWidth = 200.dp
 val GlassStageHeight = 280.dp
 private val SpillRoom = 110.dp
+private val FallZone = 150.dp
 private const val LipXFrac = 0.04f
 private const val LipYFrac = 0.08f
 
@@ -315,28 +320,28 @@ fun pourPinOffset(
     glassWPx: Float,
     glassHPx: Float,
     lipXPx: Float,
-    lipYPx: Float
+    lipYPx: Float,
+    pivotXPx: Float = glassWPx / 2,
+    pivotYPx: Float = glassHPx
 ): androidx.compose.ui.geometry.Offset {
     if (tiltDegrees == 0f) return androidx.compose.ui.geometry.Offset.Zero
     val rad = Math.toRadians(tiltDegrees.toDouble())
     val cos = kotlin.math.cos(rad)
     val sin = kotlin.math.sin(rad)
-    val px = glassWPx / 2
-    val py = glassHPx
-    val vx = lipXPx - px
-    val vy = lipYPx - py
+    val vx = lipXPx - pivotXPx
+    val vy = lipYPx - pivotYPx
     val rx = vx * cos - vy * sin
     val ry = vx * sin + vy * cos
     return androidx.compose.ui.geometry.Offset(
-        (lipXPx - (px + rx)).toFloat(),
-        (lipYPx - (py + ry)).toFloat()
+        (lipXPx - (pivotXPx + rx)).toFloat(),
+        (lipYPx - (pivotYPx + ry)).toFloat()
     )
 }
 
 /**
- * Full hero stage: optional add-pour stream on top, the tilting glass
- * with its lip pinned, and the spill stream arcing out of the mouth
- * while tilted deep. Maximum motion by design.
+ * Full hero stage: droplets fall from above onto the glass while pouring,
+ * the tilting glass keeps its lip pinned, and the spill stream arcs out
+ * of the mouth while tilted deep. Maximum motion by design.
  */
 @Composable
 fun WaterStage(
@@ -350,42 +355,68 @@ fun WaterStage(
     modifier: Modifier = Modifier
 ) {
     val density = androidx.compose.ui.platform.LocalDensity.current
+    // The level clock lives here so the droplets and the glass share it.
+    val level by animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 900),
+        label = "level"
+    )
+    val pourClock = rememberInfiniteTransition(label = "pour")
+    val fall by pourClock.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1100, easing = LinearEasing)
+        ),
+        label = "fall"
+    )
     val spillAlpha = ((-tiltDegrees - 10f) / 28f).coerceIn(0f, 1f)
+    // Glass sits below a fall zone; both share one overlay box so the
+    // droplets land exactly on the live surface.
+    val fallHpx = with(density) { FallZone.toPx() }
+    val glassHpx = with(density) { GlassStageHeight.toPx() }
+    val glassWpx = with(density) { GlassStageWidth.toPx() }
+    val surfaceY = fallHpx + (1f - level) * glassHpx
+    val lip = Offset(glassWpx * LipXFrac, fallHpx + glassHpx * LipYFrac)
     androidx.compose.foundation.layout.Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (pouring) {
-            Box(
-                modifier = Modifier
-                    .width(14.dp)
-                    .height(64.dp)
-                    .alpha(0.85f)
-                    .background(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                        RoundedCornerShape(7.dp)
-                    )
-            )
-        }
         Box(
-            modifier = Modifier.size(GlassStageWidth, GlassStageHeight + SpillRoom)
+            modifier = Modifier.size(
+                GlassStageWidth,
+                FallZone + GlassStageHeight + SpillRoom
+            )
         ) {
-            val pin = with(density) {
-                val w = GlassStageWidth.toPx()
-                val h = GlassStageHeight.toPx()
-                pourPinOffset(tiltDegrees, w, h, w * LipXFrac, h * LipYFrac)
+            if (pouring) {
+                DropletPour(
+                    modifier = Modifier.fillMaxSize(),
+                    phase = fall,
+                    surfaceYPx = surfaceY
+                )
             }
+            val pin = pourPinOffset(
+                tiltDegrees,
+                glassWpx,
+                glassHpx,
+                glassWpx * LipXFrac,
+                glassHpx * LipYFrac,
+                pivotXPx = glassWpx / 2,
+                pivotYPx = fallHpx + glassHpx
+            )
             Box(
                 modifier = Modifier
                     .size(GlassStageWidth, GlassStageHeight)
                     .align(Alignment.TopCenter)
+                    .offset(y = FallZone)
                     .graphicsLayer {
                         translationX = pin.x
                         translationY = pin.y
                     }
             ) {
                 WaterGlass(
-                    progress = progress,
+                    level = level,
+                    overfull = progress > 1f,
                     totalMl = totalMl,
                     goalMl = goalMl,
                     width = GlassStageWidth,
@@ -399,9 +430,55 @@ fun WaterStage(
             if (spillAlpha > 0.01f) {
                 SpillStream(
                     modifier = Modifier.fillMaxSize(),
-                    alpha = spillAlpha
+                    alpha = spillAlpha,
+                    lip = lip
                 )
             }
+        }
+    }
+}
+
+/**
+ * Real droplets: five staggered drops accelerate out of the top of the
+ * screen onto the live surface, with expanding splash rings where each
+ * one lands. Deterministic in the loop phase — no state to manage.
+ */
+@Composable
+private fun DropletPour(
+    modifier: Modifier = Modifier,
+    phase: Float,
+    surfaceYPx: Float
+) {
+    val water = MaterialTheme.colorScheme.primary
+    Canvas(modifier = modifier) {
+        val cx = size.width / 2
+        for (i in 0 until 5) {
+            val t = (phase + i * 0.2f) % 1f
+            val y = surfaceYPx * t * t
+            val x = cx + sin(t * PI.toFloat() * 2 + i * 1.7f) * 10.dp.toPx()
+            val alpha = 1f - t * 0.25f
+            drawCircle(
+                water.copy(alpha = 0.85f * alpha),
+                (4.5f + t * 2.5f).dp.toPx() * 0.5f,
+                Offset(x, y)
+            )
+            drawCircle(
+                water.copy(alpha = 0.30f * alpha),
+                (4.5f + t * 2.5f).dp.toPx() * 0.5f,
+                Offset(x, y - 9.dp.toPx())
+            )
+        }
+        // Splash rings blooming on the surface.
+        for (j in 0 until 2) {
+            val st = (phase * 2 + j * 0.5f) % 1f
+            drawCircle(
+                Color.White.copy(alpha = 0.5f * (1f - st)),
+                st * 16.dp.toPx(),
+                Offset(cx, surfaceYPx),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = 2.dp.toPx()
+                )
+            )
         }
     }
 }
@@ -410,14 +487,12 @@ fun WaterStage(
 @Composable
 private fun SpillStream(
     modifier: Modifier = Modifier,
-    alpha: Float
+    alpha: Float,
+    lip: Offset
 ) {
     val water = MaterialTheme.colorScheme.primary
     Canvas(modifier = modifier) {
-        val w = GlassStageWidth.toPx()
-        val h = GlassStageHeight.toPx()
-        val lip = Offset(w * LipXFrac, h * LipYFrac)
-        val end = Offset(lip.x - 52.dp.toPx(), h + SpillRoom.toPx() - 8.dp.toPx())
+        val end = Offset(lip.x - 52.dp.toPx(), lip.y + 88.dp.toPx())
         val ctrl = Offset(lip.x - 30.dp.toPx(), lip.y + 44.dp.toPx())
         val path = Path().apply {
             moveTo(lip.x, lip.y)

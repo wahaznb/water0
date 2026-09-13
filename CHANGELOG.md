@@ -31,6 +31,9 @@ All notable changes to Water0 are documented here. Format follows
   drag-select with springy droplet, release to navigate
 - Motion pass: press bounce on quick-add, cascading card entrances,
   gliding status tint, animated glass numerals
+- Top-layer-only waves; droplet pour with splash rings (replaces the bar
+  stream); glass badge on the active tab (no dot); footer chrome removed
+- Living background: swirling washes + rising bubbles reacting to progress
 - Opt-in training-data export (Settings → Your data, 90-day simulator-schema
   CSV, fully offline) + single-user time split in `train_model.py`
 - Personal-pace nudge: recommendations adapt to the user's own 7-day rhythm
