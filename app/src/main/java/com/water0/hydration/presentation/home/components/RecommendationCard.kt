@@ -98,14 +98,13 @@ fun RecommendationCard(
             ) {
                 Text(
                     text = recommendation.message,
-                    fontSize = 14.sp,
-                    color = textColor,
-                    fontWeight = FontWeight.Medium
+                    style = MaterialTheme.typography.labelLarge,
+                    color = textColor
                 )
                 if (recommendation.suggestedAmountMl > 0) {
                     Text(
                         text = "Suggested: ${recommendation.suggestedAmountMl}ml",
-                        fontSize = 12.sp,
+                        style = MaterialTheme.typography.labelMedium,
                         color = textColor.copy(alpha = 0.7f)
                     )
                 }

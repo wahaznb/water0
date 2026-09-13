@@ -153,12 +153,12 @@ fun AuroraBackground(
     androidx.compose.foundation.Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
-        // Top-left water-blue wash. Kept dim: cards are translucent now
-        // and the mesh glows through them, so loud washes band and glare.
+        // Top-left water-blue wash. Strong on purpose: translucent cards
+        // and water drink straight from this mesh.
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    primary.copy(alpha = 0.13f),
+                    primary.copy(alpha = 0.24f),
                     Color.Transparent
                 ),
                 center = androidx.compose.ui.geometry.Offset(w * 0.12f, h * 0.06f),
@@ -170,7 +170,7 @@ fun AuroraBackground(
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    secondary.copy(alpha = 0.10f),
+                    secondary.copy(alpha = 0.18f),
                     Color.Transparent
                 ),
                 center = androidx.compose.ui.geometry.Offset(w * 0.92f, h * 0.94f),
@@ -182,7 +182,7 @@ fun AuroraBackground(
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    tertiary.copy(alpha = 0.06f),
+                    tertiary.copy(alpha = 0.11f),
                     Color.Transparent
                 ),
                 center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.45f),

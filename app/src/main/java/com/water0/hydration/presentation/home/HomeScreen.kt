@@ -50,7 +50,7 @@ import com.water0.hydration.presentation.home.components.AddWaterDialog
 import com.water0.hydration.presentation.home.components.QuickAddButtons
 import com.water0.hydration.presentation.home.components.RecommendationCard
 import com.water0.hydration.presentation.home.components.SloshDriver
-import com.water0.hydration.presentation.home.components.WaterGlass
+import com.water0.hydration.presentation.home.components.WaterStage
 import com.water0.hydration.presentation.home.components.layersFor
 import com.water0.hydration.ui.theme.AuroraBackground
 import kotlinx.coroutines.delay
@@ -91,7 +91,8 @@ fun HomeScreen(
         }
     }
 
-    // One-shot pour/tilt choreography per kick.
+    // One-shot pour/slosh choreography per kick. The glass itself stays
+    // static — only the liquid moves (tilt discarded on purpose).
     LaunchedEffect(kick) {
         when (kick) {
             is GlassKick.Pour -> {
@@ -119,31 +120,14 @@ fun HomeScreen(
                 onDone = { viewModel.consumeGlassKick() }
             )
         }
-        if (pouring) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(14.dp)
-                        .height(64.dp)
-                        .alpha(0.85f)
-                        .background(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                            RoundedCornerShape(7.dp)
-                        )
-                )
-            }
-        }
-        WaterGlass(
-            modifier = Modifier.padding(top = if (pouring) 0.dp else 12.dp),
+        WaterStage(
             progress = state.percentage / 100f,
             totalMl = state.totalEffectiveMl,
             goalMl = state.goalMl,
+            layers = layersFor(state.entries),
             tiltDegrees = tilt,
             sloshBoostDp = slosh,
-            layers = layersFor(state.entries)
+            pouring = pouring
         )
 
         StatusIndicator(status = state.status)
@@ -264,23 +248,23 @@ fun HomeUiFrame(
 }
 
 // Subtle overlay tint per hydration state, drawn INSIDE the static mesh
-// (alpha <=0.06 so no banding). Behind = plum wash, ahead = teal wash,
+// (alpha <=0.10 so no banding). Behind = plum wash, ahead = teal wash,
 // over = maroon wash, on-track = transparent.
 @Composable
 private fun hydrationTintFor(uiState: HomeViewModel.UiState): Color {
     val state = uiState as? HomeViewModel.UiState.Success ?: return Color.Transparent
     return when (state.status) {
         RecommendationEngine.HydrationStatus.Status.OVER ->
-            Color(0xFF3D1A24).copy(alpha = 0.06f)
+            Color(0xFF3D1A24).copy(alpha = 0.10f)
         RecommendationEngine.HydrationStatus.Status.BEHIND -> {
-            val depth = ((70 - state.percentage.coerceAtMost(70)) / 70f * 0.06f)
-                .coerceIn(0f, 0.06f)
+            val depth = ((70 - state.percentage.coerceAtMost(70)) / 70f * 0.10f)
+                .coerceIn(0f, 0.10f)
             Color(0xFF33202E).copy(alpha = depth)
         }
         RecommendationEngine.HydrationStatus.Status.ON_TRACK -> Color.Transparent
         RecommendationEngine.HydrationStatus.Status.AHEAD -> {
-            val glow = (((state.percentage - 100).coerceAtLeast(0)) / 40f * 0.06f)
-                .coerceIn(0f, 0.06f)
+            val glow = (((state.percentage - 100).coerceAtLeast(0)) / 40f * 0.10f)
+                .coerceIn(0f, 0.10f)
             Color(0xFF12333B).copy(alpha = glow)
         }
     }
@@ -288,12 +272,18 @@ private fun hydrationTintFor(uiState: HomeViewModel.UiState): Color {
 
 @Composable
 fun StatusIndicator(status: RecommendationEngine.HydrationStatus.Status) {
-    val (text, color) = when (status) {
+    val (text, target) = when (status) {
         RecommendationEngine.HydrationStatus.Status.BEHIND -> "Behind goal" to Color(0xFFEF5350)
         RecommendationEngine.HydrationStatus.Status.ON_TRACK -> "On track" to Color(0xFF43A047)
         RecommendationEngine.HydrationStatus.Status.AHEAD -> "Ahead of goal" to Color(0xFF1E88E5)
         RecommendationEngine.HydrationStatus.Status.OVER -> "Over the safe limit" to Color(0xFFFF5252)
     }
+    // Tint glides instead of snapping when hydration state flips.
+    val color by animateColorAsState(
+        targetValue = target,
+        animationSpec = tween(durationMillis = 600),
+        label = "statusTint"
+    )
 
     Box(
         modifier = Modifier
@@ -324,21 +314,30 @@ fun RecommendationsSection(
     recommendations: List<RecommendationEngine.Recommendation>,
     onAction: (Int) -> Unit
 ) {
+    // Cards cascade in once on first composition; static afterwards so
+    // recomposition (every log) never replays the entrance.
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { entered = true }
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
-            text = "Recommendations",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
-        recommendations.forEach { rec ->
-            RecommendationCard(
-                recommendation = rec,
-                onAction = onAction
-            )
+        com.water0.hydration.ui.theme.SectionHeader(text = "Recommendations")
+        recommendations.forEachIndexed { index, rec ->
+            androidx.compose.animation.AnimatedVisibility(
+                visible = entered,
+                enter = androidx.compose.animation.fadeIn(
+                    animationSpec = tween(durationMillis = 300, delayMillis = index * 70)
+                ) + androidx.compose.animation.slideInVertically(
+                    animationSpec = tween(durationMillis = 300, delayMillis = index * 70)
+                ) { it / 3 },
+                label = "recEnter$index"
+            ) {
+                RecommendationCard(
+                    recommendation = rec,
+                    onAction = onAction
+                )
+            }
         }
     }
 }

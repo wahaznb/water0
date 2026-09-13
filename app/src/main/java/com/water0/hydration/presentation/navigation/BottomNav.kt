@@ -2,6 +2,7 @@ package com.water0.hydration.presentation.navigation
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,10 +38,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -100,12 +104,32 @@ fun GlassBoxScope.GlassBottomBar(
 ) {
     val selectedIndex = TABS.indexOfFirst { it.route == selected }.coerceAtLeast(0)
     var barWidthPx by remember { mutableStateOf(0) }
-    // Long-press a tab and drag across the bar: the droplet previews the
-    // tab under the finger, releasing navigates there.
+    // iPhone-style hold-and-scrub: long-press magnifies nearby tabs with
+    // haptic ticks, the droplet previews under the finger, release commits.
     var dragIndex by remember { mutableStateOf<Int?>(null) }
+    var fingerX by remember { mutableStateOf<Float?>(null) }
+    val holding = fingerX != null
     val activeIndex = dragIndex ?: selectedIndex
+    val haptics = LocalHapticFeedback.current
     fun indexAt(xPx: Float): Int =
         ((xPx / barWidthPx.coerceAtLeast(1) * TABS.size).toInt()).coerceIn(0, TABS.size - 1)
+    // Bar breathes up slightly while held, like the iOS tab bar expand.
+    val barScale by animateFloatAsState(
+        targetValue = if (holding) 1.03f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "barHold"
+    )
+    val dropletSize by animateDpAsState(
+        targetValue = if (holding) 14.dp else 10.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "dropletSize"
+    )
     val density = LocalDensity.current
     val dropletX by animateDpAsState(
         targetValue = with(density) {
@@ -127,6 +151,10 @@ fun GlassBoxScope.GlassBottomBar(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp)
+            .graphicsLayer {
+                scaleX = barScale
+                scaleY = barScale
+            }
             .border(
                 1.dp,
                 Brush.verticalGradient(
@@ -151,14 +179,30 @@ fun GlassBoxScope.GlassBottomBar(
                     .onSizeChanged { barWidthPx = it.width }
                     .pointerInput(Unit) {
                         detectDragGesturesAfterLongPress(
-                            onDragStart = { offset -> dragIndex = indexAt(offset.x) },
-                            onDragCancel = { dragIndex = null },
+                            onDragStart = { offset ->
+                                fingerX = offset.x
+                                val idx = indexAt(offset.x)
+                                if (idx != dragIndex) {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                }
+                                dragIndex = idx
+                            },
+                            onDragCancel = {
+                                dragIndex = null
+                                fingerX = null
+                            },
                             onDragEnd = {
                                 dragIndex?.let { onSelect(TABS[it].route) }
                                 dragIndex = null
+                                fingerX = null
                             },
                             onDrag = { change, _ ->
-                                dragIndex = indexAt(change.position.x)
+                                fingerX = change.position.x
+                                val idx = indexAt(change.position.x)
+                                if (idx != dragIndex) {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                }
+                                dragIndex = idx
                                 change.consume()
                             }
                         )
@@ -167,11 +211,30 @@ fun GlassBoxScope.GlassBottomBar(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val tabWidth = barWidthPx.toFloat() / TABS.size
                 TABS.forEachIndexed { index, tab ->
+                    // Dock magnification: tabs swell near the finger with a
+                    // gaussian falloff, each springing toward its target.
+                    val center = tabWidth * (index + 0.5f)
+                    val fx = fingerX
+                    val target = if (fx == null || tabWidth == 0f) 1f
+                    else {
+                        val d = (center - fx) / (tabWidth * 0.9f)
+                        1f + 0.45f * kotlin.math.exp(-d * d).toFloat()
+                    }
+                    val magnify by animateFloatAsState(
+                        targetValue = target,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "magnify$index"
+                    )
                     GlassTab(
                         selected = index == activeIndex,
                         onClick = { onSelect(tab.route) },
                         label = tab.label,
+                        iconScale = magnify,
                         icon = { Icon(tab.icon, contentDescription = tab.label) }
                     )
                 }
@@ -180,13 +243,13 @@ fun GlassBoxScope.GlassBottomBar(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(10.dp),
+                    .height(14.dp),
                 contentAlignment = Alignment.TopStart
             ) {
                 Box(
                     modifier = Modifier
-                        .offset(x = dropletX - 5.dp)
-                        .size(10.dp)
+                        .offset(x = dropletX - dropletSize / 2)
+                        .size(dropletSize)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary)
                 ) {
@@ -210,6 +273,7 @@ private fun androidx.compose.foundation.layout.RowScope.GlassTab(
     selected: Boolean,
     onClick: () -> Unit,
     label: String,
+    iconScale: Float = 1f,
     icon: @Composable () -> Unit
 ) {
     val color = if (selected) MaterialTheme.colorScheme.primary
@@ -219,10 +283,18 @@ private fun androidx.compose.foundation.layout.RowScope.GlassTab(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            androidx.compose.runtime.CompositionLocalProvider(
-                androidx.compose.material3.LocalContentColor provides color
+            Box(
+                modifier = Modifier.graphicsLayer {
+                    scaleX = iconScale
+                    scaleY = iconScale
+                },
+                contentAlignment = Alignment.Center
             ) {
-                icon()
+                androidx.compose.runtime.CompositionLocalProvider(
+                    androidx.compose.material3.LocalContentColor provides color
+                ) {
+                    icon()
+                }
             }
             Text(
                 text = label,

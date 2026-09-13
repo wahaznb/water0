@@ -26,12 +26,21 @@ All notable changes to Water0 are documented here. Format follows
   blur + rim highlight sampled from content, AGSL on API 33+, gradient
   fallback below), driven live by the Glass Lab settings
 - About section in Settings (version, GitHub link, license)
+- Real launcher icon (IconKitchen adaptive set + monochrome + store listing)
+- iPhone-style tab bar: hold to magnify nearby tabs with haptic scrub,
+  drag-select with springy droplet, release to navigate
+- Motion pass: press bounce on quick-add, cascading card entrances,
+  gliding status tint, animated glass numerals
 - Opt-in training-data export (Settings → Your data, 90-day simulator-schema
   CSV, fully offline) + single-user time split in `train_model.py`
 - Personal-pace nudge: recommendations adapt to the user's own 7-day rhythm
   (prorated by time of day, 3-day cold-start guard, suppressed at goal)
 - Custom water amounts (preset chips + slider + exact ml field)
 - Liquid-glass water fill replacing the progress ring (animated level + wave)
+- True drink colors (alcohol red, soda black, juice sand) rendered as
+  unmixed layers; realistic liquid (depth gradient, meniscus, bubbles,
+  shimmer, overfill foam); pour-out delete (lip-pinned tilt + spill arc),
+  static glass otherwise; standout mesh background
 - `ml_training/LEARNING_GUIDE.md`: hands-on training walkthrough incl. the
   NHANES negative result; direct NHANES training retired as a direction
 

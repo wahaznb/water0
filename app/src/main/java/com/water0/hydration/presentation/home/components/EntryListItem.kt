@@ -136,13 +136,12 @@ fun EntryListItem(
             ) {
                 Text(
                     text = "${entry.type.name}  •  ${entry.amountMl}ml$effectiveText",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = timeString,
-                    fontSize = 12.sp,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

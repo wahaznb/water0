@@ -11,9 +11,9 @@ fun drinkColor(type: HydrationEntry.DrinkType): Color = when (type) {
     HydrationEntry.DrinkType.WATER -> Color(0xFF2196F3)
     HydrationEntry.DrinkType.COFFEE -> Color(0xFF795548)
     HydrationEntry.DrinkType.TEA -> Color(0xFF8D6E63)
-    HydrationEntry.DrinkType.JUICE -> Color(0xFFFF9800)
-    HydrationEntry.DrinkType.SODA -> Color(0xFFF44336)
-    HydrationEntry.DrinkType.ALCOHOL -> Color(0xFF6D4C41)
+    HydrationEntry.DrinkType.JUICE -> Color(0xFFE0BE78)
+    HydrationEntry.DrinkType.SODA -> Color(0xFF16161A)
+    HydrationEntry.DrinkType.ALCOHOL -> Color(0xFFC62828)
     HydrationEntry.DrinkType.OTHER -> Color(0xFF9E9E9E)
 }
 

@@ -67,12 +67,7 @@ fun LogScreen(
         modifier = modifier,
         onRetry = { viewModel.refresh() }
     ) { state ->
-        Text(
-            text = "Update",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
+        com.water0.hydration.ui.theme.SectionHeader(text = "Update")
 
         FlowRow(
             modifier = Modifier
@@ -114,11 +109,8 @@ fun LogScreen(
             )
         }
 
-        Text(
-            text = "Today's entries (${state.entries.size})",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 16.dp)
+        com.water0.hydration.ui.theme.SectionHeader(
+            text = "Today's entries (${state.entries.size})"
         )
         TodayEntriesList(
             entries = state.entries,
