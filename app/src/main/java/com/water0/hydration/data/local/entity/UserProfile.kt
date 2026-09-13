@@ -25,7 +25,7 @@ data class UserProfile(
 
     enum class Sex(val baseMlPerKg: Float) {
         FEMALE(31f),
-        MALE(35f)
+        MALE(33f)
     }
 
     enum class ActivityLevel(val multiplier: Float) {

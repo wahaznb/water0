@@ -3,6 +3,7 @@ package com.water0.hydration
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -12,10 +13,13 @@ import com.water0.hydration.data.local.entity.UserProfile
 import com.water0.hydration.data.repository.HydrationRepository
 import com.water0.hydration.domain.engine.RecommendationEngine
 import com.water0.hydration.domain.usecase.CalculateRecommendationUseCase
+import com.water0.hydration.domain.usecase.DeleteHydrationUseCase
 import com.water0.hydration.domain.usecase.GetTodayProgressUseCase
 import com.water0.hydration.domain.usecase.LogHydrationUseCase
+import com.water0.hydration.presentation.home.GlassScreen
 import com.water0.hydration.presentation.home.HomeScreen
 import com.water0.hydration.presentation.home.HomeViewModel
+import com.water0.hydration.presentation.home.LogScreen
 import com.water0.hydration.ui.theme.Water0
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +33,7 @@ import org.junit.runner.RunWith
 private class TestRepository : HydrationRepository {
     private val entries = MutableStateFlow<List<HydrationEntry>>(emptyList())
     private val profile = MutableStateFlow(
-        // Explicit male to pin the goal: 70kg/moderate/temperate -> 3140 ml.
+        // Explicit male to pin the goal: 70kg/moderate/temperate -> 2972 ml.
         // (Default profile is female -> 2804 ml.)
         UserProfile(
             weightKg = 70f,
@@ -83,31 +87,51 @@ class HomeScreenTest {
         return HomeViewModel(
             GetTodayProgressUseCase(repo, engine),
             LogHydrationUseCase(repo),
-            CalculateRecommendationUseCase(engine)
+            CalculateRecommendationUseCase(engine),
+            DeleteHydrationUseCase(repo)
         )
     }
 
     @Test
-    fun showsEmptyStateAndQuickAddButtons() {
+    fun homeShowsStatusAndRecommendations() {
         composeRule.setContent {
             Water0 { HomeScreen(viewModel()) }
         }
-        composeRule.onNodeWithText("Water0").assertIsDisplayed()
-        composeRule.onNodeWithText("No water logged today").assertIsDisplayed()
-        composeRule.onNodeWithText("250ml").assertIsDisplayed()
+        // Empty repo -> 0 ml -> BEHIND with a catch-up card.
+        composeRule.onNodeWithText("Behind goal").assertIsDisplayed()
+        composeRule.onNodeWithText("Recommendations").assertIsDisplayed()
     }
 
     @Test
-    fun loggingWaterUpdatesProgressRing() {
+    fun glassShowsQuickAddAndFillsOnLog() {
         composeRule.setContent {
-            Water0 { HomeScreen(viewModel()) }
+            Water0 { GlassScreen(viewModel()) }
         }
         composeRule.onNodeWithText("250ml").performClick()
-        // Default profile goal is 3140 ml, so one 250 ml log shows "250 / 3140 ml".
+        // Pinned male profile goal is 2972 ml, so one 250 ml log shows "250 / 2972 ml".
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithText("250 / 3140 ml")
+            composeRule.onAllNodesWithText("250 / 2972 ml")
                 .fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("250 / 3140 ml").assertIsDisplayed()
+        composeRule.onNodeWithText("250 / 2972 ml").assertIsDisplayed()
+    }
+
+    @Test
+    fun logShowsEntriesAndDeletesThem() {
+        val repo = TestRepository()
+        composeRule.setContent {
+            Water0 { LogScreen(viewModel(repo)) }
+        }
+        composeRule.onNodeWithText("Log intake").assertIsDisplayed()
+        composeRule.onNodeWithText("250ml").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("Today's entries (1)")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("Delete entry").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("Today's entries (0)")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
     }
 }

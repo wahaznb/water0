@@ -5,9 +5,9 @@
   "nhanes_plain_water_p90_ml": 2676.0,
   "nhanes_total_water_mean_ml": 2870.3,
   "nhanes_total_water_median_ml": 2571.0,
-  "nhanes_total_met_rate": 0.279,
-  "nhanes_goal_mean_ml": 3579.5,
-  "nhanes_met_rate": 0.052,
+  "nhanes_total_met_rate": 0.297,
+  "nhanes_goal_mean_ml": 3472.8,
+  "nhanes_met_rate": 0.056,
   "nhanes_activity_fallback_share": 0.0,
   "nhanes_plain_water_mean_ml_female": 1196.1,
   "n_female": 2527,
@@ -15,9 +15,9 @@
   "nhanes_plain_water_mean_ml_male": 1228.5,
   "n_male": 2404,
   "nhanes_total_water_mean_ml_male": 3127.4,
-  "sim_total_day_mean_ml": 2686.9,
-  "sim_goal_mean_ml": 3061.8,
-  "sim_met_rate": 0.336,
+  "sim_total_day_mean_ml": 2649.8,
+  "sim_goal_mean_ml": 2979.6,
+  "sim_met_rate": 0.351,
   "sim_total_day_mean_ml_female": 2549.5,
-  "sim_total_day_mean_ml_male": 2821.7
+  "sim_total_day_mean_ml_male": 2748.2
 }

@@ -38,7 +38,7 @@ class CalculateRecommendationUseCase(
             appendLine("• Climate (${profile.climate.name}): +${goal.climateExtraMl}ml")
             appendLine()
             appendLine("Formula: ${perKg}ml × weight × activity_multiplier + climate_bonus")
-            appendLine("Base by sex: Female=31ml/kg, Male=35ml/kg")
+            appendLine("Base by sex: Female=31ml/kg, Male=33ml/kg")
             appendLine("Activity multipliers: Sedentary=1.0, Light=1.1, Moderate=1.2, Active=1.3, Very Active=1.4")
             appendLine("Climate bonuses: Cold=0, Temperate=200, Hot=500, Very Hot=800ml")
         }

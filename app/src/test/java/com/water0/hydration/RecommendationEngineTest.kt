@@ -21,8 +21,30 @@ class RecommendationEngineTest {
         reminderIntervalMinutes = 60,
         quietHoursStart = 22,
         quietHoursEnd = 7,
-        sex = UserProfile.Sex.MALE // 35ml/kg -> base 2940
+        sex = UserProfile.Sex.MALE // 33ml/kg -> base 2772
     )
+
+    private fun startOfToday(): Long {
+        return java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+
+    /** One 2000ml water entry per past day, [daysAgo] counting back. */
+    private fun pastWeek(daysAgo: IntRange, amountMl: Int = 2000): List<HydrationEntry> {
+        val day = 24 * 60 * 60 * 1000L
+        val today = startOfToday()
+        return daysAgo.map { k ->
+            HydrationEntry(
+                amountMl = amountMl,
+                timestamp = today - k * day + 10 * 60 * 60 * 1000L,
+                type = HydrationEntry.DrinkType.WATER
+            )
+        }
+    }
 
     @Before
     fun setUp() {
@@ -31,12 +53,12 @@ class RecommendationEngineTest {
 
     @Test
     fun `daily goal applies weight, activity and climate`() {
-        // base = 35 * 70 * 1.2 = 2940; activity extra = 2940 * 0.2 = 588
+        // base = 33 * 70 * 1.2 = 2772; activity extra = 2772 * 0.2 = 554
         val goal = engine.calculateDailyGoal(profile)
-        assertEquals(2940, goal.baseMl)
-        assertEquals(588, goal.activityExtraMl)
+        assertEquals(2772, goal.baseMl)
+        assertEquals(554, goal.activityExtraMl)
         assertEquals(200, goal.climateExtraMl)
-        assertEquals(3140, goal.totalMl)
+        assertEquals(2972, goal.totalMl)
     }
 
     @Test
@@ -47,10 +69,10 @@ class RecommendationEngineTest {
                 climate = UserProfile.Climate.COLD
             )
         )
-        assertEquals(2450, goal.baseMl) // 35 * 70 * 1.0
+        assertEquals(2310, goal.baseMl) // 33 * 70 * 1.0
         assertEquals(0, goal.activityExtraMl)
         assertEquals(0, goal.climateExtraMl)
-        assertEquals(2450, goal.totalMl)
+        assertEquals(2310, goal.totalMl)
     }
 
     @Test
@@ -175,6 +197,69 @@ class RecommendationEngineTest {
     }
 
     @Test
+    fun `personal pace fires when behind own rhythm`() {
+        // 5 past days x 2000ml. At 14:00 (wake 7, sleep 23): elapsed 8/16h,
+        // expected = 1000ml. Today at 200ml -> gap 800, clamped to 500.
+        val status = engine.calculateStatus(200, 2972)
+        val recs = engine.generateRecommendations(
+            profile, UserBehavior(), status, emptyList(),
+            currentHour = 14, pastWeekEntries = pastWeek(1..5)
+        )
+        val pace = recs.first {
+            it.reason == RecommendationEngine.Recommendation.Reason.PERSONAL_PACE
+        }
+        assertEquals(500, pace.suggestedAmountMl)
+        assertEquals(RecommendationEngine.Recommendation.Priority.MEDIUM, pace.priority)
+    }
+
+    @Test
+    fun `personal pace stays quiet with thin history or good pace`() {
+        val status = engine.calculateStatus(200, 2972)
+        // Only 2 past days -> cold-start guard.
+        val thin = engine.generateRecommendations(
+            profile, UserBehavior(), status, emptyList(),
+            currentHour = 14, pastWeekEntries = pastWeek(1..2)
+        )
+        assertTrue(thin.none {
+            it.reason == RecommendationEngine.Recommendation.Reason.PERSONAL_PACE
+        })
+        // Ahead of own pace (1500ml vs 1000ml expected) -> quiet.
+        val ahead = engine.calculateStatus(1500, 2972)
+        val recs = engine.generateRecommendations(
+            profile, UserBehavior(), ahead, emptyList(),
+            currentHour = 14, pastWeekEntries = pastWeek(1..5)
+        )
+        assertTrue(recs.none {
+            it.reason == RecommendationEngine.Recommendation.Reason.PERSONAL_PACE
+        })
+    }
+
+    @Test
+    fun `personal pace suppressed once goal met`() {
+        val met = engine.calculateStatus(2972, 2972)
+        val recs = engine.generateRecommendations(
+            profile, UserBehavior(), met, emptyList(),
+            currentHour = 14, pastWeekEntries = pastWeek(1..5)
+        )
+        assertTrue(recs.none {
+            it.reason == RecommendationEngine.Recommendation.Reason.PERSONAL_PACE
+        })
+        assertTrue(recs.any {
+            it.reason == RecommendationEngine.Recommendation.Reason.GOAL_MET
+        })
+    }
+
+    @Test
+    fun `personal pace sleeps outside active window`() {
+        assertTrue(
+            engine.personalPaceSuggestion(profile, pastWeek(1..5), 0, 23) == null
+        )
+        assertTrue(
+            engine.personalPaceSuggestion(profile, pastWeek(1..5), 0, 6) == null
+        )
+    }
+
+    @Test
     fun `quiet hours stretch the interval`() {
         // 0-24 covers every possible current hour -> always quiet.
         val quiet = profile.copy(quietHoursStart = 0, quietHoursEnd = 24)
@@ -201,11 +286,11 @@ class RecommendationEngineTest {
     }
 
     @Test
-    fun `male base uses 35ml per kg`() {
+    fun `male base uses 33ml per kg`() {
         val male = profile.copy(sex = UserProfile.Sex.MALE)
         val goal = engine.calculateDailyGoal(male)
-        assertEquals(2940, goal.baseMl)
-        assertEquals(3140, goal.totalMl)
+        assertEquals(2772, goal.baseMl)
+        assertEquals(2972, goal.totalMl)
     }
 
     @Test

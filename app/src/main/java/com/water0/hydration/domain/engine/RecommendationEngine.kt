@@ -53,7 +53,8 @@ class RecommendationEngine {
             STREAK_MAINTENANCE,
             OVER_LIMIT,
             PACING,
-            GOAL_MET
+            GOAL_MET,
+            PERSONAL_PACE
         }
     }
 
@@ -82,7 +83,8 @@ class RecommendationEngine {
         behavior: UserBehavior,
         status: HydrationStatus,
         recentEntries: List<HydrationEntry>,
-        currentHour: Int
+        currentHour: Int,
+        pastWeekEntries: List<HydrationEntry> = emptyList()
     ): List<Recommendation> {
         val recommendations = mutableListOf<Recommendation>()
 
@@ -150,6 +152,14 @@ class RecommendationEngine {
             ))
         }
 
+        // Personal pace: compares today against the user's OWN recent
+        // rhythm (avg of past active days, prorated by time of day).
+        // Adapts to behavior where fixed goal percentages can't: a slow
+        // starter who always catches up in the evening gets left alone.
+        personalPaceSuggestion(
+            profile, pastWeekEntries, status.consumedMl, currentHour
+        )?.let { recommendations.add(it) }
+
         // Evening wind down: only when close but NOT yet at goal.
         // Previously `percentage > 90` with no upper bound, so it kept
         // showing "small sip before bed" at 100%+ even after goal met.
@@ -177,7 +187,8 @@ class RecommendationEngine {
                     it.reason == Recommendation.Reason.DIURETIC_OFFSET ||
                     it.reason == Recommendation.Reason.PACING ||
                     it.reason == Recommendation.Reason.AFTER_EXERCISE ||
-                    it.reason == Recommendation.Reason.HOT_WEATHER
+                    it.reason == Recommendation.Reason.HOT_WEATHER ||
+                    it.reason == Recommendation.Reason.PERSONAL_PACE
             }
             recommendations.add(Recommendation(
                 message = "Goal reached! Nice work — no more needed unless thirsty.",
@@ -229,6 +240,48 @@ class RecommendationEngine {
         }
 
         return recommendations.sortedByDescending { it.priority.ordinal }
+    }
+
+    /**
+     * Personal pace nudge. Null unless: inside the active window, at least
+     * 3 past days with intake (cold-start guard for new users), and today
+     * below 80% of the prorated personal average.
+     */
+    fun personalPaceSuggestion(
+        profile: UserProfile,
+        pastWeekEntries: List<HydrationEntry>,
+        consumedTodayMl: Int,
+        currentHour: Int
+    ): Recommendation? {
+        if (currentHour < profile.wakeUpHour || currentHour >= profile.sleepHour) return null
+        val dailyTotals = pastWeekEntries
+            .groupBy { startOfDayMillis(it.timestamp) }
+            .values
+            .map { day -> day.sumOf { it.effectiveHydrationMl } }
+            .filter { it > 0 }
+        if (dailyTotals.size < 3) return null
+        val activeHours = (profile.sleepHour - profile.wakeUpHour).coerceAtLeast(1)
+        val elapsed = (currentHour - profile.wakeUpHour + 1).coerceIn(0, activeHours)
+        val expected = dailyTotals.average() * elapsed / activeHours
+        if (consumedTodayMl >= expected * 0.8) return null
+        val gap = (expected - consumedTodayMl).roundToInt().coerceIn(100, 500)
+        return Recommendation(
+            message = "Behind your usual pace " +
+                "(~${expected.roundToInt()}ml by now). Add ${gap}ml?",
+            priority = Recommendation.Priority.MEDIUM,
+            suggestedAmountMl = gap,
+            reason = Recommendation.Reason.PERSONAL_PACE
+        )
+    }
+
+    private fun startOfDayMillis(timestamp: Long): Long {
+        return java.util.Calendar.getInstance().apply {
+            timeInMillis = timestamp
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
     }
 
     fun calculateNextReminderInterval(

@@ -1,17 +1,17 @@
 {
   "n_train": 3944,
   "n_test": 987,
-  "regression_mae_ml": 1123.0,
-  "regression_r2": -0.077,
+  "regression_mae_ml": 1127.3,
+  "regression_r2": -0.075,
   "regression_mean_baseline_mae_ml": 1089.7,
-  "classifier_accuracy": 0.702,
-  "classifier_majority_baseline": 0.719,
+  "classifier_accuracy": 0.694,
+  "classifier_majority_baseline": 0.698,
   "permutation_importance_r2_drop": {
-    "weight_kg": 0.0185,
-    "activity": -0.0099,
-    "sex": 0.0163,
+    "weight_kg": -0.0251,
+    "activity": -0.001,
+    "sex": 0.0348,
     "age_yr": 0.1202,
-    "day_of_week": -0.0028,
-    "goal_ml": 0.0844
+    "day_of_week": 0.0126,
+    "goal_ml": 0.0369
   }
 }

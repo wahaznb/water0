@@ -1,7 +1,9 @@
-# Core pipeline (CPU-only, verified working)
-numpy
-pandas
-scikit-learn
+# Core pipeline (CPU-only). Pinned as a set: unpinned resolves once
+# drifted into a scipy/numpy import hang, so versions are locked to the
+# verified combo (2026-09-13, Python 3.11).
+numpy==2.4.6
+pandas==3.0.5
+scikit-learn==1.9.1
 
 # Optional: only needed for the Keras -> TFLite export step in train_model.py.
 # The sklearn baseline trains and evaluates without it.

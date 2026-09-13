@@ -27,14 +27,21 @@ class GetTodayProgressUseCase(
         val profileFlow = repository.getUserProfile()
         val entriesFlow = repository.getTodayEntries()
         val behaviorFlow = repository.getUserBehavior()
+        val todayStart = startOfTodayMillis()
+        // Past 7 completed days feed the personal-pace nudge. Reactive
+        // Flow, so pace adapts as history is logged or deleted.
+        val pastWeekFlow = repository.getEntriesInRange(
+            todayStart - 7 * DAY_MILLIS, todayStart - 1
+        )
 
-        return combine(profileFlow, entriesFlow, behaviorFlow) { profile, entries, behavior ->
+        return combine(profileFlow, entriesFlow, behaviorFlow, pastWeekFlow) {
+                profile, entries, behavior, pastWeek ->
             val goal = recommendationEngine.calculateDailyGoal(profile).totalMl
             val totalEffective = entries.sumOf { it.effectiveHydrationMl }
             val status = recommendationEngine.calculateStatus(totalEffective, goal)
             val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
             val recommendations = recommendationEngine.generateRecommendations(
-                profile, behavior, status, entries, currentHour
+                profile, behavior, status, entries, currentHour, pastWeek
             )
 
             ProgressResult(
@@ -47,5 +54,18 @@ class GetTodayProgressUseCase(
                 recommendations = recommendations
             )
         }
+    }
+
+    private fun startOfTodayMillis(): Long {
+        return java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+
+    companion object {
+        private const val DAY_MILLIS = 24 * 60 * 60 * 1000L
     }
 }

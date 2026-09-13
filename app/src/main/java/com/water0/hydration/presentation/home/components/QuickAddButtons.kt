@@ -10,10 +10,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,7 +31,8 @@ fun QuickAddButtons(
     modifier: Modifier = Modifier,
     onAdd: (Int) -> Unit,
     amounts: List<Int> = listOf(100, 250, 500, 750),
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    onCustomClick: (() -> Unit)? = null
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -44,6 +47,19 @@ fun QuickAddButtons(
                     modifier = Modifier.weight(1f),
                     enabled = enabled
                 )
+            }
+            // Custom amount: exact glass sizes live behind one tap.
+            if (onCustomClick != null) {
+                IconButton(
+                    onClick = onCustomClick,
+                    enabled = enabled,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Edit,
+                        contentDescription = "Custom amount"
+                    )
+                }
             }
         }
     }

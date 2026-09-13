@@ -1,7 +1,7 @@
 """Generate a synthetic hydration dataset that mirrors the Water0 app domain.
 
 Each row is one user-day. The simulation uses the SAME goal formula as
-RecommendationEngine (31/35ml x weight x activity multiplier + climate bonus,
+RecommendationEngine (31/33ml x weight x activity multiplier + climate bonus,
 by sex),
 so models trained here stay consistent with the app's rule-based v1.
 
@@ -29,7 +29,7 @@ HOURLY_P = np.array([
 
 
 def daily_goal(weight_kg: float, activity: int, climate: int, sex: int = 1) -> float:
-    per_kg = 35.0 if sex == 1 else 31.0
+    per_kg = 33.0 if sex == 1 else 31.0
     return per_kg * weight_kg * ACTIVITY_MULT[activity] + CLIMATE_BONUS[climate]
 
 
@@ -37,7 +37,7 @@ def simulate_user(rng: np.random.Generator, user_id: int, n_days: int) -> list[d
     weight = float(np.clip(rng.normal(72, 14), 45, 120))
     activity = int(rng.choice(5, p=[0.25, 0.25, 0.25, 0.15, 0.10]))
     climate = int(rng.choice(4, p=[0.15, 0.45, 0.30, 0.10]))
-    sex = int(rng.choice(2, p=[0.5, 0.5]))  # 0=female (31ml/kg), 1=male (35ml/kg)
+    sex = int(rng.choice(2, p=[0.5, 0.5]))  # 0=female (31ml/kg), 1=male (33ml/kg)
     wake = int(rng.integers(5, 9))
     sleep = int(rng.integers(21, 24))
     # Each user has a personal "discipline": fraction of their need they drink.

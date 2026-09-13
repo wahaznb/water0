@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Thermostat
+import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.WbSunny
@@ -75,6 +76,7 @@ fun RecommendationCard(
                 com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.OVER_LIMIT -> Icons.Filled.Warning
                 com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.PACING -> Icons.Filled.Speed
                 com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.GOAL_MET -> Icons.Filled.CheckCircle
+                com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.PERSONAL_PACE -> Icons.Filled.Timeline
             }
             Box(
                 modifier = Modifier

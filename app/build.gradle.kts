@@ -84,6 +84,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.junit)
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
@@ -32,9 +33,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,14 +50,17 @@ import com.water0.hydration.data.local.entity.UserBehavior
 import com.water0.hydration.data.local.entity.UserProfile
 import com.water0.hydration.di.AppContainer
 import com.water0.hydration.presentation.history.HistoryScreen
+import com.water0.hydration.presentation.home.GlassScreen
 import com.water0.hydration.presentation.home.HomeScreen
 import com.water0.hydration.presentation.home.HomeViewModel
+import com.water0.hydration.presentation.home.LogScreen
 import com.water0.hydration.presentation.navigation.GlassBottomBar
 import com.water0.hydration.presentation.navigation.Routes
 import com.water0.hydration.presentation.settings.SettingsScreen
 import com.water0.hydration.ui.theme.GlassPrefs
 import com.water0.hydration.ui.theme.GlassSnackbar
 import com.water0.hydration.ui.theme.Water0
+import com.water0.hydration.ui.theme.liquidglass.LiquidGlassContainer
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
@@ -66,7 +74,8 @@ class MainActivity : ComponentActivity() {
                 return HomeViewModel(
                     AppContainer.getGetTodayProgressUseCase(context),
                     AppContainer.getLogHydrationUseCase(context),
-                    AppContainer.getCalculateRecommendationUseCase()
+                    AppContainer.getCalculateRecommendationUseCase(),
+                    AppContainer.getDeleteHydrationUseCase(context)
                 ) as T
             }
         }
@@ -97,7 +106,7 @@ class MainActivity : ComponentActivity() {
             Water0(darkTheme = darkTheme) {
                 val pagerState = rememberPagerState(
                     initialPage = 0,
-                    pageCount = { 3 }
+                    pageCount = { 5 }
                 )
                 val scope = rememberCoroutineScope()
                 // Keep bottom-bar selection in sync when user swipes.
@@ -115,9 +124,16 @@ class MainActivity : ComponentActivity() {
                     Unit
                 }
                 // Single Scaffold for the whole pager shell: one top bar
-                // (per page), one glass bottom bar, one snackbar host.
-                // Screens are content-only and share the host.
+                // (per page) and one snackbar host. The bottom bar is NOT a
+                // Scaffold slot anymore: it must float as glassContent over
+                // the sampled content for the lens to refract it (container
+                // architecture). Its measured height reserves the inset.
                 val snackbarHostState = remember { SnackbarHostState() }
+                var barHeightDp by remember { mutableStateOf(0.dp) }
+                val density = LocalDensity.current
+                LiquidGlassContainer(
+                    modifier = Modifier.fillMaxSize(),
+                    content = {
                 Scaffold(
                     snackbarHost = {
                         SnackbarHost(snackbarHostState) { data ->
@@ -126,12 +142,35 @@ class MainActivity : ComponentActivity() {
                     },
                     containerColor = MaterialTheme.colorScheme.background,
                     topBar = {
+                        // Seamless header: transparent bar over the shared
+                        // background — no surface block between chrome and
+                        // content. Titles stay for context.
                         val topColors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
+                            containerColor = Color.Transparent,
                             titleContentColor = MaterialTheme.colorScheme.onSurface
                         )
                         when (pagerState.currentPage) {
                             1 -> TopAppBar(
+                                title = {
+                                    Text(
+                                        "Glass",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 20.sp
+                                    )
+                                },
+                                colors = topColors
+                            )
+                            2 -> TopAppBar(
+                                title = {
+                                    Text(
+                                        "Log",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 20.sp
+                                    )
+                                },
+                                colors = topColors
+                            )
+                            3 -> TopAppBar(
                                 title = {
                                     Text(
                                         "History",
@@ -141,7 +180,7 @@ class MainActivity : ComponentActivity() {
                                 },
                                 colors = topColors
                             )
-                            2 -> TopAppBar(
+                            4 -> TopAppBar(
                                 title = {
                                     Text(
                                         "Settings",
@@ -179,18 +218,12 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     },
-                    bottomBar = {
-                        GlassBottomBar(
-                            selected = selected,
-                            onSelect = navigate,
-                            config = glassConfig
-                        )
-                    }
-                ) { paddingValues ->
+                    content = { paddingValues ->
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(paddingValues)
+                            .padding(bottom = barHeightDp + 12.dp)
                     ) {
                         HorizontalPager(
                             state = pagerState,
@@ -225,7 +258,15 @@ class MainActivity : ComponentActivity() {
                                         viewModel = viewModel,
                                         snackbarHostState = snackbarHostState
                                     )
-                                    1 -> HistoryScreen(
+                                    1 -> GlassScreen(
+                                        viewModel = viewModel,
+                                        snackbarHostState = snackbarHostState
+                                    )
+                                    2 -> LogScreen(
+                                        viewModel = viewModel,
+                                        snackbarHostState = snackbarHostState
+                                    )
+                                    3 -> HistoryScreen(
                                         snackbarHostState = snackbarHostState
                                     )
                                     else -> SettingsScreen(
@@ -239,7 +280,27 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
-                }
+                    }
+                    )
+                },
+                    glassContent = {
+                        // Bottom-aligned via wrapContentSize so the call stays
+                        // directly in GlassBoxScope (no nested Box receiver).
+                        // onSizeChanged sits inside and reports the bar's own
+                        // footprint, which reserves the content inset.
+                        GlassBottomBar(
+                            selected = selected,
+                            onSelect = navigate,
+                            config = glassConfig,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .wrapContentSize(Alignment.BottomCenter)
+                                .onSizeChanged {
+                                    barHeightDp = with(density) { it.height.toDp() }
+                                }
+                        )
+                    }
+                )
             }
         }
     }

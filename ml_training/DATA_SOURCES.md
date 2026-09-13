@@ -47,7 +47,7 @@ correlate with intake; sanity-checks our feature set.
 **What:** Recommended daily intake by demographics (children/male/female,
 litres).
 
-**Use for us:** cross-checks our `35ml × kg × activity + climate` rule
+**Use for us:** cross-checks our `31/33ml × kg × activity + climate` rule
 against independent recommendations.
 
 ## 4. Published evidence our approach mirrors
@@ -69,9 +69,9 @@ against independent recommendations.
    Fair comparator is **total water** (`DR1TMOIS`, all food/drink
    moisture), not plain water alone (understates intake ~40%).
    Headline 2017-2018 result: NHANES total-water mean 2,870 ml/d
-   (F 2,626 / M 3,127) vs simulator 2,687 ml/d (F 2,550 / M 2,822) —
+   (F 2,626 / M 3,127) vs simulator 2,650 ml/d (F 2,550 / M 2,748) —
    within ~10%. Population total-water met-rate vs the app formula is
-   0.28 vs the simulator's 0.34 (discipline mean tuned 0.90 → 0.80 to
+   0.30 vs the simulator's 0.35 (discipline mean tuned 0.90 → 0.80 to
    close the original 0.47 gap). Re-run the loader to
    reproduce; raw XPTs are gitignored, the JSON report is committed.
 3. ⏭️ Kaggle sets — skipped: NHANES proved sufficient for grounding,
@@ -83,6 +83,16 @@ against independent recommendations.
    never uploaded). `train_model.py` detects single-user CSVs and holds
    out the most recent 20% of days instead of group-splitting. Personal
    fine-tuning loop is open; on-device retraining stays future work.
+
+## Formula check (NHANES 2017-2018, n=4,813 adults)
+
+Through-origin OLS of total water on weight: **32.3 ml/kg** overall
+(F 31.6 / M 32.9). The app base has been narrowed accordingly: 31/35 →
+31/33, putting the modeled gap (2) near the empirical gap (1.3) instead
+of 3× above it. A with-intercept fit still dumps most intake into a
+~2.3 L intercept (~6 ml/kg marginal) — weight alone predicts little,
+consistent with the negative training result below. Goals remain above
+population means by design (only ~30% meet them).
 
 ## Direct training on NHANES (tried — negative result, kept honest)
 

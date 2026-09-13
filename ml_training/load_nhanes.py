@@ -136,7 +136,7 @@ def map_activity(paq: pd.DataFrame | None) -> pd.Series:
 
 
 def app_goal(weight_kg: float, activity: int, climate: int, sex: int) -> float:
-    per_kg = 35.0 if sex == 1 else 31.0
+    per_kg = 33.0 if sex == 1 else 31.0
     return per_kg * weight_kg * ACTIVITY_MULT[activity] + CLIMATE_BONUS[climate]
 
 

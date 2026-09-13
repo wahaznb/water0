@@ -148,7 +148,7 @@ private fun ProfileSection(profile: UserProfile, viewModel: SettingsViewModel) {
         UserProfile.Sex.entries.forEach { sex ->
             val label = when (sex) {
                 UserProfile.Sex.FEMALE -> "Female (31 ml/kg)"
-                UserProfile.Sex.MALE -> "Male (35 ml/kg)"
+                UserProfile.Sex.MALE -> "Male (33 ml/kg)"
             }
             Row(
                 modifier = Modifier

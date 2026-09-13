@@ -27,7 +27,7 @@ class UserProfileSexTest {
         assertEquals(2804, female.baseWaterNeedMl)
 
         val male = female.copy(sex = UserProfile.Sex.MALE)
-        assertEquals(3140, male.baseWaterNeedMl)
+        assertEquals(2972, male.baseWaterNeedMl)
     }
 
     @Test

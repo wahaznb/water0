@@ -6,6 +6,7 @@ import com.water0.hydration.data.local.entity.HydrationEntry
 import com.water0.hydration.data.local.entity.UserProfile
 import com.water0.hydration.domain.engine.RecommendationEngine
 import com.water0.hydration.domain.usecase.CalculateRecommendationUseCase
+import com.water0.hydration.domain.usecase.DeleteHydrationUseCase
 import com.water0.hydration.domain.usecase.GetTodayProgressUseCase
 import com.water0.hydration.domain.usecase.LogHydrationUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,10 +14,22 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
+/**
+ * One-shot animation kicks for the hero glass on the Glass tab.
+ * Pour on every log (level rises); Slosh on every delete (glass tilts,
+ * water settles lower). Consumed by GlassScreen, then cleared.
+ * atNanos keeps rapid repeats distinct so StateFlow re-emits each one.
+ */
+sealed interface GlassKick {
+    data class Pour(val amountMl: Int, val atNanos: Long = System.nanoTime()) : GlassKick
+    data class Slosh(val atNanos: Long = System.nanoTime()) : GlassKick
+}
+
 class HomeViewModel(
     private val getTodayProgress: GetTodayProgressUseCase,
     private val logHydration: LogHydrationUseCase,
-    private val calculateRecommendation: CalculateRecommendationUseCase
+    private val calculateRecommendation: CalculateRecommendationUseCase,
+    private val deleteHydration: DeleteHydrationUseCase
 ) : ViewModel() {
 
     sealed interface UiState {
@@ -43,6 +56,13 @@ class HomeViewModel(
 
     fun consumeNotice() {
         _notice.value = null
+    }
+
+    private val _glassKick = MutableStateFlow<GlassKick?>(null)
+    val glassKick: StateFlow<GlassKick?> = _glassKick
+
+    fun consumeGlassKick() {
+        _glassKick.value = null
     }
 
     init {
@@ -75,11 +95,23 @@ class HomeViewModel(
         }
         viewModelScope.launch {
             logHydration(amountMl, type)
+            _glassKick.value = GlassKick.Pour(amountMl)
         }
     }
 
     fun quickAdd(amountMl: Int) {
         logWater(amountMl)
+    }
+
+    fun deleteEntry(entryId: Long) {
+        viewModelScope.launch {
+            try {
+                deleteHydration(entryId)
+                _glassKick.value = GlassKick.Slosh()
+            } catch (e: Exception) {
+                _notice.value = e.message ?: "Delete failed"
+            }
+        }
     }
 
     fun getGoalBreakdown(profile: UserProfile) = calculateRecommendation(profile)

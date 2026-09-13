@@ -1,10 +1,13 @@
 package com.water0.hydration.presentation.home
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,16 +17,15 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,11 +40,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.water0.hydration.domain.engine.RecommendationEngine
-import com.water0.hydration.presentation.home.components.ProgressRing
-import com.water0.hydration.presentation.home.components.QuickAddButtons
 import com.water0.hydration.presentation.home.components.RecommendationCard
-import com.water0.hydration.presentation.home.components.TodayEntriesList
 import com.water0.hydration.ui.theme.AuroraBackground
+import com.water0.hydration.ui.theme.glassCardBorder
+import com.water0.hydration.ui.theme.glassCardContainer
 import kotlinx.coroutines.launch
 
 // Content-only: the single Scaffold (top bar, glass bottom bar, snackbar
@@ -71,8 +72,39 @@ fun HomeScreen(
         }
     }
 
-    // Living tint: subtle overlay inside the static mesh gradient (no
-    // full-screen containerColor animation — that banded with the blobs).
+    HomeUiFrame(
+        uiState = uiState,
+        modifier = modifier,
+        onRetry = { viewModel.refresh() }
+    ) { state ->
+        StatusIndicator(status = state.status)
+
+        TodaySummaryCard(state = state)
+
+        if (state.recommendations.isNotEmpty()) {
+            RecommendationsSection(
+                recommendations = state.recommendations,
+                onAction = { amount ->
+                    viewModel.quickAdd(amount)
+                    notify("Added $amount ml")
+                }
+            )
+        }
+    }
+}
+
+/**
+ * Shared frame for the Home-tab family (Home / Glass / Log): mesh
+ * background with hydration tint, scrollable column, loading + error
+ * states. Keeps the three screens visually identical for free.
+ */
+@Composable
+fun HomeUiFrame(
+    uiState: HomeViewModel.UiState,
+    modifier: Modifier = Modifier,
+    onRetry: () -> Unit,
+    content: @Composable ColumnScope.(HomeViewModel.UiState.Success) -> Unit
+) {
     val hydrationTarget = hydrationTintFor(uiState)
     val hydrationTint by animateColorAsState(
         targetValue = hydrationTarget,
@@ -81,102 +113,104 @@ fun HomeScreen(
     )
 
     Box(modifier = modifier.fillMaxSize()) {
-            AuroraBackground(
-                modifier = Modifier.fillMaxSize(),
-                hydrationTint = hydrationTint
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                when (val state = uiState) {
-                    is HomeViewModel.UiState.Success -> {
-                        ProgressRing(
-                            modifier = Modifier
-                                .padding(top = 12.dp),
-                            progress = state.percentage / 100f,
-                            totalMl = state.totalEffectiveMl,
-                            goalMl = state.goalMl,
-                            size = 280
+        AuroraBackground(
+            modifier = Modifier.fillMaxSize(),
+            hydrationTint = hydrationTint
+        )
+        when (val state = uiState) {
+            is HomeViewModel.UiState.Success -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    content(state)
+                }
+            }
+            HomeViewModel.UiState.Loading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(48.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            is HomeViewModel.UiState.Error -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Error loading data",
+                            fontSize = 18.sp,
+                            color = Color.Red
                         )
-
-                        StatusIndicator(status = state.status)
-
-                        QuickAddButtons(
-                            onAdd = { amount ->
-                                viewModel.quickAdd(amount)
-                                    notify("Added $amount ml")
-                            }
+                        Text(
+                            text = state.message,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-
-                        if (state.recommendations.isNotEmpty()) {
-                            RecommendationsSection(
-                                recommendations = state.recommendations,
-                                onAction = { amount ->
-                                    viewModel.quickAdd(amount)
-                                notify("Added $amount ml")
-                                }
-                            )
-                        }
-
-                        TodayEntriesList(
-                            entries = state.entries,
-                            onDelete = {
-                                notify("Delete not implemented yet")
-                            }
-                        )
-                    }
-                    HomeViewModel.UiState.Loading -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(top = 100.dp),
-                            contentAlignment = Alignment.Center
+                        Button(
+                            onClick = onRetry,
+                            colors = ButtonDefaults.buttonColors()
                         ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(48.dp),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                    is HomeViewModel.UiState.Error -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(top = 100.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                Text(
-                                    text = "Error loading data",
-                                    fontSize = 18.sp,
-                                    color = Color.Red
-                                )
-                                Text(
-                                    text = state.message,
-                                    fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Button(
-                                    onClick = { viewModel.refresh() },
-                                    colors = ButtonDefaults.buttonColors()
-                                ) {
-                                    Text("Retry")
-                                }
-                            }
+                            Text("Retry")
                         }
                     }
                 }
             }
         }
     }
+}
+
+/** Basic info at a glance: today's total against the personal goal. */
+@Composable
+private fun TodaySummaryCard(state: HomeViewModel.UiState.Success) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = glassCardContainer()),
+        border = glassCardBorder(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = "Today",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "${state.totalEffectiveMl} / ${state.goalMl} ml",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = if (state.remainingMl > 0) "${state.remainingMl} ml to go"
+                else "Goal reached",
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
 
 // Subtle overlay tint per hydration state, drawn INSIDE the static mesh
 // (alpha <=0.10 so no banding). Behind = plum wash, ahead = teal wash,

@@ -20,7 +20,7 @@ class UseCaseTest {
 
     @Before
     fun setUp() {
-        // 70kg / moderate / temperate / male -> goal 3140 ml.
+        // 70kg / moderate / temperate / male -> goal 2972 ml.
         repository = FakeHydrationRepository(
             initialProfile = UserProfile(
                 weightKg = 70f,
@@ -64,8 +64,8 @@ class UseCaseTest {
         val result = GetTodayProgressUseCase(repository, engine)().first()
 
         assertEquals(750, result.totalEffectiveMl)
-        assertEquals(3140, result.goalMl)
-        assertEquals(750 * 100 / 3140, result.percentage)
+        assertEquals(2972, result.goalMl)
+        assertEquals(750 * 100 / 2972, result.percentage)
         assertEquals(
             RecommendationEngine.HydrationStatus.Status.BEHIND,
             result.status
@@ -83,7 +83,7 @@ class UseCaseTest {
         val breakdown = CalculateRecommendationUseCase(engine)(
             UserProfile(weightKg = 70f, sex = UserProfile.Sex.MALE)
         )
-        assertEquals(3140, breakdown.totalMl)
-        assertTrue(breakdown.explanation.contains("3140"))
+        assertEquals(2972, breakdown.totalMl)
+        assertTrue(breakdown.explanation.contains("2972"))
     }
 }
