@@ -9,7 +9,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.History
@@ -45,9 +43,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.water0.hydration.ui.theme.GlassConfig
 import com.water0.hydration.ui.theme.liquidglass.GlassBoxScope
 import com.water0.hydration.ui.theme.liquidglass.LiquidGlassBox
@@ -148,7 +144,7 @@ fun GlassBoxScope.GlassBottomBar(
                 onHeight(with(density) { it.height.toDp() })
             },
             params = params,
-            shape = RoundedCornerShape(24.dp)
+            shape = CircleShape
         ) {
             Box {
                 // One badge, gliding behind the icons (drawn first).
@@ -239,7 +235,6 @@ fun GlassBoxScope.GlassBottomBar(
                         GlassTab(
                             selected = index == activeIndex,
                             onClick = { onSelect(tab.route) },
-                            label = tab.label,
                             iconScale = magnify,
                             icon = { Icon(tab.icon, contentDescription = tab.label) }
                         )
@@ -254,39 +249,28 @@ fun GlassBoxScope.GlassBottomBar(
 private fun GlassTab(
     selected: Boolean,
     onClick: () -> Unit,
-    label: String,
     iconScale: Float = 1f,
     icon: @Composable () -> Unit
 ) {
     val color = if (selected) MaterialTheme.colorScheme.primary
     else MaterialTheme.colorScheme.onSurfaceVariant
     // Fixed width: the dock wraps its tabs (no weight in a wrap-content Row).
-    TextButton(onClick = onClick, modifier = Modifier.width(68.dp)) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .graphicsLayer {
-                        scaleX = iconScale
-                        scaleY = iconScale
-                    }
-                    .size(28.dp)
-            ) {
-                androidx.compose.runtime.CompositionLocalProvider(
-                    androidx.compose.material3.LocalContentColor provides color
-                ) {
-                    icon()
+    // Icon-only: the label lives in contentDescription for talkback.
+    TextButton(onClick = onClick, modifier = Modifier.width(60.dp)) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .graphicsLayer {
+                    scaleX = iconScale
+                    scaleY = iconScale
                 }
+                .size(28.dp)
+        ) {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.material3.LocalContentColor provides color
+            ) {
+                icon()
             }
-            Text(
-                text = label,
-                fontSize = 11.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                color = color
-            )
         }
     }
 }

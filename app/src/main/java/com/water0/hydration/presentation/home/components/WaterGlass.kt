@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,12 +51,36 @@ import kotlin.math.sin
 import kotlinx.coroutines.launch
 
 /**
- * Liquid-glass water fill. Logging water pours into the glass: the level
- * animates toward the new progress and the surface keeps a slow wave, so
- * every quick-add visibly adds water. Glass and water are translucent so
- * the mesh background glows through; non-water drinks stack as unmixed
- * color layers on top of the water, oil-on-water style.
+ * Real tumbler silhouette: wider mouth, tapered walls, rounded shoulders,
+ * thick base. Content clipped to it reads as glassware, not a rounded
+ * rectangle with water in it.
  */
+class TumblerShape : androidx.compose.ui.graphics.Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+        density: Density
+    ): androidx.compose.ui.graphics.Outline {
+        val w = size.width
+        val h = size.height
+        val topInset = w * 0.055f
+        val botInset = w * 0.125f
+        val r = w * 0.10f
+        val path = Path().apply {
+            moveTo(topInset + r, 0f)
+            lineTo(w - topInset - r, 0f)
+            quadraticBezierTo(w - topInset, 0f, w - topInset, r)
+            lineTo(w - botInset, h - r)
+            quadraticBezierTo(w - botInset, h, w - botInset - r, h)
+            lineTo(botInset + r, h)
+            quadraticBezierTo(botInset, h, botInset, h - r)
+            lineTo(topInset, r)
+            quadraticBezierTo(topInset, 0f, topInset + r, 0f)
+            close()
+        }
+        return androidx.compose.ui.graphics.Outline.Generic(path)
+    }
+}
 @Composable
 fun WaterGlass(
     modifier: Modifier = Modifier,
@@ -91,7 +116,7 @@ fun WaterGlass(
     )
     val percentage = (level * 100).roundToInt()
     val bar = MaterialTheme.colorScheme.primary
-    val shape = RoundedCornerShape(28.dp)
+    val shape = TumblerShape()
     // Bands share the filled height; fall back to one water band.
     val bands = layers.filter { it.fraction > 0f }
         .takeIf { it.isNotEmpty() }
@@ -122,6 +147,13 @@ fun WaterGlass(
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
+            // Thick glass base behind the liquid (heavy bottom, barware).
+            drawRoundRect(
+                color = Color.White.copy(alpha = 0.10f),
+                topLeft = Offset(size.width * 0.06f, size.height * 0.90f),
+                size = Size(size.width * 0.88f, size.height * 0.10f),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx())
+            )
             if (level <= 0.001f) return@Canvas
             val waterHeight = size.height * level
             val waterTop = size.height - waterHeight
@@ -207,10 +239,10 @@ fun WaterGlass(
                 Offset(size.width - wallWidth, size.height),
                 wallWidth
             )
-            // Rising bubbles — frequent by design. More while pouring,
-            // sloshing, or over the goal.
-            val bubbleCount = 12 + (if (pouring) 8 else 0) + (if (overfull) 10 else 0) +
-                sloshBoostDp.toInt()
+            // Rising bubbles — frequent by design (7x density). More while
+            // pouring, sloshing, or over the goal.
+            val bubbleCount = 84 + (if (pouring) 24 else 0) + (if (overfull) 30 else 0) +
+                sloshBoostDp.toInt() * 3
             for (i in 0 until bubbleCount) {
                 val seed = ((i * 37) % 100) / 100f
                 val speed = 0.5f + (i % 3) * 0.25f
@@ -232,6 +264,15 @@ fun WaterGlass(
                     )
                 }
             }
+            // Rim ellipse: the mouth of the tumbler, back edge brighter.
+            drawOval(
+                color = Color.White.copy(alpha = 0.35f),
+                topLeft = Offset(size.width * 0.04f, -8.dp.toPx()),
+                size = Size(size.width * 0.92f, 20.dp.toPx()),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = 3.dp.toPx()
+                )
+            )
             // Glass highlight down the left edge.
             drawRect(
                 brush = Brush.horizontalGradient(

@@ -28,8 +28,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,11 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.water0.hydration.domain.engine.RecommendationEngine
-import com.water0.hydration.presentation.home.components.SloshDriver
 import com.water0.hydration.presentation.home.components.RecommendationCard
-import com.water0.hydration.presentation.home.components.WaterStage
-import com.water0.hydration.presentation.home.components.layersFor
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // Content-only: the single Scaffold (top bar, glass bottom bar, snackbar
@@ -62,15 +56,7 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
-    val kick by viewModel.glassKick.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-
-    var tilt by remember { mutableFloatStateOf(0f) }
-    var slosh by remember { mutableFloatStateOf(0f) }
-    var pouring by remember { mutableStateOf(false) }
-    // Counts Slosh kicks so each one runs its keyframes to completion even
-    // after the shared kick is consumed.
-    var sloshRunId by remember { mutableIntStateOf(0) }
 
     fun notify(message: String) {
         scope.launch {
@@ -85,22 +71,6 @@ fun HomeScreen(
         }
     }
 
-    // One-shot pour/slosh choreography per kick. The glass itself stays
-    // static — only the liquid moves (tilt discarded on purpose).
-    LaunchedEffect(kick) {
-        when (kick) {
-            is GlassKick.Pour -> {
-                pouring = true
-                delay(650)
-                pouring = false
-                viewModel.consumeGlassKick()
-            }
-            // Slosh consumption happens in SloshDriver when done.
-            is GlassKick.Slosh -> sloshRunId++
-            null -> Unit
-        }
-    }
-
     HomeUiFrame(
         uiState = uiState,
         modifier = modifier,
@@ -108,60 +78,35 @@ fun HomeScreen(
     ) { state ->
         HomeHeader()
 
-        if (sloshRunId > 0) {
-            SloshDriver(
-                runId = sloshRunId,
-                onTiltFrame = { tilt = it },
-                onSloshFrame = { slosh = it },
-                onDone = { viewModel.consumeGlassKick() }
-            )
-        }
-        // Tank on the left half, numbers on the right — recommendations
-        // below stay the main focus.
-        androidx.compose.foundation.layout.Row(
+        // Numbers live here now; the tank itself is ambient behind the
+        // whole shell (see AmbientTank) so it never fights content.
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            WaterStage(
-                totalMl = state.totalEffectiveMl,
-                goalMl = state.goalMl,
-                layers = layersFor(state.entries),
-                tiltDegrees = tilt,
-                sloshBoostDp = slosh,
-                pouring = pouring,
-                glassWidth = 170.dp,
-                glassHeight = 380.dp,
-                showCaption = false,
-                modifier = Modifier.weight(1f)
+            Text(
+                text = "${state.percentage}%",
+                fontSize = 40.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "${state.percentage}%",
-                    fontSize = 40.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "${state.totalEffectiveMl} / ${state.goalMl} ml",
-                    fontSize = 15.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = if (state.remainingMl > 0) "${state.remainingMl} ml to go"
-                    else "Goal reached",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "${state.entries.size} logs today",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                text = "${state.totalEffectiveMl} / ${state.goalMl} ml",
+                fontSize = 15.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = if (state.remainingMl > 0) "${state.remainingMl} ml to go"
+                else "Goal reached",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "${state.entries.size} logs today",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         StatusIndicator(status = state.status)

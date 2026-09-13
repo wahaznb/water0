@@ -39,6 +39,9 @@ All notable changes to Water0 are documented here. Format follows
   stream); glass badge on the active tab (no dot); footer chrome removed
 - Living background: swirling washes + rising bubbles reacting to progress,
   twinkle specks, film grain against banding; washes turned up loud
+- Ambient mega-tank: one persistent tumbler behind every tab (cropped hero
+  on Home, dim refractive backdrop elsewhere); tumbler silhouette with
+  thick base + rim; icon-only dock tabs
 - Home is tank + recommendations only (logging lives strictly in Update);
   tall side tank with stats column; chronological unmixed drink layers
 - Opt-in training-data export (Settings → Your data, 90-day simulator-schema
@@ -82,7 +85,6 @@ All notable changes to Water0 are documented here. Format follows
   (operator-precedence bug, caught by tests)
 - Fresh installs stuck on Loading (empty Room tables emit nothing)
 
-## [0.1] - TBD
+## [0.1.0] - 2026-09-13
 
-First tagged release (pre-1.0: core tracking + glass UI done, Play
-release signing and on-device model still ahead).
+First tagged release (published as v0.1 — same precedence).

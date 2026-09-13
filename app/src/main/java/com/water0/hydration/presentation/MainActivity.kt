@@ -42,6 +42,7 @@ import com.water0.hydration.data.local.entity.UserBehavior
 import com.water0.hydration.data.local.entity.UserProfile
 import com.water0.hydration.di.AppContainer
 import com.water0.hydration.presentation.history.HistoryScreen
+import com.water0.hydration.presentation.home.AmbientTank
 import com.water0.hydration.presentation.home.HomeScreen
 import com.water0.hydration.presentation.home.HomeViewModel
 import com.water0.hydration.presentation.home.LogScreen
@@ -164,6 +165,14 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize(),
                         hydrationTint = rootTint,
                         energy = rootEnergy
+                    )
+                    // Ambient mega-tank behind the pages: hero on Home, dim
+                    // backdrop elsewhere. NOT inside the pager (it would
+                    // swipe away) and NOT in the lens layer (it is meant to
+                    // BE refracted, not to refract).
+                    AmbientTank(
+                        viewModel = viewModel,
+                        selectedRoute = selected
                     )
                 Scaffold(
                     snackbarHost = {

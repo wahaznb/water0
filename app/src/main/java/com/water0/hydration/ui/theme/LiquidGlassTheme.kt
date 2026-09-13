@@ -246,7 +246,7 @@ fun AuroraBackground(
         // Twinkle specks: tiny, near-static bright dots scattered over the
         // whole field. They barely move but catch the lens rim highlight,
         // which is what makes refraction visible even when still.
-        for (i in 0 until 26) {
+        for (i in 0 until 182) {
             val seed = ((i * 71) % 100) / 100f
             val x = (((i * 41) % 100) / 100f) * w
             val y = (((i * 67) % 100) / 100f) * h
