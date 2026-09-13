@@ -82,6 +82,7 @@ All notable changes to Water0 are documented here. Format follows
   (operator-precedence bug, caught by tests)
 - Fresh installs stuck on Loading (empty Room tables emit nothing)
 
-## [1.0.0] - TBD
+## [0.1] - TBD
 
-First tagged release. Planned: app icon artwork, release notes below.
+First tagged release (pre-1.0: core tracking + glass UI done, Play
+release signing and on-device model still ahead).
