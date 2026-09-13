@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -50,26 +52,23 @@ import com.water0.hydration.ui.theme.liquidglass.toLiquidParams
 
 object Routes {
     const val HOME = "home"
-    const val GLASS = "glass"
-    const val LOG = "log"
-    const val HISTORY = "history"
+    const val UPDATE = "update"
+    const val LOGS = "logs"
     const val SETTINGS = "settings"
 
     fun indexOf(route: String): Int = when (route) {
         HOME -> 0
-        GLASS -> 1
-        LOG -> 2
-        HISTORY -> 3
-        SETTINGS -> 4
+        UPDATE -> 1
+        LOGS -> 2
+        SETTINGS -> 3
         else -> 0
     }
 
     fun fromIndex(index: Int): String = when (index) {
         0 -> HOME
-        1 -> GLASS
-        2 -> LOG
-        3 -> HISTORY
-        4 -> SETTINGS
+        1 -> UPDATE
+        2 -> LOGS
+        3 -> SETTINGS
         else -> HOME
     }
 }
@@ -82,9 +81,8 @@ private data class Tab(
 
 private val TABS = listOf(
     Tab(Routes.HOME, "Home", Icons.Filled.Home),
-    Tab(Routes.GLASS, "Glass", Icons.Filled.LocalDrink),
-    Tab(Routes.LOG, "Log", Icons.Filled.EditNote),
-    Tab(Routes.HISTORY, "History", Icons.Filled.History),
+    Tab(Routes.UPDATE, "Update", Icons.Filled.EditNote),
+    Tab(Routes.LOGS, "Logs", Icons.Filled.History),
     Tab(Routes.SETTINGS, "Settings", Icons.Filled.Settings)
 )
 
@@ -102,11 +100,17 @@ fun GlassBoxScope.GlassBottomBar(
 ) {
     val selectedIndex = TABS.indexOfFirst { it.route == selected }.coerceAtLeast(0)
     var barWidthPx by remember { mutableStateOf(0) }
+    // Long-press a tab and drag across the bar: the droplet previews the
+    // tab under the finger, releasing navigates there.
+    var dragIndex by remember { mutableStateOf<Int?>(null) }
+    val activeIndex = dragIndex ?: selectedIndex
+    fun indexAt(xPx: Float): Int =
+        ((xPx / barWidthPx.coerceAtLeast(1) * TABS.size).toInt()).coerceIn(0, TABS.size - 1)
     val density = LocalDensity.current
     val dropletX by animateDpAsState(
         targetValue = with(density) {
             if (barWidthPx == 0) 0.dp
-            else (barWidthPx * (selectedIndex + 0.5f) / TABS.size).toDp()
+            else (barWidthPx * (activeIndex + 0.5f) / TABS.size).toDp()
         },
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -145,13 +149,27 @@ fun GlassBoxScope.GlassBottomBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .onSizeChanged { barWidthPx = it.width }
+                    .pointerInput(Unit) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { offset -> dragIndex = indexAt(offset.x) },
+                            onDragCancel = { dragIndex = null },
+                            onDragEnd = {
+                                dragIndex?.let { onSelect(TABS[it].route) }
+                                dragIndex = null
+                            },
+                            onDrag = { change, _ ->
+                                dragIndex = indexAt(change.position.x)
+                                change.consume()
+                            }
+                        )
+                    }
                     .padding(horizontal = 4.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TABS.forEach { tab ->
+                TABS.forEachIndexed { index, tab ->
                     GlassTab(
-                        selected = selected == tab.route,
+                        selected = index == activeIndex,
                         onClick = { onSelect(tab.route) },
                         label = tab.label,
                         icon = { Icon(tab.icon, contentDescription = tab.label) }

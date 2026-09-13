@@ -1,6 +1,8 @@
 package com.water0.hydration.presentation.settings
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +20,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
@@ -66,6 +72,9 @@ class SettingsViewModelFactory(private val context: Context) : ViewModelProvider
 fun SettingsScreen(
     darkTheme: Boolean = true,
     onToggleTheme: (Boolean) -> Unit = {},
+    glassConfig: com.water0.hydration.ui.theme.GlassConfig =
+        com.water0.hydration.ui.theme.GlassConfig(),
+    onGlassConfigChange: (com.water0.hydration.ui.theme.GlassConfig) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = viewModel(
         factory = SettingsViewModelFactory(LocalContext.current)
@@ -103,8 +112,9 @@ fun SettingsScreen(
                     SleepSection(profile = current, viewModel = viewModel)
                     UnitsSection(profile = current, viewModel = viewModel)
                     AppearanceSection(darkTheme = darkTheme, onToggleTheme = onToggleTheme)
-                    GlassLabSection()
+                    GlassLabSection(config = glassConfig, onChange = onGlassConfigChange)
                     DataSection(viewModel = viewModel)
+                    AboutSection()
                 }
             }
         }
@@ -393,102 +403,48 @@ private fun AppearanceSection(darkTheme: Boolean, onToggleTheme: (Boolean) -> Un
 }
 
 @Composable
-private fun GlassLabSection() {
-    val context = LocalContext.current
-    val glassPrefs = remember { com.water0.hydration.ui.theme.GlassPrefs.from(context) }
-    var draft by remember { androidx.compose.runtime.mutableStateOf(glassPrefs.draft()) }
-    var pending by remember { androidx.compose.runtime.mutableStateOf(glassPrefs.hasPendingChanges()) }
-
-    SectionCard(title = "Glass Lab (restart to apply)") {
+private fun GlassLabSection(
+    config: com.water0.hydration.ui.theme.GlassConfig,
+    onChange: (com.water0.hydration.ui.theme.GlassConfig) -> Unit
+) {
+    // Live: every move recomposes the lens immediately. Blur bends real
+    // pixels only on the Android 13+ lens path — below that it is stored
+    // but has no visible effect (gradient fallback can't blur a backdrop).
+    val lensBlur = android.os.Build.VERSION.SDK_INT >= 33
+    SectionCard(title = "Glass Lab (live)") {
         Text(
-            text = "Blur: ${draft.blurRadius.value.toInt()}dp",
+            text = "Blur: ${config.blurRadius.value.toInt()}dp" +
+                if (lensBlur) "" else " (Android 13+ lens)",
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurface
         )
         Slider(
-            value = draft.blurRadius.value,
-            onValueChange = {
-                draft = draft.copy(blurRadius = it.dp)
-                glassPrefs.saveDraft(draft)
-                pending = glassPrefs.hasPendingChanges()
-            },
+            value = config.blurRadius.value,
+            onValueChange = { onChange(config.copy(blurRadius = it.dp)) },
             valueRange = 0f..40f
         )
         Text(
-            text = "Tint: ${(draft.tintAlpha * 100).roundToInt()}%",
+            text = "Tint: ${(config.tintAlpha * 100).roundToInt()}%",
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurface
         )
         Slider(
-            value = draft.tintAlpha,
-            onValueChange = {
-                draft = draft.copy(tintAlpha = it)
-                glassPrefs.saveDraft(draft)
-                pending = glassPrefs.hasPendingChanges()
-            },
+            value = config.tintAlpha,
+            onValueChange = { onChange(config.copy(tintAlpha = it)) },
             valueRange = 0f..0.60f
         )
         Text(
-            text = "Bevel: ${(draft.bevelAlpha * 100).roundToInt()}%",
+            text = "Bevel: ${(config.bevelAlpha * 100).roundToInt()}%",
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurface
         )
         Slider(
-            value = draft.bevelAlpha,
-            onValueChange = {
-                draft = draft.copy(bevelAlpha = it)
-                glassPrefs.saveDraft(draft)
-                pending = glassPrefs.hasPendingChanges()
-            },
+            value = config.bevelAlpha,
+            onValueChange = { onChange(config.copy(bevelAlpha = it)) },
             valueRange = 0f..0.20f
         )
-        if (pending) {
-            Text(
-                text = "Restart app to apply glass changes.",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.tertiary
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                androidx.compose.material3.OutlinedButton(
-                    onClick = {
-                        glassPrefs.applyDraft()
-                        pending = false
-                        // Cold restart: relaunch MainActivity and clear back stack.
-                        val pm = context.packageManager
-                        val intent = pm.getLaunchIntentForPackage(context.packageName)
-                        if (intent != null) {
-                            intent.addFlags(
-                                android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
-                                    android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
-                            )
-                            context.startActivity(intent)
-                            if (context is android.app.Activity) {
-                                context.finishAffinity()
-                            }
-                            kotlin.system.exitProcess(0)
-                        }
-                    }
-                ) {
-                    Text("Restart now")
-                }
-                TextButton(
-                    onClick = {
-                        glassPrefs.resetToDefaults()
-                        draft = glassPrefs.draft()
-                        pending = glassPrefs.hasPendingChanges()
-                    }
-                ) {
-                    Text("Reset defaults (23 / 31% / 5%)")
-                }
-            }
-        } else {
-            Text(
-                text = "Defaults: 23dp blur, 31% tint, 5% bevel.",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        TextButton(onClick = { onChange(com.water0.hydration.ui.theme.GlassConfig()) }) {
+            Text("Reset defaults (23 / 31% / 5%)")
         }
     }
 }
@@ -549,6 +505,53 @@ private fun DataSection(viewModel: SettingsViewModel) {
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+@Composable
+private fun AboutSection() {
+    val context = LocalContext.current
+    SectionCard(title = "About") {
+        Text(
+            text = "Water0 ${com.water0.hydration.BuildConfig.VERSION_NAME} " +
+                "(${com.water0.hydration.BuildConfig.VERSION_CODE})",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = "Offline-first hydration tracker. No account, no tracking — " +
+                "your data never leaves this phone unless you export it yourself. " +
+                "Apache 2.0 open source.",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Source code on GitHub",
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            IconButton(
+                onClick = {
+                    context.startActivity(
+                        Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://github.com/wahaznb/water0")
+                        )
+                    )
+                }
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.OpenInNew,
+                    contentDescription = "Open GitHub repository"
+                )
+            }
         }
     }
 }

@@ -17,7 +17,7 @@ Open-source Android app for tracking hydration with personalized recommendations
 - Room Database, DataStore, WorkManager
 - Manual DI via AppContainer (Hilt returns in v0.2)
 - JUnit4 + MockK unit tests, Compose UI tests, GitHub Actions CI
-- Python (offline): synthetic data + scikit-learn baselines, optional TFLite export — see `ml_training/`
+- Python (offline): NHANES grounding + personal-data retraining, optional TFLite export — see `ml_training/`
 
 ## Building
 ```bash
@@ -26,15 +26,17 @@ Open-source Android app for tracking hydration with personalized recommendations
 
 ## Machine learning (Python, offline)
 
-`ml_training/` holds the Python side: a synthetic data generator and a
-training script (scikit-learn baselines + optional Keras → TFLite export
-for future on-device use). The Android app itself stays fully offline.
+`ml_training/` holds the Python side, grounded in real data: CDC NHANES
+2017-2018 (4,931 adults) calibrates the goal formula, and your own
+opt-in app export (Settings → Your data) retrains personal models
+(scikit-learn baselines + optional Keras → TFLite export for future
+on-device use). The Android app itself stays fully offline.
 
 ```bash
 cd ml_training
 pip install -r requirements.txt
-python generate_data.py
-python train_model.py
+python load_nhanes.py
+python train_model.py --data ~/water0-training-*.csv --out-dir model_personal
 ```
 
 See `ml_training/README.md` for the pipeline, Android integration plan,

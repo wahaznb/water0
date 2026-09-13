@@ -15,18 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,13 +28,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -50,7 +39,6 @@ import com.water0.hydration.data.local.entity.UserBehavior
 import com.water0.hydration.data.local.entity.UserProfile
 import com.water0.hydration.di.AppContainer
 import com.water0.hydration.presentation.history.HistoryScreen
-import com.water0.hydration.presentation.home.GlassScreen
 import com.water0.hydration.presentation.home.HomeScreen
 import com.water0.hydration.presentation.home.HomeViewModel
 import com.water0.hydration.presentation.home.LogScreen
@@ -98,15 +86,17 @@ class MainActivity : ComponentActivity() {
         // Default is dark, Omarchy-style.
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val glassPrefs = GlassPrefs.from(this)
-        val glassConfig = glassPrefs.applied()
         setContent {
             var darkTheme by remember {
                 mutableStateOf(prefs.getBoolean(KEY_DARK_THEME, true))
             }
+            // Glass Lab state: sliders write through prefs and recompose
+            // the lens live — no restart needed.
+            var glassConfig by remember { mutableStateOf(glassPrefs.applied()) }
             Water0(darkTheme = darkTheme) {
                 val pagerState = rememberPagerState(
                     initialPage = 0,
-                    pageCount = { 5 }
+                    pageCount = { 4 }
                 )
                 val scope = rememberCoroutineScope()
                 // Keep bottom-bar selection in sync when user swipes.
@@ -123,11 +113,12 @@ class MainActivity : ComponentActivity() {
                     }
                     Unit
                 }
-                // Single Scaffold for the whole pager shell: one top bar
-                // (per page) and one snackbar host. The bottom bar is NOT a
-                // Scaffold slot anymore: it must float as glassContent over
-                // the sampled content for the lens to refract it (container
-                // architecture). Its measured height reserves the inset.
+                // Single Scaffold for the whole pager shell: snackbar host
+                // only — no top bar (headers live in content now) and no
+                // bottom slot (the glass bar floats as glassContent over the
+                // sampled content for the lens to refract it). Its measured
+                // height reserves the content inset; the toast is lifted
+                // above it for the same reason.
                 val snackbarHostState = remember { SnackbarHostState() }
                 var barHeightDp by remember { mutableStateOf(0.dp) }
                 val density = LocalDensity.current
@@ -136,88 +127,14 @@ class MainActivity : ComponentActivity() {
                     content = {
                 Scaffold(
                     snackbarHost = {
-                        SnackbarHost(snackbarHostState) { data ->
+                        SnackbarHost(
+                            snackbarHostState,
+                            modifier = Modifier.padding(bottom = barHeightDp + 16.dp)
+                        ) { data ->
                             GlassSnackbar(message = data.visuals.message)
                         }
                     },
                     containerColor = MaterialTheme.colorScheme.background,
-                    topBar = {
-                        // Seamless header: transparent bar over the shared
-                        // background — no surface block between chrome and
-                        // content. Titles stay for context.
-                        val topColors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = Color.Transparent,
-                            titleContentColor = MaterialTheme.colorScheme.onSurface
-                        )
-                        when (pagerState.currentPage) {
-                            1 -> TopAppBar(
-                                title = {
-                                    Text(
-                                        "Glass",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 20.sp
-                                    )
-                                },
-                                colors = topColors
-                            )
-                            2 -> TopAppBar(
-                                title = {
-                                    Text(
-                                        "Log",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 20.sp
-                                    )
-                                },
-                                colors = topColors
-                            )
-                            3 -> TopAppBar(
-                                title = {
-                                    Text(
-                                        "History",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 20.sp
-                                    )
-                                },
-                                colors = topColors
-                            )
-                            4 -> TopAppBar(
-                                title = {
-                                    Text(
-                                        "Settings",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 20.sp
-                                    )
-                                },
-                                navigationIcon = {
-                                    IconButton(onClick = { navigate(Routes.HOME) }) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                            contentDescription = "Back"
-                                        )
-                                    }
-                                },
-                                colors = topColors
-                            )
-                            else -> TopAppBar(
-                                title = {
-                                    Text(
-                                        "Water0",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 20.sp
-                                    )
-                                },
-                                colors = topColors,
-                                actions = {
-                                    IconButton(onClick = { navigate(Routes.SETTINGS) }) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Settings,
-                                            contentDescription = "Settings"
-                                        )
-                                    }
-                                }
-                            )
-                        }
-                    },
                     content = { paddingValues ->
                     Box(
                         modifier = Modifier
@@ -258,15 +175,11 @@ class MainActivity : ComponentActivity() {
                                         viewModel = viewModel,
                                         snackbarHostState = snackbarHostState
                                     )
-                                    1 -> GlassScreen(
+                                    1 -> LogScreen(
                                         viewModel = viewModel,
                                         snackbarHostState = snackbarHostState
                                     )
-                                    2 -> LogScreen(
-                                        viewModel = viewModel,
-                                        snackbarHostState = snackbarHostState
-                                    )
-                                    3 -> HistoryScreen(
+                                    2 -> HistoryScreen(
                                         snackbarHostState = snackbarHostState
                                     )
                                     else -> SettingsScreen(
@@ -274,6 +187,11 @@ class MainActivity : ComponentActivity() {
                                         onToggleTheme = { enabled ->
                                             darkTheme = enabled
                                             prefs.edit().putBoolean(KEY_DARK_THEME, enabled).apply()
+                                        },
+                                        glassConfig = glassConfig,
+                                        onGlassConfigChange = {
+                                            glassPrefs.saveApplied(it)
+                                            glassConfig = it
                                         }
                                     )
                                 }

@@ -16,7 +16,6 @@ import com.water0.hydration.domain.usecase.CalculateRecommendationUseCase
 import com.water0.hydration.domain.usecase.DeleteHydrationUseCase
 import com.water0.hydration.domain.usecase.GetTodayProgressUseCase
 import com.water0.hydration.domain.usecase.LogHydrationUseCase
-import com.water0.hydration.presentation.home.GlassScreen
 import com.water0.hydration.presentation.home.HomeScreen
 import com.water0.hydration.presentation.home.HomeViewModel
 import com.water0.hydration.presentation.home.LogScreen
@@ -103,9 +102,9 @@ class HomeScreenTest {
     }
 
     @Test
-    fun glassShowsQuickAddAndFillsOnLog() {
+    fun homeGlassFillsOnQuickAdd() {
         composeRule.setContent {
-            Water0 { GlassScreen(viewModel()) }
+            Water0 { HomeScreen(viewModel()) }
         }
         composeRule.onNodeWithText("250ml").performClick()
         // Pinned male profile goal is 2972 ml, so one 250 ml log shows "250 / 2972 ml".
@@ -122,7 +121,7 @@ class HomeScreenTest {
         composeRule.setContent {
             Water0 { LogScreen(viewModel(repo)) }
         }
-        composeRule.onNodeWithText("Log intake").assertIsDisplayed()
+        composeRule.onNodeWithText("Update").assertIsDisplayed()
         composeRule.onNodeWithText("250ml").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText("Today's entries (1)")

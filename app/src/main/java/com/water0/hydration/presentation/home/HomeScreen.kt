@@ -13,26 +13,32 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,10 +46,14 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.water0.hydration.domain.engine.RecommendationEngine
+import com.water0.hydration.presentation.home.components.AddWaterDialog
+import com.water0.hydration.presentation.home.components.QuickAddButtons
 import com.water0.hydration.presentation.home.components.RecommendationCard
+import com.water0.hydration.presentation.home.components.SloshDriver
+import com.water0.hydration.presentation.home.components.WaterGlass
+import com.water0.hydration.presentation.home.components.layersFor
 import com.water0.hydration.ui.theme.AuroraBackground
-import com.water0.hydration.ui.theme.glassCardBorder
-import com.water0.hydration.ui.theme.glassCardContainer
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // Content-only: the single Scaffold (top bar, glass bottom bar, snackbar
@@ -57,7 +67,16 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
+    val kick by viewModel.glassKick.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    var showCustomAmount by remember { mutableStateOf(false) }
+
+    var tilt by remember { mutableFloatStateOf(0f) }
+    var slosh by remember { mutableFloatStateOf(0f) }
+    var pouring by remember { mutableStateOf(false) }
+    // Counts Slosh kicks so each one runs its keyframes to completion even
+    // after the shared kick is consumed.
+    var sloshRunId by remember { mutableIntStateOf(0) }
 
     fun notify(message: String) {
         scope.launch {
@@ -72,14 +91,81 @@ fun HomeScreen(
         }
     }
 
+    // One-shot pour/tilt choreography per kick.
+    LaunchedEffect(kick) {
+        when (kick) {
+            is GlassKick.Pour -> {
+                pouring = true
+                delay(650)
+                pouring = false
+                viewModel.consumeGlassKick()
+            }
+            // Slosh consumption happens in SloshDriver when done.
+            is GlassKick.Slosh -> sloshRunId++
+            null -> Unit
+        }
+    }
+
     HomeUiFrame(
         uiState = uiState,
         modifier = modifier,
         onRetry = { viewModel.refresh() }
     ) { state ->
+        if (sloshRunId > 0) {
+            SloshDriver(
+                runId = sloshRunId,
+                onTiltFrame = { tilt = it },
+                onSloshFrame = { slosh = it },
+                onDone = { viewModel.consumeGlassKick() }
+            )
+        }
+        if (pouring) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(14.dp)
+                        .height(64.dp)
+                        .alpha(0.85f)
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                            RoundedCornerShape(7.dp)
+                        )
+                )
+            }
+        }
+        WaterGlass(
+            modifier = Modifier.padding(top = if (pouring) 0.dp else 12.dp),
+            progress = state.percentage / 100f,
+            totalMl = state.totalEffectiveMl,
+            goalMl = state.goalMl,
+            tiltDegrees = tilt,
+            sloshBoostDp = slosh,
+            layers = layersFor(state.entries)
+        )
+
         StatusIndicator(status = state.status)
 
-        TodaySummaryCard(state = state)
+        QuickAddButtons(
+            onAdd = { amount ->
+                viewModel.quickAdd(amount)
+                notify("Added $amount ml")
+            },
+            onCustomClick = { showCustomAmount = true }
+        )
+
+        if (showCustomAmount) {
+            AddWaterDialog(
+                onDismiss = { showCustomAmount = false },
+                onConfirm = { amount ->
+                    viewModel.quickAdd(amount)
+                    notify("Added $amount ml")
+                    showCustomAmount = false
+                }
+            )
+        }
 
         if (state.recommendations.isNotEmpty()) {
             RecommendationsSection(
@@ -177,59 +263,24 @@ fun HomeUiFrame(
     }
 }
 
-/** Basic info at a glance: today's total against the personal goal. */
-@Composable
-private fun TodaySummaryCard(state: HomeViewModel.UiState.Success) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = glassCardContainer()),
-        border = glassCardBorder(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = "Today",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "${state.totalEffectiveMl} / ${state.goalMl} ml",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = if (state.remainingMl > 0) "${state.remainingMl} ml to go"
-                else "Goal reached",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
 // Subtle overlay tint per hydration state, drawn INSIDE the static mesh
-// (alpha <=0.10 so no banding). Behind = plum wash, ahead = teal wash,
+// (alpha <=0.06 so no banding). Behind = plum wash, ahead = teal wash,
 // over = maroon wash, on-track = transparent.
 @Composable
 private fun hydrationTintFor(uiState: HomeViewModel.UiState): Color {
     val state = uiState as? HomeViewModel.UiState.Success ?: return Color.Transparent
     return when (state.status) {
         RecommendationEngine.HydrationStatus.Status.OVER ->
-            Color(0xFF3D1A24).copy(alpha = 0.10f)
+            Color(0xFF3D1A24).copy(alpha = 0.06f)
         RecommendationEngine.HydrationStatus.Status.BEHIND -> {
-            val depth = ((70 - state.percentage.coerceAtMost(70)) / 70f * 0.10f)
-                .coerceIn(0f, 0.10f)
+            val depth = ((70 - state.percentage.coerceAtMost(70)) / 70f * 0.06f)
+                .coerceIn(0f, 0.06f)
             Color(0xFF33202E).copy(alpha = depth)
         }
         RecommendationEngine.HydrationStatus.Status.ON_TRACK -> Color.Transparent
         RecommendationEngine.HydrationStatus.Status.AHEAD -> {
-            val glow = (((state.percentage - 100).coerceAtLeast(0)) / 40f * 0.10f)
-                .coerceIn(0f, 0.10f)
+            val glow = (((state.percentage - 100).coerceAtLeast(0)) / 40f * 0.06f)
+                .coerceIn(0f, 0.06f)
             Color(0xFF12333B).copy(alpha = glow)
         }
     }

@@ -88,15 +88,7 @@ fun EntryListItem(
         com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.ALCOHOL -> Icons.Filled.SportsBar
         com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.OTHER -> Icons.Filled.WaterDrop
     }
-    val drinkColor = when (entry.type) {
-        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.WATER -> Color(0xFF2196F3)
-        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.COFFEE -> Color(0xFF795548)
-        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.TEA -> Color(0xFF8D6E63)
-        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.JUICE -> Color(0xFFFF9800)
-        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.SODA -> Color(0xFFF44336)
-        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.ALCOHOL -> Color(0xFF6D4C41)
-        com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.OTHER -> Color(0xFF9E9E9E)
-    }
+    val drinkColor = drinkColor(entry.type)
 
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     val timeString = timeFormat.format(entry.timestamp)

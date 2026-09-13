@@ -98,7 +98,7 @@ object GlassColors {
 // (small chrome only) + translucent tint + hairline border + top bevel
 // highlight. Full-screen blur is never used — it bands and drops frames.
 object Glass {
-    const val CARD_ALPHA = 0.72f
+    const val CARD_ALPHA = 0.45f
     const val BORDER_ALPHA = 0.22f
     const val CHIP_ALPHA = 0.55f
 }
@@ -107,9 +107,19 @@ object Glass {
 fun glassCardContainer(): Color =
     MaterialTheme.colorScheme.surface.copy(alpha = Glass.CARD_ALPHA)
 
+// Beveled rim: bright top edge fading into the hairline outline, the
+// cheap version of a lens edge. Shared by every card in the app.
 @Composable
-fun glassCardBorder(bevelAlpha: Float = GlassConfig.Defaults.BEVEL_ALPHA): BorderStroke =
-    BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = Glass.BORDER_ALPHA))
+fun glassCardBorder(): BorderStroke =
+    BorderStroke(
+        1.dp,
+        Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.16f),
+                MaterialTheme.colorScheme.outline.copy(alpha = Glass.BORDER_ALPHA)
+            )
+        )
+    )
 
 // BlockAds-style state tint for cards: subtle, never full-screen flash.
 @Composable
@@ -143,11 +153,12 @@ fun AuroraBackground(
     androidx.compose.foundation.Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
-        // Top-left water-blue wash.
+        // Top-left water-blue wash. Kept dim: cards are translucent now
+        // and the mesh glows through them, so loud washes band and glare.
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    primary.copy(alpha = 0.22f),
+                    primary.copy(alpha = 0.13f),
                     Color.Transparent
                 ),
                 center = androidx.compose.ui.geometry.Offset(w * 0.12f, h * 0.06f),
@@ -159,7 +170,7 @@ fun AuroraBackground(
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    secondary.copy(alpha = 0.16f),
+                    secondary.copy(alpha = 0.10f),
                     Color.Transparent
                 ),
                 center = androidx.compose.ui.geometry.Offset(w * 0.92f, h * 0.94f),
@@ -171,7 +182,7 @@ fun AuroraBackground(
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    tertiary.copy(alpha = 0.10f),
+                    tertiary.copy(alpha = 0.06f),
                     Color.Transparent
                 ),
                 center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.45f),

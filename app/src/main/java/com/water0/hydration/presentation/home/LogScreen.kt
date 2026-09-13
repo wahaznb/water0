@@ -68,7 +68,7 @@ fun LogScreen(
         onRetry = { viewModel.refresh() }
     ) { state ->
         Text(
-            text = "Log intake",
+            text = "Update",
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 16.dp)

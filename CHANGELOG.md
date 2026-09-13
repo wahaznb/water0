@@ -9,27 +9,29 @@ All notable changes to Water0 are documented here. Format follows
 - Profile sex (female 31ml/kg / male 33ml/kg, narrowed from 35 on NHANES
   evidence) with Room v1→v2 migration,
   settings radio, and goal breakdown by sex
-- Swipeable pager shell (hold-and-slide across Home/History/Settings) with
+- Swipeable pager shell (hold-and-slide across tabs) with
   glass bottom bar and motion-blur transition
 - Glass Lab in Settings: blur/tint/bevel sliders (defaults 23dp / 31% / 5%),
-  apply-on-restart with live pending state
+  applied live, no restart — kept after audit (restart flow deleted)
 - Material icons throughout (tabs, recommendation reasons, drink entries,
   delete, navigation); glass toast snackbars
-- Centered 280dp progress ring over static Canvas mesh gradient
-- Single-Scaffold pager shell (content-only screens, shared glass snackbar)
+- Four-tab navigation (Home / Update / Logs / Settings): hero water glass
+  back on Home with transparent unmixed drink layers, Update tab with drink
+  types and working delete, long-press-drag across tabs to navigate,
+  droplet selection indicator on the glass bar
+- Translucent liquid-glass cards everywhere (settings, recommendations,
+  logs) over a dimmed mesh; header removed for a seamless top; toast
+  lifted above the glass bar
+- Real liquid-glass bottom bar: ported backdrop-lens technique (refraction +
+  blur + rim highlight sampled from content, AGSL on API 33+, gradient
+  fallback below), driven live by the Glass Lab settings
+- About section in Settings (version, GitHub link, license)
 - Opt-in training-data export (Settings → Your data, 90-day simulator-schema
   CSV, fully offline) + single-user time split in `train_model.py`
 - Personal-pace nudge: recommendations adapt to the user's own 7-day rhythm
   (prorated by time of day, 3-day cold-start guard, suppressed at goal)
-- Five-tab navigation (Home / Glass / Log / History / Settings): hero water
-  glass that pours on log and tilts on delete, Log tab with drink types and
-  working delete, droplet selection indicator on the glass bar
-- Real liquid-glass bottom bar: ported backdrop-lens technique (refraction +
-  blur + rim highlight sampled from content, AGSL on API 33+, gradient
-  fallback below), driven by the Glass Lab settings
 - Custom water amounts (preset chips + slider + exact ml field)
 - Liquid-glass water fill replacing the progress ring (animated level + wave)
-- Seamless transparent header across all three screens
 - `ml_training/LEARNING_GUIDE.md`: hands-on training walkthrough incl. the
   NHANES negative result; direct NHANES training retired as a direction
 
