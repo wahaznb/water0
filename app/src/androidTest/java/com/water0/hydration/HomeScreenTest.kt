@@ -130,7 +130,7 @@ class HomeScreenTest {
         composeRule.setContent {
             Water0 { LogScreen(viewModel(repo)) }
         }
-        composeRule.onNodeWithText("Update").assertIsDisplayed()
+        composeRule.onNodeWithText("Today's entries (0)").assertIsDisplayed()
         composeRule.onNodeWithText("250ml").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText("Today's entries (1)")

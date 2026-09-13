@@ -9,10 +9,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +34,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -48,6 +53,7 @@ import com.water0.hydration.presentation.home.HomeViewModel
 import com.water0.hydration.presentation.home.LogScreen
 import com.water0.hydration.presentation.home.hydrationTintFor
 import com.water0.hydration.presentation.navigation.GlassBottomBar
+import com.water0.hydration.presentation.navigation.LensPlate
 import com.water0.hydration.presentation.navigation.Routes
 import com.water0.hydration.presentation.settings.SettingsScreen
 import com.water0.hydration.ui.theme.GlassPrefs
@@ -144,6 +150,16 @@ class MainActivity : ComponentActivity() {
                 // above it for the same reason.
                 val snackbarHostState = remember { SnackbarHostState() }
                 var barHeightDp by remember { mutableStateOf(0.dp) }
+                var plateHeightDp by remember { mutableStateOf(0.dp) }
+                val density = LocalDensity.current
+                // The plate only exists off-Home; animate the inset with its
+                // fade so content never jumps.
+                val topInsetTarget = if (selected == Routes.HOME) 0.dp else plateHeightDp
+                val topInset by animateDpAsState(
+                    targetValue = topInsetTarget,
+                    animationSpec = tween(durationMillis = 250),
+                    label = "topInset"
+                )
                 // Background state comes from the shared HomeViewModel so the
                 // ONE root Aurora below matches the glass everywhere.
                 val homeUiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -185,11 +201,15 @@ class MainActivity : ComponentActivity() {
                     },
                     containerColor = Color.Transparent,
                     content = { paddingValues ->
+                    // Full-bleed: lists flow to the screen end UNDER the
+                    // floating dock (which is translucent) instead of ending
+                    // abruptly above it. barHeightDp survives for the toast
+                    // lift only.
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(paddingValues)
-                            .padding(bottom = barHeightDp + 12.dp)
+                            .padding(top = topInset)
                     ) {
                         HorizontalPager(
                             state = pagerState,
@@ -251,7 +271,42 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 },
-                    glassContent = {
+                    glassContent = scope@{
+                        // Lens title plate on non-Home tabs (Home has its
+                        // in-content header). Fades with the inset animation.
+                        // Labeled lambda: nested Boxes shadow the scope, so
+                        // extension calls below use an explicit receiver.
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = selected != Routes.HOME,
+                            enter = androidx.compose.animation.fadeIn(
+                                animationSpec = tween(durationMillis = 250)
+                            ),
+                            exit = androidx.compose.animation.fadeOut(
+                                animationSpec = tween(durationMillis = 200)
+                            ),
+                            label = "plate"
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .statusBarsPadding()
+                                    .padding(horizontal = 16.dp)
+                                    .padding(top = 8.dp),
+                                contentAlignment = Alignment.TopCenter
+                            ) {
+                                this@scope.LensPlate(
+                                    title = when (selected) {
+                                        Routes.UPDATE -> "Update"
+                                        Routes.LOGS -> "Logs"
+                                        else -> "Settings"
+                                    },
+                                    config = glassConfig,
+                                    modifier = Modifier.onSizeChanged {
+                                        plateHeightDp = with(density) { it.height.toDp() }
+                                    }
+                                )
+                            }
+                        }
                         // Directly in GlassBoxScope (no nested Box receiver).
                         GlassBottomBar(
                             selected = selected,

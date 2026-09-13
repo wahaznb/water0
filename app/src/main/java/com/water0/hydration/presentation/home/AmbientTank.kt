@@ -1,9 +1,12 @@
 package com.water0.hydration.presentation.home
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -18,6 +21,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -63,6 +68,25 @@ fun AmbientTank(
             null -> Unit
         }
     }
+
+    // Tab-change pulse: the tank swings back to middle, goes big and
+    // fullscreen-soft, then settles into its per-tab pose. Skipped on
+    // first composition (no route change yet).
+    var firstRoute by remember { mutableStateOf(true) }
+    val pulse = remember { Animatable(0f) }
+    LaunchedEffect(selectedRoute) {
+        if (firstRoute) {
+            firstRoute = false
+        } else {
+            pulse.snapTo(0f)
+            pulse.animateTo(1f, tween(durationMillis = 700, easing = LinearEasing))
+        }
+    }
+    val pulseWave = kotlin.math.sin(pulse.value * kotlin.math.PI).toFloat()
+    val pulseScale = 1f + 0.45f * pulseWave
+    val pulseBlur = if (android.os.Build.VERSION.SDK_INT >= 31) {
+        (pulseWave * 16f).dp
+    } else 0.dp
 
     val state = uiState as? HomeViewModel.UiState.Success ?: return
     val home = selectedRoute == Routes.HOME
@@ -114,19 +138,30 @@ fun AmbientTank(
                 onDone = { viewModel.consumeGlassKick() }
             )
         }
-        WaterStage(
-            totalMl = state.totalEffectiveMl,
-            goalMl = state.goalMl,
-            layers = layersFor(state.entries),
-            tiltDegrees = tilt,
-            sloshBoostDp = slosh,
-            pouring = pouring,
-            glassWidth = tankW,
-            glassHeight = tankH,
-            showCaption = home,
+        // Transition covers the spring: fullscreen-ish, bigger, softer.
+        // Blur needs API 31+; below that the animation is scale-only.
+        Box(
             modifier = Modifier
-                .offset(x = tankX)
-                .alpha(tankAlpha)
-        )
+                .graphicsLayer {
+                    scaleX = pulseScale
+                    scaleY = pulseScale
+                }
+                .blur(pulseBlur)
+        ) {
+            WaterStage(
+                totalMl = state.totalEffectiveMl,
+                goalMl = state.goalMl,
+                layers = layersFor(state.entries),
+                tiltDegrees = tilt,
+                sloshBoostDp = slosh,
+                pouring = pouring,
+                glassWidth = tankW,
+                glassHeight = tankH,
+                showCaption = false,
+                modifier = Modifier
+                    .offset(x = tankX)
+                    .alpha(tankAlpha)
+            )
+        }
     }
 }

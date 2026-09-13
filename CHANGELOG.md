@@ -62,6 +62,8 @@ All notable changes to Water0 are documented here. Format follows
   90–99%); goal-met state shows a celebration instead of drink nudges
 - Tab bar rendered at the top over the status bar (dock wrapper didn't
   span the overlay); dock now pinned to the bottom
+- Content cut off abruptly above the dock; lists now flow full-bleed
+  underneath the floating dock instead
 - Bare Text()/Icon() rendered black on dark theme (Material3 doesn't set
   LocalContentColor); scheme color provided once at the theme root
 - Background gradient banding: removed large-area blur blobs, subtle

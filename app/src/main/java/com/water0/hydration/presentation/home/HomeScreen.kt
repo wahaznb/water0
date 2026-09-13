@@ -35,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.water0.hydration.domain.engine.RecommendationEngine
+import com.water0.hydration.ui.theme.Glass
 import com.water0.hydration.presentation.home.components.RecommendationCard
 import kotlinx.coroutines.launch
 
@@ -80,33 +83,62 @@ fun HomeScreen(
 
         // Numbers live here now; the tank itself is ambient behind the
         // whole shell (see AmbientTank) so it never fights content.
-        Column(
+        // Left ~40% stays empty for the cropped tank; the frosted panel
+        // keeps text readable over it.
+        androidx.compose.foundation.layout.Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = "${state.percentage}%",
-                fontSize = 40.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+            androidx.compose.foundation.layout.Spacer(
+                modifier = Modifier.weight(0.7f)
             )
-            Text(
-                text = "${state.totalEffectiveMl} / ${state.goalMl} ml",
-                fontSize = 15.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = if (state.remainingMl > 0) "${state.remainingMl} ml to go"
-                else "Goal reached",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "${state.entries.size} logs today",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Column(
+                modifier = Modifier
+                    .weight(1.3f)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.42f),
+                        RoundedCornerShape(20.dp)
+                    )
+                    .border(
+                        1.dp,
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.White.copy(alpha = 0.16f),
+                                MaterialTheme.colorScheme.outline.copy(
+                                    alpha = Glass.BORDER_ALPHA
+                                )
+                            )
+                        ),
+                        RoundedCornerShape(20.dp)
+                    )
+                    .padding(14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "${state.percentage}%",
+                    fontSize = 40.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "${state.totalEffectiveMl} / ${state.goalMl} ml",
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (state.remainingMl > 0) "${state.remainingMl} ml to go"
+                    else "Goal reached",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "${state.entries.size} logs today",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         StatusIndicator(status = state.status)

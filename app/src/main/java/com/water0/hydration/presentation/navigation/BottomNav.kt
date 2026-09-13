@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.History
@@ -43,7 +44,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.water0.hydration.ui.theme.GlassConfig
 import com.water0.hydration.ui.theme.liquidglass.GlassBoxScope
 import com.water0.hydration.ui.theme.liquidglass.LiquidGlassBox
@@ -272,5 +275,33 @@ private fun GlassTab(
                 icon()
             }
         }
+    }
+}
+
+/**
+ * Lens title plate for non-Home tabs: a real backdrop lens (same port as
+ * the dock) floating under the status bar. Call from glassContent; the
+ * caller measures it for the content top inset.
+ */
+@Composable
+fun GlassBoxScope.LensPlate(
+    title: String,
+    config: GlassConfig,
+    modifier: Modifier = Modifier
+) {
+    val surface = MaterialTheme.colorScheme.surface
+    val params = remember(config, surface) { config.toLiquidParams(surface) }
+    this@LensPlate.LiquidGlassBox(
+        modifier = modifier.fillMaxWidth(),
+        params = params,
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Text(
+            text = title,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
+        )
     }
 }

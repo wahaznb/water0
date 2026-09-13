@@ -67,8 +67,7 @@ fun LogScreen(
         modifier = modifier,
         onRetry = { viewModel.refresh() }
     ) { state ->
-        com.water0.hydration.ui.theme.SectionHeader(text = "Update")
-
+        // Title lives in the shell's lens plate; content starts with tools.
         FlowRow(
             modifier = Modifier
                 .fillMaxWidth()
