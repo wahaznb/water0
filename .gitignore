@@ -57,5 +57,8 @@ keystore.properties
 # Local-only learning notes (never push)
 learning-guide/
 
+# Phone screenshots shared for review (never push)
+/screenshots >_
+
 # ...except the Gradle wrapper jar, which CI needs to run ./gradlew
 !gradle-wrapper.jar

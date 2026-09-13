@@ -37,7 +37,10 @@ All notable changes to Water0 are documented here. Format follows
   gliding status tint, animated glass numerals
 - Top-layer-only waves; droplet pour with splash rings (replaces the bar
   stream); glass badge on the active tab (no dot); footer chrome removed
-- Living background: swirling washes + rising bubbles reacting to progress
+- Living background: swirling washes + rising bubbles reacting to progress,
+  twinkle specks, film grain against banding; washes turned up loud
+- Home is tank + recommendations only (logging lives strictly in Update);
+  tall side tank with stats column; chronological unmixed drink layers
 - Opt-in training-data export (Settings → Your data, 90-day simulator-schema
   CSV, fully offline) + single-user time split in `train_model.py`
 - Personal-pace nudge: recommendations adapt to the user's own 7-day rhythm
@@ -54,6 +57,10 @@ All notable changes to Water0 are documented here. Format follows
 ### Fixed
 - Evening "small sip before bed" no longer shows after goal met (gated to
   90–99%); goal-met state shows a celebration instead of drink nudges
+- Tab bar rendered at the top over the status bar (dock wrapper didn't
+  span the overlay); dock now pinned to the bottom
+- Bare Text()/Icon() rendered black on dark theme (Material3 doesn't set
+  LocalContentColor); scheme color provided once at the theme root
 - Background gradient banding: removed large-area blur blobs, subtle
   ≤10% hydration overlay only
 - Time-flaky quiet-hours unit test (injected clock hour)

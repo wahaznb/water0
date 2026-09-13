@@ -30,7 +30,15 @@ fun LiquidGlassTheme(
     MaterialTheme(
         colorScheme = colors,
         typography = Typography,
-        content = content
+        content = {
+            // Material3 does NOT set LocalContentColor (unlike Material2),
+            // so bare Text()/Icon() default to BLACK — invisible on dark
+            // theme. Provide the scheme color once, everywhere.
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.material3.LocalContentColor provides colors.onSurface,
+                content = content
+            )
+        }
     )
 }
 
@@ -159,7 +167,7 @@ fun AuroraBackground(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 7000, easing = LinearEasing)
+            animation = tween(durationMillis = 6000, easing = LinearEasing)
         ),
         label = "rise"
     )
@@ -173,12 +181,16 @@ fun AuroraBackground(
             val oy = kotlin.math.sin(swirl + phase) * h * r
             return androidx.compose.ui.geometry.Offset(w * fx + ox, h * fy + oy)
         }
-        // Top-left water-blue wash. Strong on purpose: translucent cards
-        // and water drink straight from this mesh.
+        // Top-left water-blue wash. Loud on purpose: translucent cards
+        // and water drink straight from this mesh. Four stops instead of
+        // two — a bare color-to-transparent ramp quantizes into visible
+        // posterized rings; intermediate stops spread the error.
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    primary.copy(alpha = 0.24f),
+                    primary.copy(alpha = 0.36f),
+                    primary.copy(alpha = 0.20f),
+                    primary.copy(alpha = 0.08f),
                     Color.Transparent
                 ),
                 center = orbit(0.12f, 0.06f, 0.05f, 0f),
@@ -190,7 +202,9 @@ fun AuroraBackground(
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    secondary.copy(alpha = 0.18f),
+                    secondary.copy(alpha = 0.26f),
+                    secondary.copy(alpha = 0.14f),
+                    secondary.copy(alpha = 0.05f),
                     Color.Transparent
                 ),
                 center = orbit(0.92f, 0.94f, 0.04f, 2.1f),
@@ -202,7 +216,9 @@ fun AuroraBackground(
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    tertiary.copy(alpha = 0.11f),
+                    tertiary.copy(alpha = 0.16f),
+                    tertiary.copy(alpha = 0.09f),
+                    tertiary.copy(alpha = 0.03f),
                     Color.Transparent
                 ),
                 center = orbit(0.5f, 0.45f, 0.06f, 4.2f),
@@ -213,7 +229,7 @@ fun AuroraBackground(
         // Rising bubble particles. More, brighter, and faster with energy.
         // Kept small on purpose: fine bright dots read best through the
         // lens edge, which is exactly where the bottom bar samples them.
-        val count = (10 + energy * 20).toInt()
+        val count = (14 + energy * 24).toInt()
         for (i in 0 until count) {
             val seed = ((i * 37) % 100) / 100f
             val speed = 0.6f + (i % 4) * 0.2f
@@ -243,6 +259,19 @@ fun AuroraBackground(
         }
         if (hydrationTint != Color.Transparent) {
             drawRect(color = hydrationTint, size = size)
+        }
+        // Film grain last: fixed pseudo-random speckle that breaks the
+        // concentric banding wide alpha gradients otherwise show. Static
+        // positions (no time component) so it never shimmers or costs
+        // recomposition — one cheap pass over tiny dots.
+        for (i in 0 until 450) {
+            val gx = (((i * 73) % 100) / 100f) * w
+            val gy = (((i * 97) % 100) / 100f) * h
+            drawCircle(
+                (if (i % 2 == 0) Color.White else Color.Black).copy(alpha = 0.03f),
+                1.dp.toPx() * 0.5f,
+                androidx.compose.ui.geometry.Offset(gx, gy)
+            )
         }
     }
 }

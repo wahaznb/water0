@@ -74,7 +74,9 @@ fun WaterGlass(
     /** Bottom-up unmixed bands; empty = single water band. */
     layers: List<WaterLayer> = emptyList(),
     /** True while the pour stream is running (extra turbulence + foam). */
-    pouring: Boolean = false
+    pouring: Boolean = false,
+    /** False when the numbers live beside the tank instead of on it. */
+    showCaption: Boolean = true
 ) {
     // Wave phase drifts forever; only the TOP band follows it — lower
     // interfaces stay flat like real settled layers.
@@ -205,9 +207,9 @@ fun WaterGlass(
                 Offset(size.width - wallWidth, size.height),
                 wallWidth
             )
-            // Rising bubbles. More of them while pouring or over the goal —
-            // an overfull glass foams instead of clipping silently.
-            val bubbleCount = 6 + (if (pouring) 8 else 0) + (if (overfull) 10 else 0) +
+            // Rising bubbles — frequent by design. More while pouring,
+            // sloshing, or over the goal.
+            val bubbleCount = 12 + (if (pouring) 8 else 0) + (if (overfull) 10 else 0) +
                 sloshBoostDp.toInt()
             for (i in 0 until bubbleCount) {
                 val seed = ((i * 37) % 100) / 100f
@@ -242,17 +244,19 @@ fun WaterGlass(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = "$percentage%",
-                fontSize = 44.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = "$totalMl / $goalMl ml",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (showCaption) {
+                Text(
+                    text = "$percentage%",
+                    fontSize = 44.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "$totalMl / $goalMl ml",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -356,7 +360,10 @@ fun WaterStage(
     tiltDegrees: Float,
     sloshBoostDp: Float,
     pouring: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    glassWidth: Dp = GlassStageWidth,
+    glassHeight: Dp = GlassStageHeight,
+    showCaption: Boolean = true
 ) {
     val density = androidx.compose.ui.platform.LocalDensity.current
     // Single source of truth with the "X / Y ml" caption below.
@@ -385,8 +392,8 @@ fun WaterStage(
     // Glass sits below a fall zone; both share one overlay box so the
     // droplets land exactly on the live surface.
     val fallHpx = with(density) { fallH.toPx() }
-    val glassHpx = with(density) { GlassStageHeight.toPx() }
-    val glassWpx = with(density) { GlassStageWidth.toPx() }
+    val glassHpx = with(density) { glassHeight.toPx() }
+    val glassWpx = with(density) { glassWidth.toPx() }
     val surfaceY = fallHpx + (1f - level) * glassHpx
     val lip = Offset(glassWpx * LipXFrac, fallHpx + glassHpx * LipYFrac)
     androidx.compose.foundation.layout.Column(
@@ -395,8 +402,8 @@ fun WaterStage(
     ) {
         Box(
             modifier = Modifier.size(
-                GlassStageWidth,
-                fallH + GlassStageHeight + SpillRoom
+                glassWidth,
+                fallH + glassHeight + SpillRoom
             )
         ) {
             if (pouring) {
@@ -417,7 +424,7 @@ fun WaterStage(
             )
             Box(
                 modifier = Modifier
-                    .size(GlassStageWidth, GlassStageHeight)
+                    .size(glassWidth, glassHeight)
                     .align(Alignment.TopCenter)
                     .offset(y = fallH)
                     .graphicsLayer {
@@ -430,12 +437,13 @@ fun WaterStage(
                     overfull = overfull,
                     totalMl = totalMl,
                     goalMl = goalMl,
-                    width = GlassStageWidth,
-                    height = GlassStageHeight,
+                    width = glassWidth,
+                    height = glassHeight,
                     tiltDegrees = tiltDegrees,
                     sloshBoostDp = sloshBoostDp,
                     layers = layers,
-                    pouring = pouring
+                    pouring = pouring,
+                    showCaption = showCaption
                 )
             }
             if (spillAlpha > 0.01f) {

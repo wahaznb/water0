@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -133,10 +134,12 @@ fun GlassBoxScope.GlassBottomBar(
 
     // Compact centered dock (not a footer): fixed-width tabs, lens hugging
     // them. The lens height is hoisted for the content inset — measured on
-    // the lens itself, never on a full-size wrapper.
+    // the lens itself, never on a full-size wrapper. NOTE: this wrapper
+    // must fillMaxSize — BottomCenter only pushes the dock down when the
+    // box actually spans the overlay (a wrap-content box sits at the top).
     Box(
         modifier = modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .padding(bottom = 12.dp),
         contentAlignment = Alignment.BottomCenter
     ) {

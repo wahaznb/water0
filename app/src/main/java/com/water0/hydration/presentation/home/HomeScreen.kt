@@ -116,14 +116,53 @@ fun HomeScreen(
                 onDone = { viewModel.consumeGlassKick() }
             )
         }
-        WaterStage(
-            totalMl = state.totalEffectiveMl,
-            goalMl = state.goalMl,
-            layers = layersFor(state.entries),
-            tiltDegrees = tilt,
-            sloshBoostDp = slosh,
-            pouring = pouring
-        )
+        // Tank on the left half, numbers on the right — recommendations
+        // below stay the main focus.
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            WaterStage(
+                totalMl = state.totalEffectiveMl,
+                goalMl = state.goalMl,
+                layers = layersFor(state.entries),
+                tiltDegrees = tilt,
+                sloshBoostDp = slosh,
+                pouring = pouring,
+                glassWidth = 170.dp,
+                glassHeight = 380.dp,
+                showCaption = false,
+                modifier = Modifier.weight(1f)
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "${state.percentage}%",
+                    fontSize = 40.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "${state.totalEffectiveMl} / ${state.goalMl} ml",
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (state.remainingMl > 0) "${state.remainingMl} ml to go"
+                    else "Goal reached",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "${state.entries.size} logs today",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
         StatusIndicator(status = state.status)
 

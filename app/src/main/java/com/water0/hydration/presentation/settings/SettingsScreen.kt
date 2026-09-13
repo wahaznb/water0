@@ -237,7 +237,7 @@ private fun ProfileSection(profile: UserProfile, viewModel: SettingsViewModel) {
             color = MaterialTheme.colorScheme.onSurface
         )
         UserProfile.Climate.entries.forEach { climate ->
-            val label = "${climate.name.lowercase().replaceFirstChar { it.uppercase() }} (+${climate.extraMlPerDay} ml)"
+            val label = "${climate.name.lowercase().replace("_", " ").replaceFirstChar { it.uppercase() }} (+${climate.extraMlPerDay} ml)"
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
