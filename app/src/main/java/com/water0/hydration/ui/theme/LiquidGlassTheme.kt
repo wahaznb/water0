@@ -127,23 +127,6 @@ fun glassCardBorder(): BorderStroke =
         )
     )
 
-// BlockAds-style state tint for cards: subtle, never full-screen flash.
-@Composable
-fun statusTint(
-    percentage: Int,
-    status: com.water0.hydration.domain.engine.RecommendationEngine.HydrationStatus.Status?
-): Color {
-    return when (status) {
-        com.water0.hydration.domain.engine.RecommendationEngine.HydrationStatus.Status.BEHIND ->
-            MaterialTheme.colorScheme.error.copy(alpha = 0.08f)
-        com.water0.hydration.domain.engine.RecommendationEngine.HydrationStatus.Status.AHEAD ->
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-        com.water0.hydration.domain.engine.RecommendationEngine.HydrationStatus.Status.OVER ->
-            MaterialTheme.colorScheme.error.copy(alpha = 0.14f)
-        else -> Color.Transparent
-    }
-}
-
 // Fixed mesh background with living water: three Canvas radial washes
 // that slowly swirl, plus bubble particles rising to the top. `energy`
 // (0..1, wired to hydration progress) drives bubble count, opacity, and
@@ -228,7 +211,9 @@ fun AuroraBackground(
             size = size
         )
         // Rising bubble particles. More, brighter, and faster with energy.
-        val count = (6 + energy * 12).toInt()
+        // Kept small on purpose: fine bright dots read best through the
+        // lens edge, which is exactly where the bottom bar samples them.
+        val count = (10 + energy * 20).toInt()
         for (i in 0 until count) {
             val seed = ((i * 37) % 100) / 100f
             val speed = 0.6f + (i % 4) * 0.2f
@@ -239,6 +224,20 @@ fun AuroraBackground(
             drawCircle(
                 primary.copy(alpha = (0.10f + energy * 0.14f) * (1f - t * 0.5f)),
                 (1.5f + (i % 3)).dp.toPx() * 0.5f,
+                androidx.compose.ui.geometry.Offset(x, y)
+            )
+        }
+        // Twinkle specks: tiny, near-static bright dots scattered over the
+        // whole field. They barely move but catch the lens rim highlight,
+        // which is what makes refraction visible even when still.
+        for (i in 0 until 26) {
+            val seed = ((i * 71) % 100) / 100f
+            val x = (((i * 41) % 100) / 100f) * w
+            val y = (((i * 67) % 100) / 100f) * h
+            val twinkle = 0.5f + 0.5f * kotlin.math.sin(rise * 6.28f + seed * 6.28f).toFloat()
+            drawCircle(
+                Color.White.copy(alpha = (0.05f + energy * 0.10f) * twinkle),
+                (1f + (i % 2)).dp.toPx() * 0.5f,
                 androidx.compose.ui.geometry.Offset(x, y)
             )
         }

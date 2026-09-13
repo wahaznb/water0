@@ -8,11 +8,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.core.content.ContextCompat
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +20,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,12 +29,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.water0.hydration.data.local.entity.UserBehavior
 import com.water0.hydration.data.local.entity.UserProfile
@@ -42,11 +45,13 @@ import com.water0.hydration.presentation.history.HistoryScreen
 import com.water0.hydration.presentation.home.HomeScreen
 import com.water0.hydration.presentation.home.HomeViewModel
 import com.water0.hydration.presentation.home.LogScreen
+import com.water0.hydration.presentation.home.hydrationTintFor
 import com.water0.hydration.presentation.navigation.GlassBottomBar
 import com.water0.hydration.presentation.navigation.Routes
 import com.water0.hydration.presentation.settings.SettingsScreen
 import com.water0.hydration.ui.theme.GlassPrefs
 import com.water0.hydration.ui.theme.GlassSnackbar
+import com.water0.hydration.ui.theme.AuroraBackground
 import com.water0.hydration.ui.theme.Water0
 import com.water0.hydration.ui.theme.liquidglass.LiquidGlassContainer
 import kotlinx.coroutines.launch
@@ -78,6 +83,16 @@ class MainActivity : ComponentActivity() {
     )
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Full-bleed background under status/nav bars (kills the grey
+        // system-bar bands); Scaffold insets keep content clear of them.
+        // (WindowCompat instead of enableEdgeToEdge: our activity-ktx
+        // predates that helper.)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        @Suppress("DEPRECATION")
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= 29) {
+            window.isNavigationBarContrastEnforced = false
+        }
         seedDefaults()
         requestNotificationPermission()
         AppContainer.getNotificationScheduler(this).ensureScheduled()
@@ -93,6 +108,13 @@ class MainActivity : ComponentActivity() {
             // Glass Lab state: sliders write through prefs and recompose
             // the lens live — no restart needed.
             var glassConfig by remember { mutableStateOf(glassPrefs.applied()) }
+            // Status/nav icon contrast follows the theme (dark-first app).
+            SideEffect {
+                WindowCompat.getInsetsController(window, window.decorView).let {
+                    it.isAppearanceLightStatusBars = !darkTheme
+                    it.isAppearanceLightNavigationBars = !darkTheme
+                }
+            }
             Water0(darkTheme = darkTheme) {
                 val pagerState = rememberPagerState(
                     initialPage = 0,
@@ -121,10 +143,28 @@ class MainActivity : ComponentActivity() {
                 // above it for the same reason.
                 val snackbarHostState = remember { SnackbarHostState() }
                 var barHeightDp by remember { mutableStateOf(0.dp) }
-                val density = LocalDensity.current
+                // Background state comes from the shared HomeViewModel so the
+                // ONE root Aurora below matches the glass everywhere.
+                val homeUiState by viewModel.uiState.collectAsStateWithLifecycle()
+                val rootTintTarget = hydrationTintFor(homeUiState)
+                val rootTint by animateColorAsState(
+                    targetValue = rootTintTarget,
+                    animationSpec = tween(durationMillis = 1000),
+                    label = "rootTint"
+                )
+                val rootEnergy = ((homeUiState as? HomeViewModel.UiState.Success)
+                    ?.percentage?.div(100f) ?: 0.35f).coerceIn(0f, 1f)
                 LiquidGlassContainer(
                     modifier = Modifier.fillMaxSize(),
                     content = {
+                // Full-bleed living background behind EVERYTHING (including
+                // the lens bar zone) so the lens always samples real pixels.
+                Box(modifier = Modifier.fillMaxSize()) {
+                    AuroraBackground(
+                        modifier = Modifier.fillMaxSize(),
+                        hydrationTint = rootTint,
+                        energy = rootEnergy
+                    )
                 Scaffold(
                     snackbarHost = {
                         SnackbarHost(
@@ -134,7 +174,7 @@ class MainActivity : ComponentActivity() {
                             GlassSnackbar(message = data.visuals.message)
                         }
                     },
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = Color.Transparent,
                     content = { paddingValues ->
                     Box(
                         modifier = Modifier
@@ -195,27 +235,20 @@ class MainActivity : ComponentActivity() {
                                         }
                                     )
                                 }
+                                }
                             }
                         }
                     }
-                    }
                     )
+                }
                 },
                     glassContent = {
-                        // Bottom-aligned via wrapContentSize so the call stays
-                        // directly in GlassBoxScope (no nested Box receiver).
-                        // onSizeChanged sits inside and reports the bar's own
-                        // footprint, which reserves the content inset.
+                        // Directly in GlassBoxScope (no nested Box receiver).
                         GlassBottomBar(
                             selected = selected,
                             onSelect = navigate,
                             config = glassConfig,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .wrapContentSize(Alignment.BottomCenter)
-                                .onSizeChanged {
-                                    barHeightDp = with(density) { it.height.toDp() }
-                                }
+                            onHeight = { barHeightDp = it }
                         )
                     }
                 )

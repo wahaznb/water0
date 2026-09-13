@@ -1,5 +1,10 @@
 package com.water0.hydration.presentation.home.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +30,7 @@ import androidx.compose.material3.Text
 import com.water0.hydration.ui.theme.glassCardBorder
 import com.water0.hydration.ui.theme.glassCardContainer
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,7 +44,8 @@ import java.util.Locale
 fun TodayEntriesList(
     modifier: Modifier = Modifier,
     entries: List<com.water0.hydration.data.local.entity.HydrationEntry>,
-    onDelete: (Long) -> Unit
+    onDelete: (Long) -> Unit,
+    markedForDelete: Set<Long> = emptySet()
 ) {
     if (entries.isEmpty()) {
         Box(
@@ -67,7 +74,19 @@ fun TodayEntriesList(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             entries.forEach { entry ->
-                EntryListItem(entry = entry, onDelete = onDelete)
+                // Tetris line-clear: flash white, then collapse upward.
+                AnimatedVisibility(
+                    visible = entry.id !in markedForDelete,
+                    exit = fadeOut(tween(150, delayMillis = 150)) +
+                        shrinkVertically(tween(350)),
+                    label = "delete${entry.id}"
+                ) {
+                    EntryListItem(
+                        entry = entry,
+                        onDelete = onDelete,
+                        marked = entry.id in markedForDelete
+                    )
+                }
             }
         }
     }
@@ -76,7 +95,8 @@ fun TodayEntriesList(
 @Composable
 fun EntryListItem(
     entry: com.water0.hydration.data.local.entity.HydrationEntry,
-    onDelete: (Long) -> Unit
+    onDelete: (Long) -> Unit,
+    marked: Boolean = false
 ) {
     // Drink icon instead of text avatar / emoji.
     val drinkIcon = when (entry.type) {
@@ -98,12 +118,20 @@ fun EntryListItem(
         " ($effectiveMl ml effective)"
     } else ""
 
+    // Marked-for-delete rows flash white before collapsing.
+    val container by androidx.compose.animation.animateColorAsState(
+        targetValue = if (marked) Color.White.copy(alpha = 0.85f)
+        else glassCardContainer(),
+        animationSpec = tween(durationMillis = 150),
+        label = "deleteFlash"
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
         colors = CardDefaults.cardColors(
-            containerColor = glassCardContainer()
+            containerColor = container
         ),
         border = glassCardBorder(),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)

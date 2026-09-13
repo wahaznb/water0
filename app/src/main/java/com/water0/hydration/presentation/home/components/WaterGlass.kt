@@ -5,6 +5,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
@@ -342,10 +343,13 @@ fun pourPinOffset(
  * Full hero stage: droplets fall from above onto the glass while pouring,
  * the tilting glass keeps its lip pinned, and the spill stream arcs out
  * of the mouth while tilted deep. Maximum motion by design.
+ *
+ * The level derives from the same total/goal numbers the caption shows,
+ * so text and visual can never disagree. The fall zone grows/shrinks
+ * animated instead of popping the layout.
  */
 @Composable
 fun WaterStage(
-    progress: Float,
     totalMl: Int,
     goalMl: Int,
     layers: List<WaterLayer>,
@@ -355,11 +359,18 @@ fun WaterStage(
     modifier: Modifier = Modifier
 ) {
     val density = androidx.compose.ui.platform.LocalDensity.current
-    // The level clock lives here so the droplets and the glass share it.
+    // Single source of truth with the "X / Y ml" caption below.
+    val ratio = if (goalMl > 0) totalMl.toFloat() / goalMl else 0f
     val level by animateFloatAsState(
-        targetValue = progress.coerceIn(0f, 1f),
+        targetValue = ratio.coerceIn(0f, 1f),
         animationSpec = tween(durationMillis = 900),
         label = "level"
+    )
+    val overfull = ratio > 1f
+    val fallH by animateDpAsState(
+        targetValue = if (pouring) FallZone else 0.dp,
+        animationSpec = tween(durationMillis = 300),
+        label = "fallZone"
     )
     val pourClock = rememberInfiniteTransition(label = "pour")
     val fall by pourClock.animateFloat(
@@ -373,7 +384,7 @@ fun WaterStage(
     val spillAlpha = ((-tiltDegrees - 10f) / 28f).coerceIn(0f, 1f)
     // Glass sits below a fall zone; both share one overlay box so the
     // droplets land exactly on the live surface.
-    val fallHpx = with(density) { FallZone.toPx() }
+    val fallHpx = with(density) { fallH.toPx() }
     val glassHpx = with(density) { GlassStageHeight.toPx() }
     val glassWpx = with(density) { GlassStageWidth.toPx() }
     val surfaceY = fallHpx + (1f - level) * glassHpx
@@ -385,7 +396,7 @@ fun WaterStage(
         Box(
             modifier = Modifier.size(
                 GlassStageWidth,
-                FallZone + GlassStageHeight + SpillRoom
+                fallH + GlassStageHeight + SpillRoom
             )
         ) {
             if (pouring) {
@@ -408,7 +419,7 @@ fun WaterStage(
                 modifier = Modifier
                     .size(GlassStageWidth, GlassStageHeight)
                     .align(Alignment.TopCenter)
-                    .offset(y = FallZone)
+                    .offset(y = fallH)
                     .graphicsLayer {
                         translationX = pin.x
                         translationY = pin.y
@@ -416,7 +427,7 @@ fun WaterStage(
             ) {
                 WaterGlass(
                     level = level,
-                    overfull = progress > 1f,
+                    overfull = overfull,
                     totalMl = totalMl,
                     goalMl = goalMl,
                     width = GlassStageWidth,

@@ -18,18 +18,14 @@ fun drinkColor(type: HydrationEntry.DrinkType): Color = when (type) {
 }
 
 /**
- * Totales today's entries into bottom-up layers: water first, then every
- * other drink stacked on top in enum order — layered like oil on water,
- * never mixed. Fractions are of today's total.
+ * Today's entries as bottom-up bands in LOGGED order — water, then coffee,
+ * then water again all stay visible as separate stripes (oil-on-water,
+ * never mixed). Fractions are of today's effective total.
  */
 fun layersFor(entries: List<HydrationEntry>): List<WaterLayer> {
     val total = entries.sumOf { it.effectiveHydrationMl }
     if (total <= 0) return emptyList()
-    val byType = entries.groupBy { it.type }
-    val ordered = listOf(HydrationEntry.DrinkType.WATER) +
-        (HydrationEntry.DrinkType.entries - HydrationEntry.DrinkType.WATER)
-    return ordered.mapNotNull { type ->
-        val part = byType[type]?.sumOf { it.effectiveHydrationMl } ?: 0
-        if (part > 0) WaterLayer(drinkColor(type), part.toFloat() / total) else null
-    }
+    return entries.sortedBy { it.timestamp }
+        .filter { it.effectiveHydrationMl > 0 }
+        .map { WaterLayer(drinkColor(it.type), it.effectiveHydrationMl.toFloat() / total) }
 }

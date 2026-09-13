@@ -13,6 +13,10 @@ All notable changes to Water0 are documented here. Format follows
   glass bottom bar and motion-blur transition
 - Glass Lab in Settings: blur/tint/bevel sliders (defaults 23dp / 31% / 5%),
   applied live, no restart — kept after audit (restart flow deleted)
+- Edge-to-edge display with full-bleed living background (kills grey
+  system bars); Tetris line-clear delete animation in the Log tab
+- Compact centered dock (no footer): fixed-width tabs, gliding selection
+  badge that follows the finger, lens height measured on the lens itself
 - Material icons throughout (tabs, recommendation reasons, drink entries,
   delete, navigation); glass toast snackbars
 - Four-tab navigation (Home / Update / Logs / Settings): hero water glass

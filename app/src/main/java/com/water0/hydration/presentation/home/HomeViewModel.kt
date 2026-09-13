@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 /**
  * One-shot animation kicks for the hero glass on the Glass tab.
  * Pour on every log (level rises); Slosh on every delete (glass tilts,
- * water settles lower). Consumed by GlassScreen, then cleared.
+ * water settles lower). Consumed by HomeScreen, then cleared.
  * atNanos keeps rapid repeats distinct so StateFlow re-emits each one.
  */
 sealed interface GlassKick {
@@ -63,6 +63,18 @@ class HomeViewModel(
 
     fun consumeGlassKick() {
         _glassKick.value = null
+    }
+
+    // Rows flashing before the Tetris collapse in the Log tab.
+    private val _deletingIds = MutableStateFlow<Set<Long>>(emptySet())
+    val deletingIds: StateFlow<Set<Long>> = _deletingIds
+
+    fun markDeleting(entryId: Long) {
+        _deletingIds.value = _deletingIds.value + entryId
+    }
+
+    fun unmarkDeleting(entryId: Long) {
+        _deletingIds.value = _deletingIds.value - entryId
     }
 
     init {

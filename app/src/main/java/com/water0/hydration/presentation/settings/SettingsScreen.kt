@@ -98,7 +98,6 @@ fun SettingsScreen(
             }
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
-                com.water0.hydration.ui.theme.AuroraBackground(modifier = Modifier.fillMaxSize())
                 Column(
                     modifier = Modifier
                         .fillMaxSize()

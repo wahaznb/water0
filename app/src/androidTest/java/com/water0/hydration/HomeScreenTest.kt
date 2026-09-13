@@ -102,12 +102,21 @@ class HomeScreenTest {
     }
 
     @Test
-    fun homeGlassFillsOnQuickAdd() {
-        composeRule.setContent {
-            Water0 { HomeScreen(viewModel()) }
+    fun homeGlassReflectsLoggedWater() {
+        val repo = TestRepository()
+        kotlinx.coroutines.runBlocking {
+            repo.insertEntry(
+                HydrationEntry(
+                    amountMl = 250,
+                    timestamp = System.currentTimeMillis(),
+                    type = HydrationEntry.DrinkType.WATER
+                )
+            )
         }
-        composeRule.onNodeWithText("250ml").performClick()
-        // Pinned male profile goal is 2972 ml, so one 250 ml log shows "250 / 2972 ml".
+        composeRule.setContent {
+            Water0 { HomeScreen(viewModel(repo)) }
+        }
+        // Pinned male profile goal is 2972 ml.
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText("250 / 2972 ml")
                 .fetchSemanticsNodes().isNotEmpty()

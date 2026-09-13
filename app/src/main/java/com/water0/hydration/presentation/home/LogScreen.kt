@@ -114,10 +114,18 @@ fun LogScreen(
         )
         TodayEntriesList(
             entries = state.entries,
-            onDelete = {
-                viewModel.deleteEntry(it)
-                notify("Entry deleted")
-            }
+            onDelete = { id ->
+                // Mark first so the Tetris flash+collapse plays, then
+                // actually delete once the exit animation has run.
+                scope.launch {
+                    viewModel.markDeleting(id)
+                    kotlinx.coroutines.delay(350)
+                    viewModel.deleteEntry(id)
+                    viewModel.unmarkDeleting(id)
+                    notify("Entry deleted")
+                }
+            },
+            markedForDelete = viewModel.deletingIds.collectAsStateWithLifecycle().value
         )
         if (state.entries.isEmpty()) {
             Text(

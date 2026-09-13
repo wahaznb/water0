@@ -25,8 +25,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,13 +44,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.water0.hydration.domain.engine.RecommendationEngine
-import com.water0.hydration.presentation.home.components.AddWaterDialog
-import com.water0.hydration.presentation.home.components.QuickAddButtons
-import com.water0.hydration.presentation.home.components.RecommendationCard
 import com.water0.hydration.presentation.home.components.SloshDriver
+import com.water0.hydration.presentation.home.components.RecommendationCard
 import com.water0.hydration.presentation.home.components.WaterStage
 import com.water0.hydration.presentation.home.components.layersFor
-import com.water0.hydration.ui.theme.AuroraBackground
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -69,7 +64,6 @@ fun HomeScreen(
     val notice by viewModel.notice.collectAsStateWithLifecycle()
     val kick by viewModel.glassKick.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-    var showCustomAmount by remember { mutableStateOf(false) }
 
     var tilt by remember { mutableFloatStateOf(0f) }
     var slosh by remember { mutableFloatStateOf(0f) }
@@ -112,6 +106,8 @@ fun HomeScreen(
         modifier = modifier,
         onRetry = { viewModel.refresh() }
     ) { state ->
+        HomeHeader()
+
         if (sloshRunId > 0) {
             SloshDriver(
                 runId = sloshRunId,
@@ -121,7 +117,6 @@ fun HomeScreen(
             )
         }
         WaterStage(
-            progress = state.percentage / 100f,
             totalMl = state.totalEffectiveMl,
             goalMl = state.goalMl,
             layers = layersFor(state.entries),
@@ -131,25 +126,6 @@ fun HomeScreen(
         )
 
         StatusIndicator(status = state.status)
-
-        QuickAddButtons(
-            onAdd = { amount ->
-                viewModel.quickAdd(amount)
-                notify("Added $amount ml")
-            },
-            onCustomClick = { showCustomAmount = true }
-        )
-
-        if (showCustomAmount) {
-            AddWaterDialog(
-                onDismiss = { showCustomAmount = false },
-                onConfirm = { amount ->
-                    viewModel.quickAdd(amount)
-                    notify("Added $amount ml")
-                    showCustomAmount = false
-                }
-            )
-        }
 
         if (state.recommendations.isNotEmpty()) {
             RecommendationsSection(
@@ -163,10 +139,48 @@ fun HomeScreen(
     }
 }
 
+/** In-content header: brand + greeting + date. No app bar needed. */
+@Composable
+private fun HomeHeader() {
+    val cal = java.util.Calendar.getInstance()
+    val greeting = when (cal.get(java.util.Calendar.HOUR_OF_DAY)) {
+        in 5..11 -> "Good morning"
+        in 12..17 -> "Good afternoon"
+        in 18..21 -> "Good evening"
+        else -> "Up late?"
+    }
+    val date = java.text.SimpleDateFormat("EEEE, MMM d", java.util.Locale.getDefault())
+        .format(cal.time)
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Water0",
+            style = MaterialTheme.typography.titleLarge
+        )
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = greeting,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = date,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
 /**
- * Shared frame for the Home-tab family (Home / Glass / Log): mesh
- * background with hydration tint, scrollable column, loading + error
- * states. Keeps the three screens visually identical for free.
+ * Shared frame for the Home-tab family (Home / Log): scrollable column
+ * plus loading + error states. The background lives once at the shell
+ * root (MainActivity) so the lens always samples living pixels.
  */
 @Composable
 fun HomeUiFrame(
@@ -175,22 +189,7 @@ fun HomeUiFrame(
     onRetry: () -> Unit,
     content: @Composable ColumnScope.(HomeViewModel.UiState.Success) -> Unit
 ) {
-    val hydrationTarget = hydrationTintFor(uiState)
-    val hydrationTint by animateColorAsState(
-        targetValue = hydrationTarget,
-        animationSpec = tween(durationMillis = 1000),
-        label = "hydrationTint"
-    )
-
     Box(modifier = modifier.fillMaxSize()) {
-        // Background breathes with the glass: more water, more life.
-        val energy = ((uiState as? HomeViewModel.UiState.Success)
-            ?.percentage?.div(100f) ?: 0.35f).coerceIn(0f, 1f)
-        AuroraBackground(
-            modifier = Modifier.fillMaxSize(),
-            hydrationTint = hydrationTint,
-            energy = energy
-        )
         when (val state = uiState) {
             is HomeViewModel.UiState.Success -> {
                 Column(
@@ -253,9 +252,10 @@ fun HomeUiFrame(
 
 // Subtle overlay tint per hydration state, drawn INSIDE the static mesh
 // (alpha <=0.10 so no banding). Behind = plum wash, ahead = teal wash,
-// over = maroon wash, on-track = transparent.
+// over = maroon wash, on-track = transparent. Public: MainActivity paints
+// the single root background with it so every tab shares the tint.
 @Composable
-private fun hydrationTintFor(uiState: HomeViewModel.UiState): Color {
+fun hydrationTintFor(uiState: HomeViewModel.UiState): Color {
     val state = uiState as? HomeViewModel.UiState.Success ?: return Color.Transparent
     return when (state.status) {
         RecommendationEngine.HydrationStatus.Status.OVER ->
