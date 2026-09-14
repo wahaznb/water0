@@ -53,71 +53,81 @@ fun RecommendationCard(
 
     Card(
         modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = glassCardContainer()
         ),
         border = glassCardBorder(),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Reason icon instead of emoji/text glyph.
-            val icon = when (recommendation.reason) {
-                com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.MORNING_START -> Icons.Filled.WbSunny
-                com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.BEHIND_GOAL -> Icons.Filled.WaterDrop
-                com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.AFTER_EXERCISE -> Icons.Filled.FitnessCenter
-                com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.HOT_WEATHER -> Icons.Filled.Thermostat
-                com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.DIURETIC_OFFSET -> Icons.Filled.LocalCafe
-                com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.EVENING_WIND_DOWN -> Icons.Filled.Bedtime
-                com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.STREAK_MAINTENANCE -> Icons.Filled.EmojiEvents
-                com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.OVER_LIMIT -> Icons.Filled.Warning
-                com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.PACING -> Icons.Filled.Speed
-                com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.GOAL_MET -> Icons.Filled.CheckCircle
-                com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.PERSONAL_PACE -> Icons.Filled.Timeline
-            }
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(textColor.copy(alpha = 0.14f), RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.Top,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = textColor,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = recommendation.message,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = textColor
-                )
-                if (recommendation.suggestedAmountMl > 0) {
-                    Text(
-                        text = "Suggested: ${recommendation.suggestedAmountMl}ml",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = textColor.copy(alpha = 0.7f)
+                // Reason icon instead of emoji/text glyph.
+                val icon = when (recommendation.reason) {
+                    com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.MORNING_START -> Icons.Filled.WbSunny
+                    com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.BEHIND_GOAL -> Icons.Filled.WaterDrop
+                    com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.AFTER_EXERCISE -> Icons.Filled.FitnessCenter
+                    com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.HOT_WEATHER -> Icons.Filled.Thermostat
+                    com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.DIURETIC_OFFSET -> Icons.Filled.LocalCafe
+                    com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.EVENING_WIND_DOWN -> Icons.Filled.Bedtime
+                    com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.STREAK_MAINTENANCE -> Icons.Filled.EmojiEvents
+                    com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.OVER_LIMIT -> Icons.Filled.Warning
+                    com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.PACING -> Icons.Filled.Speed
+                    com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.GOAL_MET -> Icons.Filled.CheckCircle
+                    com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.PERSONAL_PACE -> Icons.Filled.Timeline
+                }
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(textColor.copy(alpha = 0.14f), RoundedCornerShape(16.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = textColor,
+                        modifier = Modifier.size(26.dp)
                     )
+                }
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = recommendation.message,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 21.sp,
+                        color = textColor
+                    )
+                    if (recommendation.suggestedAmountMl > 0) {
+                        Text(
+                            text = "Suggested: ${recommendation.suggestedAmountMl} ml",
+                            fontSize = 13.sp,
+                            color = textColor.copy(alpha = 0.72f)
+                        )
+                    }
                 }
             }
 
             if (recommendation.suggestedAmountMl > 0) {
                 TextButton(
                     onClick = { onAction(recommendation.suggestedAmountMl) },
-                    modifier = Modifier.padding(start = 8.dp)
+                    modifier = Modifier.align(Alignment.End)
                 ) {
                     Text(
-                        text = "Add ${recommendation.suggestedAmountMl}ml",
-                        fontSize = 12.sp,
+                        text = "Add ${recommendation.suggestedAmountMl} ml",
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = textColor
                     )

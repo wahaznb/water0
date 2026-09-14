@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -55,7 +56,10 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     viewModel: HomeViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Scrollable clearance for the floating top lens ("Water0" plate).
+    // Scrolls away so content later glides behind the glass.
+    topGutter: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
@@ -79,7 +83,12 @@ fun HomeScreen(
         modifier = modifier,
         onRetry = { viewModel.refresh() }
     ) { state ->
-        HomeHeader()
+        // Title lives on the floating "Water0" lens; this scrollable gutter
+        // holds initial clearance, then scrolls away so content refracts
+        // through the glass instead of clipping at its edge.
+        androidx.compose.foundation.layout.Spacer(
+            modifier = Modifier.height(topGutter)
+        )
 
         // Numbers live here now; the tank itself is ambient behind the
         // whole shell (see AmbientTank) so it never fights content.
@@ -91,6 +100,22 @@ fun HomeScreen(
         ) {
             androidx.compose.foundation.layout.Spacer(
                 modifier = Modifier.weight(0.7f)
+            )
+            // Strict red separator: tank zone ends here, information begins.
+            Box(
+                modifier = Modifier
+                    .width(2.dp)
+                    .fillMaxHeight()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Transparent,
+                                Color(0xFFE5484D).copy(alpha = 0.7f),
+                                Color.Transparent
+                            )
+                        ),
+                        RoundedCornerShape(1.dp)
+                    )
             )
             Column(
                 modifier = Modifier
@@ -114,8 +139,9 @@ fun HomeScreen(
                     )
                     .padding(14.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                GreetingBox()
                 Text(
                     text = "${state.percentage}%",
                     fontSize = 40.sp,
@@ -141,23 +167,44 @@ fun HomeScreen(
             }
         }
 
-        StatusIndicator(status = state.status)
-
-        if (state.recommendations.isNotEmpty()) {
-            RecommendationsSection(
-                recommendations = state.recommendations,
-                onAction = { amount ->
-                    viewModel.quickAdd(amount)
-                    notify("Added $amount ml")
-                }
+        // Status pill ("Ahead of goal" / "Behind goal" …) + recommendations
+        // live in the RIGHT info zone, never under the tank. Same
+        // 0.7 / 2dp / 1.3 split as the stats row above, so their left
+        // edges line up exactly with the percentage panel.
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            androidx.compose.foundation.layout.Spacer(
+                modifier = Modifier.weight(0.7f)
             )
+            // Invisible twin of the red divider above: keeps alignment
+            // identical without drawing a second line.
+            androidx.compose.foundation.layout.Spacer(
+                modifier = Modifier.width(2.dp)
+            )
+            Column(
+                modifier = Modifier.weight(1.3f),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                StatusIndicator(status = state.status)
+
+                RecommendationsSection(
+                    recommendations = state.recommendations,
+                    onAction = { amount ->
+                        viewModel.quickAdd(amount)
+                        notify("Added $amount ml")
+                    }
+                )
+            }
         }
     }
 }
 
-/** In-content header: brand + greeting + date. No app bar needed. */
+/** Greeting + date in their own frosted box above the percentage. */
 @Composable
-private fun HomeHeader() {
+private fun ColumnScope.GreetingBox() {
     val cal = java.util.Calendar.getInstance()
     val greeting = when (cal.get(java.util.Calendar.HOUR_OF_DAY)) {
         in 5..11 -> "Good morning"
@@ -167,21 +214,27 @@ private fun HomeHeader() {
     }
     val date = java.text.SimpleDateFormat("EEEE, MMM d", java.util.Locale.getDefault())
         .format(cal.time)
-    androidx.compose.foundation.layout.Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                RoundedCornerShape(14.dp)
+            )
+            .border(
+                1.dp,
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.30f),
+                RoundedCornerShape(14.dp)
+            )
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = "Water0",
-            style = MaterialTheme.typography.titleLarge
-        )
-        Column(horizontalAlignment = Alignment.End) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = greeting,
-                fontSize = 13.sp,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
@@ -340,22 +393,159 @@ fun RecommendationsSection(
     LaunchedEffect(Unit) { entered = true }
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         com.water0.hydration.ui.theme.SectionHeader(text = "Recommendations")
-        recommendations.forEachIndexed { index, rec ->
-            androidx.compose.animation.AnimatedVisibility(
-                visible = entered,
-                enter = androidx.compose.animation.fadeIn(
-                    animationSpec = tween(durationMillis = 300, delayMillis = index * 70)
-                ) + androidx.compose.animation.slideInVertically(
-                    animationSpec = tween(durationMillis = 300, delayMillis = index * 70)
-                ) { it / 3 },
-                label = "recEnter$index"
+        if (recommendations.isEmpty()) {
+            AllClearCard()
+        } else {
+            recommendations.forEachIndexed { index, rec ->
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = entered,
+                    enter = androidx.compose.animation.fadeIn(
+                        animationSpec = tween(durationMillis = 300, delayMillis = index * 70)
+                    ) + androidx.compose.animation.slideInVertically(
+                        animationSpec = tween(durationMillis = 300, delayMillis = index * 70)
+                    ) { it / 3 },
+                    label = "recEnter$index"
+                ) {
+                    RecommendationCard(
+                        recommendation = rec,
+                        onAction = onAction
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Custom "all clear" art: a Canvas-drawn droplet buddy (no emoji font —
+ * renders identically everywhere). Soft glass tile, droplet body in the
+ * theme primary, two dot eyes + a smile arc, plus calm copy.
+ */
+@Composable
+private fun AllClearCard() {
+    val primary = MaterialTheme.colorScheme.primary
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.42f),
+                RoundedCornerShape(20.dp)
+            )
+            .border(
+                1.dp,
+                Brush.verticalGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.16f),
+                        MaterialTheme.colorScheme.outline.copy(
+                            alpha = Glass.BORDER_ALPHA
+                        )
+                    )
+                ),
+                RoundedCornerShape(20.dp)
+            )
+            .padding(horizontal = 20.dp, vertical = 18.dp)
+    ) {
+        androidx.compose.foundation.layout.Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            androidx.compose.foundation.Canvas(
+                modifier = Modifier.size(64.dp)
             ) {
-                RecommendationCard(
-                    recommendation = rec,
-                    onAction = onAction
+                val w = size.width
+                val h = size.height
+                // Soft halo behind the buddy.
+                drawCircle(
+                    color = primary.copy(alpha = 0.14f),
+                    radius = w * 0.48f,
+                    center = center
+                )
+                // Droplet body: circle + triangle top, drawn as one path.
+                val body = androidx.compose.ui.graphics.Path().apply {
+                    val cx = w * 0.5f
+                    val topY = h * 0.08f
+                    val bulbC = h * 0.58f
+                    val r = w * 0.30f
+                    moveTo(cx, topY)
+                    // Right curve down to the bulb.
+                    cubicTo(
+                        cx + r * 1.15f, bulbC - r * 0.9f,
+                        cx + r, bulbC + r * 0.25f,
+                        cx + r * 0.72f, bulbC + r * 0.72f
+                    )
+                    // Bottom arc.
+                    cubicTo(
+                        cx + r * 0.3f, bulbC + r * 1.25f,
+                        cx - r * 0.3f, bulbC + r * 1.25f,
+                        cx - r * 0.72f, bulbC + r * 0.72f
+                    )
+                    cubicTo(
+                        cx - r, bulbC + r * 0.25f,
+                        cx - r * 1.15f, bulbC - r * 0.9f,
+                        cx, topY
+                    )
+                    close()
+                }
+                drawPath(path = body, color = primary.copy(alpha = 0.85f))
+                // Shine streak on the left edge.
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.55f),
+                    radius = w * 0.055f,
+                    center = androidx.compose.ui.geometry.Offset(w * 0.40f, h * 0.55f)
+                )
+                // Eyes.
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.95f),
+                    radius = w * 0.055f,
+                    center = androidx.compose.ui.geometry.Offset(w * 0.43f, h * 0.60f)
+                )
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.95f),
+                    radius = w * 0.055f,
+                    center = androidx.compose.ui.geometry.Offset(w * 0.57f, h * 0.60f)
+                )
+                drawCircle(
+                    color = androidx.compose.ui.graphics.Color(0xFF1A1B26),
+                    radius = w * 0.028f,
+                    center = androidx.compose.ui.geometry.Offset(w * 0.43f, h * 0.605f)
+                )
+                drawCircle(
+                    color = androidx.compose.ui.graphics.Color(0xFF1A1B26),
+                    radius = w * 0.028f,
+                    center = androidx.compose.ui.geometry.Offset(w * 0.57f, h * 0.605f)
+                )
+                // Smile arc.
+                drawArc(
+                    color = androidx.compose.ui.graphics.Color(0xFF1A1B26),
+                    startAngle = 20f,
+                    sweepAngle = 140f,
+                    useCenter = false,
+                    topLeft = androidx.compose.ui.geometry.Offset(w * 0.40f, h * 0.60f),
+                    size = androidx.compose.ui.geometry.Size(w * 0.20f, h * 0.16f),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = w * 0.025f)
+                )
+            }
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "All clear — nice pacing",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = onSurface
+                )
+                Text(
+                    text = "No nudges right now. Sip when thirsty and I'll pop back in.",
+                    fontSize = 13.sp,
+                    color = onVariant
                 )
             }
         }

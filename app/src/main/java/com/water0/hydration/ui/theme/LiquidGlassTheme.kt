@@ -12,6 +12,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -44,7 +45,7 @@ fun LiquidGlassTheme(
 
 object GlassColors {
     val dark = darkColorScheme(
-        background = Color(0xFF1A1B26),
+        background = Color(0xFF000000),
         surface = Color(0xFF222738),
         surfaceVariant = Color(0xFF2E3550),
         onBackground = Color(0xFFC0CAF5),
@@ -135,6 +136,16 @@ fun glassCardBorder(): BorderStroke =
         )
     )
 
+// One background bubble's dice roll. Generated once per composition root
+// from a fixed seed: random layout, stable identities, no reshuffle.
+private data class BgBubble(
+    val xFrac: Float,
+    val sizeDp: Float,
+    val speed: Float,
+    val phase: Float,
+    val swayDp: Float
+)
+
 // Fixed mesh background with living water: three Canvas radial washes
 // that slowly swirl, plus bubble particles rising to the top. `energy`
 // (0..1, wired to hydration progress) drives bubble count, opacity, and
@@ -151,13 +162,14 @@ fun AuroraBackground(
     val secondary = MaterialTheme.colorScheme.secondary
     val tertiary = MaterialTheme.colorScheme.tertiary
     val drift = rememberInfiniteTransition(label = "aurora")
-    // Full swirl every ~26s; bubbles loop every ~7s.
+    // Slow calm swirl (~34s); bubbles loop ~11s; blooms breathe on a 7s
+    // clock — one slow breath per light, staggered so never in sync.
     val swirl by drift.animateFloat(
         initialValue = 0f,
         targetValue = (2 * kotlin.math.PI).toFloat(),
         animationSpec = infiniteRepeatable(
             animation = tween(
-                durationMillis = (26000 / (0.5f + energy)).toInt(),
+                durationMillis = (34000 / (0.5f + energy)).toInt(),
                 easing = LinearEasing
             )
         ),
@@ -167,133 +179,146 @@ fun AuroraBackground(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 6000, easing = LinearEasing)
+            animation = tween(durationMillis = 11000, easing = LinearEasing)
         ),
         label = "rise"
     )
+    // Blooms breathe on a 7s clock — much slower than before per request.
+    val bloom by drift.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 7000, easing = LinearEasing)
+        ),
+        label = "bloom"
+    )
+    // Bubble dice, rolled once from the per-launch seed minted in
+    // Water0Application.onCreate: a fresh random sky every cold start,
+    // stable across rotations, never reshuffling mid-session.
+    // (Context read outside remember: its calculation block is not
+    // composable.)
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    val bgSeed = remember {
+        try {
+            appContext
+                .getSharedPreferences("water0_prefs", android.content.Context.MODE_PRIVATE)
+                .getInt("bg_seed", 20260914)
+        } catch (_: Exception) {
+            20260914
+        }
+    }
+    val bubbles = remember(bgSeed) {
+        val rng = kotlin.random.Random(bgSeed)
+        List(14) {
+            BgBubble(
+                xFrac = rng.nextFloat(),
+                sizeDp = 2f + rng.nextFloat() * 3.5f,
+                speed = 0.35f + rng.nextFloat() * 0.5f,
+                phase = rng.nextFloat(),
+                swayDp = 4f + rng.nextFloat() * 10f
+            )
+        }
+    }
     androidx.compose.foundation.Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
-        // Each wash orbits the screen center slightly — a slow swirl,
-        // not a spin. Radius of orbit scales with wash size.
-        fun orbit(fx: Float, fy: Float, r: Float, phase: Float): androidx.compose.ui.geometry.Offset {
-            val ox = kotlin.math.cos(swirl + phase) * w * r
-            val oy = kotlin.math.sin(swirl + phase) * h * r
-            return androidx.compose.ui.geometry.Offset(w * fx + ox, h * fy + oy)
-        }
-        // Top-left water-blue wash. Barely-there depth only — the base is
-        // black water now, and these just keep it from going flat.
-        drawRect(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    primary.copy(alpha = 0.12f),
-                    primary.copy(alpha = 0.07f),
-                    primary.copy(alpha = 0.02f),
-                    Color.Transparent
-                ),
-                center = orbit(0.12f, 0.06f, 0.05f, 0f),
-                radius = w * 0.75f
-            ),
-            size = size
-        )
-        // Bottom-right cyan wash.
-        drawRect(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    secondary.copy(alpha = 0.09f),
-                    secondary.copy(alpha = 0.05f),
-                    secondary.copy(alpha = 0.02f),
-                    Color.Transparent
-                ),
-                center = orbit(0.92f, 0.94f, 0.04f, 2.1f),
-                radius = w * 0.70f
-            ),
-            size = size
-        )
-        // Faint violet core to avoid flat mid-tone.
-        drawRect(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    tertiary.copy(alpha = 0.06f),
-                    tertiary.copy(alpha = 0.03f),
-                    tertiary.copy(alpha = 0.01f),
-                    Color.Transparent
-                ),
-                center = orbit(0.5f, 0.45f, 0.06f, 4.2f),
-                radius = w * 0.55f
-            ),
-            size = size
-        )
-        // Rising bubble particles. More, brighter, and faster with energy.
-        // Kept small on purpose: fine bright dots read best through the
-        // lens edge, which is exactly where the bottom bar samples them.
-        val count = (14 + energy * 24).toInt()
-        for (i in 0 until count) {
-            val seed = ((i * 37) % 100) / 100f
-            val speed = 0.6f + (i % 4) * 0.2f
-            val t = (rise * speed + seed) % 1f
-            val x = (((i * 53) % 100) / 100f) * w +
-                kotlin.math.sin(t * 6.28f + seed * 6.28f).toFloat() * 8.dp.toPx()
+        // Pure black base — no washes. The old blue/cyan/violet washes are
+        // what turned the field grey; glows now float on true black and
+        // read by contrast instead of blending into haze.
+        drawRect(color = Color.Black, size = size)
+        // Rising bubbles: few and dim so black dominates.
+        val visibleBubbles = (8 + energy * 6).toInt()
+        for (b in bubbles.take(visibleBubbles)) {
+            val t = (rise * b.speed + b.phase) % 1f
+            val fade = kotlin.math.sin(t * kotlin.math.PI).toFloat()
+            val x = b.xFrac * w +
+                kotlin.math.sin(t * 6.28f + b.phase * 6.28f).toFloat() * b.swayDp.dp.toPx()
             val y = h * 1.05f - t * h * 1.1f
             drawCircle(
-                primary.copy(alpha = (0.10f + energy * 0.14f) * (1f - t * 0.5f)),
-                (1.5f + (i % 3)).dp.toPx() * 0.5f,
+                primary.copy(alpha = (0.04f + energy * 0.04f) * fade),
+                b.sizeDp.dp.toPx() * 0.5f,
                 androidx.compose.ui.geometry.Offset(x, y)
             )
         }
-        // Twinkle specks: tiny, near-static bright dots scattered over the
-        // whole field. They barely move but catch the lens rim highlight,
-        // which is what makes refraction visible even when still.
-        for (i in 0 until 182) {
+        // Sparse pinpoint stars — few enough that black stays black.
+        for (i in 0 until 48) {
             val seed = ((i * 71) % 100) / 100f
             val x = (((i * 41) % 100) / 100f) * w
             val y = (((i * 67) % 100) / 100f) * h
             val twinkle = 0.5f + 0.5f * kotlin.math.sin(rise * 6.28f + seed * 6.28f).toFloat()
             drawCircle(
-                Color.White.copy(alpha = (0.05f + energy * 0.10f) * twinkle),
+                Color.White.copy(alpha = (0.020f + energy * 0.040f) * twinkle),
                 (1f + (i % 2)).dp.toPx() * 0.5f,
                 androidx.compose.ui.geometry.Offset(x, y)
             )
         }
-        // Deep-water glow pulses: random soft lights breathing on their
-        // own slow cycles, like bioluminescence — no fish, just the lights.
-        // Staggered phases so the field never pulses in sync.
-        for (i in 0 until 14) {
+        // Deep-water blooms: THREE lights only, slow 7s breaths with a
+        // bright star burning in the middle of each. Dim halo + hot core =
+        // contrast against pure black instead of grey haze.
+        for (i in 0 until 3) {
             val seed = ((i * 91) % 100) / 100f
-            val speed = 0.25f + (i % 5) * 0.12f
-            val glow = (rise * speed + seed) % 1f
+            // Same 7s period for every light, staggered phase only — slow,
+            // sparse, never pulsing in sync.
+            val glow = (bloom + seed) % 1f
             val envelope = kotlin.math.sin(glow * 6.28f).toFloat()
-            val intensity = envelope * envelope * (0.10f + energy * 0.08f)
+            val core = envelope * envelope
+            val intensity = core * (0.08f + energy * 0.06f)
             if (intensity > 0.004f) {
                 val gx = (((i * 47) % 100) / 100f) * w
                 val gy = (((i * 83) % 100) / 100f) * h
-                val radius = (36f + (i % 4) * 14f).dp.toPx()
+                val radius = (100f + (i % 5) * 40f).dp.toPx()
+                val center = androidx.compose.ui.geometry.Offset(gx, gy)
                 drawCircle(
                     brush = Brush.radialGradient(
                         listOf(
                             secondary.copy(alpha = intensity),
                             Color.Transparent
                         ),
-                        center = androidx.compose.ui.geometry.Offset(gx, gy),
+                        center = center,
                         radius = radius
                     ),
                     radius = radius,
-                    center = androidx.compose.ui.geometry.Offset(gx, gy)
+                    center = center
+                )
+                // Star core: tight bright glow + hot pinpoint + 4-point
+                // sparkle, all breathing on the same envelope as its halo.
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.35f * core),
+                    radius = 7.dp.toPx(),
+                    center = center
+                )
+                drawCircle(
+                    color = Color.White.copy(alpha = (0.70f + energy * 0.25f) * core),
+                    radius = 2.2.dp.toPx(),
+                    center = center
+                )
+                val sparkLen = 9.dp.toPx() * (0.4f + 0.6f * core)
+                val sparkAlpha = 0.45f * core
+                drawLine(
+                    color = Color.White.copy(alpha = sparkAlpha),
+                    start = center - androidx.compose.ui.geometry.Offset(sparkLen, 0f),
+                    end = center + androidx.compose.ui.geometry.Offset(sparkLen, 0f),
+                    strokeWidth = 1.dp.toPx()
+                )
+                drawLine(
+                    color = Color.White.copy(alpha = sparkAlpha),
+                    start = center - androidx.compose.ui.geometry.Offset(0f, sparkLen),
+                    end = center + androidx.compose.ui.geometry.Offset(0f, sparkLen),
+                    strokeWidth = 1.dp.toPx()
                 )
             }
         }
         if (hydrationTint != Color.Transparent) {
             drawRect(color = hydrationTint, size = size)
         }
-        // Film grain last: fixed pseudo-random speckle that breaks the
-        // concentric banding wide alpha gradients otherwise show. Static
-        // positions (no time component) so it never shimmers or costs
-        // recomposition — one cheap pass over tiny dots.
-        for (i in 0 until 450) {
+        // Film grain last: whisper-thin, so it never veils the black.
+        for (i in 0 until 300) {
             val gx = (((i * 73) % 100) / 100f) * w
             val gy = (((i * 97) % 100) / 100f) * h
             drawCircle(
-                (if (i % 2 == 0) Color.White else Color.Black).copy(alpha = 0.03f),
+                (if (i % 2 == 0) Color.White else Color.Black).copy(
+                    alpha = if (i % 2 == 0) 0.010f else 0.03f
+                ),
                 1.dp.toPx() * 0.5f,
                 androidx.compose.ui.geometry.Offset(gx, gy)
             )

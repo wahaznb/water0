@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -75,10 +76,12 @@ fun HistoryScreen(
     modifier: Modifier = Modifier,
     viewModel: HistoryViewModel = viewModel(
         factory = HistoryViewModelFactory(LocalContext.current)
-    )
+    ),
+    // Floating "Logs" lens clearance: list starts below it, then scrolls
+    // behind the glass instead of clipping at its edge.
+    topGutter: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val daysBack by viewModel.daysBack.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -88,27 +91,8 @@ fun HistoryScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Last",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                viewModel.rangeOptions.forEach { option ->
-                    if (option == daysBack) {
-                        Button(onClick = {}) {
-                            Text(text = "${option}d")
-                        }
-                    } else {
-                        OutlinedButton(onClick = { viewModel.setDaysBack(option) }) {
-                            Text(text = "${option}d")
-                        }
-                    }
-                }
-            }
+            // Title + range live on the floating lens — the list flows
+            // beneath it while scrolling.
 
             when (val state = uiState) {
                 HistoryViewModel.UiState.Loading -> {
@@ -136,7 +120,10 @@ fun HistoryScreen(
                 is HistoryViewModel.UiState.Success -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            top = topGutter
+                        )
                     ) {
                         items(state.days, key = { it.dayStartMillis }) { day ->
                             DayCard(
@@ -178,6 +165,7 @@ private fun DayCard(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = glassCardContainer()
         ),

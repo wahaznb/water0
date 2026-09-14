@@ -16,6 +16,9 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.LocalCafe
+import androidx.compose.material.icons.filled.LocalDrink
+import androidx.compose.material.icons.filled.SportsBar
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -29,7 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -80,20 +83,18 @@ fun QuickAddButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    val label = when (amount) {
-        100 -> "100ml"
-        250 -> "250ml"
-        500 -> "500ml"
-        750 -> "750ml"
-        else -> "${amount}ml"
+    // Every button reads differently: its own icon + name, one shared
+    // glass tint — no more rainbow of near-identical drops.
+    val icon: ImageVector
+    val name: String
+    when (amount) {
+        100 -> { icon = Icons.Filled.WaterDrop; name = "Sip" }
+        250 -> { icon = Icons.Filled.LocalDrink; name = "Glass" }
+        500 -> { icon = Icons.Filled.LocalCafe; name = "Bottle" }
+        750 -> { icon = Icons.Filled.SportsBar; name = "Jug" }
+        else -> { icon = Icons.Filled.WaterDrop; name = "Custom" }
     }
-    val color = when (amount) {
-        100 -> MaterialTheme.colorScheme.primaryContainer
-        250 -> MaterialTheme.colorScheme.secondaryContainer
-        500 -> MaterialTheme.colorScheme.tertiaryContainer
-        750 -> Color(0xFFBA68C8)
-        else -> MaterialTheme.colorScheme.surfaceVariant
-    }
+    val tint = MaterialTheme.colorScheme.primaryContainer
 
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -110,7 +111,7 @@ fun QuickAddButton(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp)
+            .height(64.dp)
             .padding(horizontal = 4.dp)
             .graphicsLayer {
                 // iPhone-style press bounce.
@@ -120,12 +121,12 @@ fun QuickAddButton(
         interactionSource = interactionSource,
         enabled = enabled,
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (enabled) color.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            containerColor = if (enabled) tint.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             contentColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
         ),
         border = BorderStroke(
             1.dp,
-            if (enabled) color.copy(alpha = 0.45f)
+            if (enabled) tint.copy(alpha = 0.45f)
             else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
         ),
         shape = RoundedCornerShape(12.dp)
@@ -135,15 +136,22 @@ fun QuickAddButton(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = Icons.Filled.WaterDrop,
+                imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(20.dp)
             )
-            Text(
-                text = label,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
+            androidx.compose.foundation.layout.Column {
+                Text(
+                    text = "${amount}ml",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = name,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

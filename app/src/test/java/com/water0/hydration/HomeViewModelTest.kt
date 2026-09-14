@@ -80,7 +80,10 @@ class HomeViewModelTest {
         viewModel.deleteEntry(id)
 
         assertTrue(repository.getTodayEntries().first().isEmpty())
-        assertTrue(viewModel.glassKick.first() is GlassKick.Slosh)
+        val kick = viewModel.glassKick.first()
+        assertTrue(kick is GlassKick.Slosh)
+        // The tank needs the deleted amount for its away-balance math.
+        assertEquals(250, (kick as GlassKick.Slosh).amountMl)
     }
 
     @Test

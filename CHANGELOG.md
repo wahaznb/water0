@@ -32,6 +32,26 @@ All notable changes to Water0 are documented here. Format follows
 - Lens title plates on Update/Logs/Settings; touch-blob tab indicator that
   follows the finger and morphs while held; tab-change zoom-blur pulse
   only on home transitions; drink colors fitted to the theme palette
+- Plates removed everywhere (no overlap, no Home ghost): Update/Logs/
+  Settings own plain in-content headers, Logs range back in content;
+  tab selector is a layout-centered liquid-glass circle (no drifting dot);
+  status + recs aligned to the right info zone, tank shifted left and
+  dimmed off-Home; background dark pass (~40% dimmer washes/blooms)
+- Top glass tab bar restored (titles + Logs range in the lens, reserved
+  inset so records never slide under, pager-driven so Home never ghosts);
+  recommendations breathing room (full-width, roomier cards, Canvas droplet
+  buddy empty state); dock is a rounded rectangle (28dp) with a clean
+  glass selection circle (inner bar removed)
+- Pitch-black background pass (washes/bubbles/twinkles halved again, white
+  grain cut, calm ~34s swirl); blooms breathe on a 7s clock with a small
+  bright star core + sparkle in the middle of each light; dock bubble is
+  one floating lens that trails the finger instead of popping tab-to-tab
+- Weight is typed (kg/lb numeric field with range check), not a slider;
+  notification permission is opt-in on the Reminders toggle, never at
+  install; pure-black field (washes deleted, 14 bubbles / 48 stars /
+  3 blooms with hot cores for contrast); full-width dock (measured tabs,
+  30dp icons, 56dp bubble); recs back in the right info zone; floating
+  top lens on every tab ("Water0" included) with scroll-under content
 - About section in Settings (version, GitHub link, license)
 - Real launcher icon (IconKitchen adaptive set + monochrome + store listing)
 - iPhone-style tab bar: hold to magnify nearby tabs with haptic scrub,
@@ -42,11 +62,29 @@ All notable changes to Water0 are documented here. Format follows
   stream); glass badge on the active tab (no dot); footer chrome removed
 - Living background: swirling washes + rising bubbles reacting to progress,
   twinkle specks, film grain against banding; washes turned up loud
+- Background bubbles: truly random seeded layout, larger, slower (11s loop),
+  sine-fade wrap so the loop never pops; fresh sky minted every cold start,
+  stable across rotations
 - Black-water background with random bioluminescent glow pulses (no fish,
   just lights); full glass gently overflows instead of clipping
+- Tank animations play only on Home: other tabs accumulate the net ml and
+  replay it as one pour/slosh on return
 - Ambient mega-tank: one persistent tumbler behind every tab (cropped hero
   on Home, dim refractive backdrop elsewhere); tumbler silhouette with
   thick base + rim; icon-only dock tabs
+- Home zones per layout: tank left, frosted info panel right with red
+  divider, greeting box above stats; headers removed everywhere (no ghost
+  plates); tab transition shrinks instead of blur-grow
+- Touch circle tab indicator (measured centers, swells on press); 72dp
+  tabs; 20dp radii on all text cards; drink colors fitted to the theme
+- Blue-tinted lens plates; quick-add buttons with distinct icons + names
+  on one glass tint; darker black water; 3x bigger/brighter/fewer/slower
+  glow blooms
+- Home zones per layout: tank left, frosted info panel right with red
+  divider, greeting box above stats; lens plates only off-Home (pager
+  driven, no ghosts); tab transition shrinks instead of blur-grow
+- Touch-blob tab indicator (measured centers, morphs on touch); 20dp
+  radii on all text cards; wider 72dp dock tabs
 - Home is tank + recommendations only (logging lives strictly in Update);
   tall side tank with stats column; chronological unmixed drink layers
 - Opt-in training-data export (Settings → Your data, 90-day simulator-schema

@@ -11,15 +11,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material3.Icon
@@ -78,7 +81,10 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = viewModel(
         factory = SettingsViewModelFactory(LocalContext.current)
-    )
+    ),
+    // Floating "Settings" lens clearance: scrolls away, then cards glide
+    // behind the glass instead of clipping at its edge.
+    topGutter: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     val profile by viewModel.profile.collectAsStateWithLifecycle()
 
@@ -105,6 +111,9 @@ fun SettingsScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    androidx.compose.foundation.layout.Spacer(
+                        modifier = Modifier.height(topGutter)
+                    )
                     ProfileSection(profile = current, viewModel = viewModel)
                     GoalSection(profile = current, viewModel = viewModel)
                     RemindersSection(profile = current, viewModel = viewModel)
@@ -124,6 +133,7 @@ fun SettingsScreen(
 private fun SectionCard(title: String, content: @Composable () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = glassCardContainer()
         ),
@@ -179,21 +189,57 @@ private fun ProfileSection(profile: UserProfile, viewModel: SettingsViewModel) {
             }
         }
 
-        val weightLabel = if (profile.useMetricUnits) {
-            "${profile.weightKg.roundToInt()} kg"
-        } else {
-            "${(profile.weightKg * 2.20462f).roundToInt()} lb"
+        val weightUnit = if (profile.useMetricUnits) "kg" else "lb"
+        // Numeric entry (not a slider): exact body weight matters for the
+        // goal math, and a slider can't hit e.g. 68 vs 70 deliberately.
+        // Displayed in the active unit system, stored as kg.
+        var weightText by remember(profile.weightKg, profile.useMetricUnits) {
+            mutableStateOf(
+                if (profile.useMetricUnits) profile.weightKg.roundToInt().toString()
+                else (profile.weightKg * 2.20462f).roundToInt().toString()
+            )
         }
+        var weightError by remember { mutableStateOf<String?>(null) }
         Text(
-            text = "Weight: $weightLabel",
+            text = "Weight",
             fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface
         )
-        Slider(
-            value = profile.weightKg,
-            onValueChange = { viewModel.updateWeight(it) },
-            valueRange = 30f..150f,
-            steps = 119
+        OutlinedTextField(
+            value = weightText,
+            onValueChange = { raw ->
+                // Digits + one decimal point only.
+                val clean = raw.filter { it.isDigit() || it == '.' }
+                weightText = clean
+                val parsed = clean.toFloatOrNull()
+                if (parsed == null) {
+                    weightError = "Enter a number"
+                } else {
+                    val kg = if (profile.useMetricUnits) parsed else parsed / 2.20462f
+                    when {
+                        kg < 30f || kg > 150f -> weightError =
+                            if (profile.useMetricUnits) "30–150 kg" else "66–331 lb"
+                        else -> {
+                            weightError = null
+                            if (kotlin.math.abs(kg - profile.weightKg) > 0.05f) {
+                                viewModel.updateWeight(kg)
+                            }
+                        }
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Weight ($weightUnit)") },
+            suffix = { Text(weightUnit) },
+            supportingText = {
+                Text(weightError ?: if (profile.useMetricUnits) "30–150 kg" else "66–331 lb")
+            },
+            isError = weightError != null,
+            singleLine = true,
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+            )
         )
 
         Text(
@@ -274,6 +320,13 @@ private fun GoalSection(profile: UserProfile, viewModel: SettingsViewModel) {
 
 @Composable
 private fun RemindersSection(profile: UserProfile, viewModel: SettingsViewModel) {
+    val context = LocalContext.current
+    // Opt-in permission: asked only when the user flips reminders ON, never
+    // at install. If denied, the toggle still saves — the worker just skips
+    // showing until the system permission is granted.
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* best-effort: toggle already saved */ }
     SectionCard(title = "Reminders") {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -283,7 +336,24 @@ private fun RemindersSection(profile: UserProfile, viewModel: SettingsViewModel)
             Text(text = "Enable reminders", fontSize = 16.sp)
             Switch(
                 checked = profile.remindersEnabled,
-                onCheckedChange = { viewModel.toggleReminders(it) }
+                onCheckedChange = {
+                    viewModel.toggleReminders(it)
+                    if (it && android.os.Build.VERSION.SDK_INT >= 33) {
+                        val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                            context, android.Manifest.permission.POST_NOTIFICATIONS
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                        if (!granted) {
+                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                }
+            )
+        }
+        if (!profile.remindersEnabled) {
+            Text(
+                text = "Off — turn on anytime for gentle nudges. You'll be asked for notification permission only then.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Text(

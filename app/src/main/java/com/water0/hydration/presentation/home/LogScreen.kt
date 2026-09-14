@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -41,7 +42,8 @@ import kotlinx.coroutines.launch
 fun LogScreen(
     viewModel: HomeViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    topGutter: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
@@ -67,7 +69,12 @@ fun LogScreen(
         modifier = modifier,
         onRetry = { viewModel.refresh() }
     ) { state ->
-        // Title lives in the shell's lens plate; content starts with tools.
+        // Scrollable clearance for the floating "Update" lens — scrolls
+        // away so entries later glide behind the glass.
+        androidx.compose.foundation.layout.Spacer(
+            modifier = Modifier.height(topGutter)
+        )
+        // Title lives in the shell's top glass bar; content starts with tools.
         FlowRow(
             modifier = Modifier
                 .fillMaxWidth()

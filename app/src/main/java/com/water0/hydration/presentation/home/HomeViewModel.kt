@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
  */
 sealed interface GlassKick {
     data class Pour(val amountMl: Int, val atNanos: Long = System.nanoTime()) : GlassKick
-    data class Slosh(val atNanos: Long = System.nanoTime()) : GlassKick
+    data class Slosh(val amountMl: Int, val atNanos: Long = System.nanoTime()) : GlassKick
 }
 
 class HomeViewModel(
@@ -118,8 +118,13 @@ class HomeViewModel(
     fun deleteEntry(entryId: Long) {
         viewModelScope.launch {
             try {
+                // Read the amount BEFORE deleting (already in UiState): the
+                // tank needs the net delta to replay the animation on Home.
+                val amountMl = (_uiState.value as? UiState.Success)
+                    ?.entries?.find { it.id == entryId }
+                    ?.effectiveHydrationMl ?: 0
                 deleteHydration(entryId)
-                _glassKick.value = GlassKick.Slosh()
+                _glassKick.value = GlassKick.Slosh(amountMl)
             } catch (e: Exception) {
                 _notice.value = e.message ?: "Delete failed"
             }

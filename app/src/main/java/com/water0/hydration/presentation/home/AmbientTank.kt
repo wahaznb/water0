@@ -53,19 +53,50 @@ fun AmbientTank(
     // Counts Slosh kicks so each one runs its keyframes to completion even
     // after the shared kick is consumed.
     var sloshRunId by remember { mutableIntStateOf(0) }
+    // Net ml logged/deleted while AWAY from Home. Animations play ONLY on
+    // Home: other tabs stay silent and this accumulates (+ pours, − sloshes)
+    // until the homecoming replay below spends it as one animation.
+    var pendingDeltaMl by remember { mutableIntStateOf(0) }
+    val home = selectedRoute == Routes.HOME
 
-    // One-shot pour/slosh choreography per kick.
+    // One-shot pour/slosh choreography per kick — on Home only.
     LaunchedEffect(kick) {
-        when (kick) {
+        when (val k = kick) {
             is GlassKick.Pour -> {
+                if (home) {
+                    pouring = true
+                    delay(650)
+                    pouring = false
+                } else {
+                    pendingDeltaMl += k.amountMl
+                }
+                viewModel.consumeGlassKick()
+            }
+            is GlassKick.Slosh -> {
+                if (home) {
+                    // Slosh consumption happens in SloshDriver when done.
+                    sloshRunId++
+                } else {
+                    pendingDeltaMl -= k.amountMl
+                    viewModel.consumeGlassKick()
+                }
+            }
+            null -> Unit
+        }
+    }
+
+    // Homecoming replay: one animation for the whole away balance.
+    LaunchedEffect(home) {
+        if (home && pendingDeltaMl != 0) {
+            val net = pendingDeltaMl
+            pendingDeltaMl = 0
+            if (net > 0) {
                 pouring = true
                 delay(650)
                 pouring = false
-                viewModel.consumeGlassKick()
+            } else {
+                sloshRunId++
             }
-            // Slosh consumption happens in SloshDriver when done.
-            is GlassKick.Slosh -> sloshRunId++
-            null -> Unit
         }
     }
 
@@ -86,19 +117,17 @@ fun AmbientTank(
         wasHome = isHome
     }
     val pulseWave = kotlin.math.sin(pulse.value * kotlin.math.PI).toFloat()
-    val pulseScale = 1f + 0.45f * pulseWave
-    val pulseBlur = if (android.os.Build.VERSION.SDK_INT >= 31) {
-        (pulseWave * 16f).dp
-    } else 0.dp
+    // Move-and-shrink transition only: the pose springs handle travel, this
+    // dips the scale a touch mid-flight. No blur, no grow — per request.
+    val pulseScale = 1f - 0.06f * pulseWave
 
     val state = uiState as? HomeViewModel.UiState.Success ?: return
-    val home = selectedRoute == Routes.HOME
     val anim = spring<Float>(
         dampingRatio = Spring.DampingRatioNoBouncy,
         stiffness = Spring.StiffnessLow
     )
     val tankW by animateDpAsState(
-        targetValue = if (home) 240.dp else 300.dp,
+        targetValue = if (home) 320.dp else 300.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessLow
@@ -106,17 +135,18 @@ fun AmbientTank(
         label = "tankW"
     )
     val tankH by animateDpAsState(
-        targetValue = if (home) 520.dp else 440.dp,
+        targetValue = if (home) 644.dp else 440.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessLow
         ),
         label = "tankH"
     )
-    // Home: left edge crops ~40% off-screen — half a tank looming.
-    // Elsewhere: centered and dim, pure backdrop.
+    // Home: cropped further left so the right edge clears the info zone
+    // (status + recs start after the tank). Elsewhere: centered and dim,
+    // pure backdrop.
     val tankX by animateDpAsState(
-        targetValue = if (home) -70.dp else 0.dp,
+        targetValue = if (home) -135.dp else 0.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessLow
@@ -124,7 +154,7 @@ fun AmbientTank(
         label = "tankX"
     )
     val tankAlpha by animateFloatAsState(
-        targetValue = if (home) 1f else 0.42f,
+        targetValue = if (home) 1f else 0.30f,
         animationSpec = anim,
         label = "tankAlpha"
     )
@@ -141,15 +171,13 @@ fun AmbientTank(
                 onDone = { viewModel.consumeGlassKick() }
             )
         }
-        // Transition covers the spring: fullscreen-ish, bigger, softer.
-        // Blur needs API 31+; below that the animation is scale-only.
+        // Transition covers the spring: a small dip while it travels.
         Box(
             modifier = Modifier
                 .graphicsLayer {
                     scaleX = pulseScale
                     scaleY = pulseScale
                 }
-                .blur(pulseBlur)
         ) {
             WaterStage(
                 totalMl = state.totalEffectiveMl,

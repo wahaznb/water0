@@ -1,12 +1,9 @@
 package com.water0.hydration.presentation
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
@@ -37,7 +34,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -47,6 +43,8 @@ import com.water0.hydration.data.local.entity.UserBehavior
 import com.water0.hydration.data.local.entity.UserProfile
 import com.water0.hydration.di.AppContainer
 import com.water0.hydration.presentation.history.HistoryScreen
+import com.water0.hydration.presentation.history.HistoryViewModel
+import com.water0.hydration.presentation.history.HistoryViewModelFactory
 import com.water0.hydration.presentation.home.AmbientTank
 import com.water0.hydration.presentation.home.HomeScreen
 import com.water0.hydration.presentation.home.HomeViewModel
@@ -54,6 +52,7 @@ import com.water0.hydration.presentation.home.LogScreen
 import com.water0.hydration.presentation.home.hydrationTintFor
 import com.water0.hydration.presentation.navigation.GlassBottomBar
 import com.water0.hydration.presentation.navigation.LensPlate
+import com.water0.hydration.presentation.navigation.PlateOption
 import com.water0.hydration.presentation.navigation.Routes
 import com.water0.hydration.presentation.settings.SettingsScreen
 import com.water0.hydration.ui.theme.GlassPrefs
@@ -81,8 +80,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private val notificationPermission =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* best-effort */ }
+    // No install-time permission prompt: notifications are opt-in via the
+    // Settings → Reminders toggle, which requests POST_NOTIFICATIONS only
+    // when the user actually enables reminders. The worker still runs and
+    // reschedules without it — it just skips showing.
+
+    // Hoisted so the Logs lens plate drives the same range state the
+    // History list renders (one source of truth, no duplicate ViewModels).
+    private val historyViewModel: HistoryViewModel by viewModels {
+        HistoryViewModelFactory(this)
+    }
 
     @OptIn(
         androidx.compose.foundation.ExperimentalFoundationApi::class,
@@ -101,7 +108,6 @@ class MainActivity : ComponentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
         seedDefaults()
-        requestNotificationPermission()
         AppContainer.getNotificationScheduler(this).ensureScheduled()
         // Theme choice persists in plain SharedPreferences: a single
         // boolean flag is exactly what prefs are for (no DB migration).
@@ -150,16 +156,23 @@ class MainActivity : ComponentActivity() {
                 // above it for the same reason.
                 val snackbarHostState = remember { SnackbarHostState() }
                 var barHeightDp by remember { mutableStateOf(0.dp) }
-                var plateHeightDp by remember { mutableStateOf(0.dp) }
+                // Floating lenses everywhere (top bar + bottom dock): content
+                // flows full-bleed UNDER them so scrolled text refracts
+                // through the glass instead of clipping at its edge. Each
+                // screen owns a scrollable top gutter (passed below) for
+                // initial clearance — it scrolls away, then content glides
+                // behind the lens like the bottom dock. Starts estimated so
+                // the first frame already clears.
+                var plateHeightDp by remember { mutableStateOf(68.dp) }
                 val density = LocalDensity.current
-                // The plate only exists off-Home; animate the inset with its
-                // fade so content never jumps.
-                val topInsetTarget = if (selected == Routes.HOME) 0.dp else plateHeightDp
+                val platePage = pagerState.currentPage
+                val topInsetTarget = plateHeightDp
                 val topInset by animateDpAsState(
                     targetValue = topInsetTarget,
                     animationSpec = tween(durationMillis = 250),
                     label = "topInset"
                 )
+                val daysBack by historyViewModel.daysBack.collectAsStateWithLifecycle()
                 // Background state comes from the shared HomeViewModel so the
                 // ONE root Aurora below matches the glass everywhere.
                 val homeUiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -201,15 +214,13 @@ class MainActivity : ComponentActivity() {
                     },
                     containerColor = Color.Transparent,
                     content = { paddingValues ->
-                    // Full-bleed: lists flow to the screen end UNDER the
-                    // floating dock (which is translucent) instead of ending
-                    // abruptly above it. barHeightDp survives for the toast
-                    // lift only.
+                    // Full-bleed: lists flow UNDER both floating lenses
+                    // (top bar + dock) instead of clipping at their edges.
+                    // barHeightDp survives for the toast lift only.
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(paddingValues)
-                            .padding(top = topInset)
                     ) {
                         HorizontalPager(
                             state = pagerState,
@@ -242,14 +253,18 @@ class MainActivity : ComponentActivity() {
                                 when (page) {
                                     0 -> HomeScreen(
                                         viewModel = viewModel,
-                                        snackbarHostState = snackbarHostState
+                                        snackbarHostState = snackbarHostState,
+                                        topGutter = topInset
                                     )
                                     1 -> LogScreen(
                                         viewModel = viewModel,
-                                        snackbarHostState = snackbarHostState
+                                        snackbarHostState = snackbarHostState,
+                                        topGutter = topInset
                                     )
                                     2 -> HistoryScreen(
-                                        snackbarHostState = snackbarHostState
+                                        snackbarHostState = snackbarHostState,
+                                        viewModel = historyViewModel,
+                                        topGutter = topInset
                                     )
                                     else -> SettingsScreen(
                                         darkTheme = darkTheme,
@@ -261,7 +276,8 @@ class MainActivity : ComponentActivity() {
                                         onGlassConfigChange = {
                                             glassPrefs.saveApplied(it)
                                             glassConfig = it
-                                        }
+                                        },
+                                        topGutter = topInset
                                     )
                                 }
                                 }
@@ -272,29 +288,41 @@ class MainActivity : ComponentActivity() {
                 }
                 },
                     glassContent = scope@{
-                        // Plate renders ONLY off-Home via plain conditional —
-                        // no AnimatedVisibility ghost frames, no stale title.
-                        if (selected != Routes.HOME) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .statusBarsPadding()
-                                    .padding(horizontal = 16.dp)
-                                    .padding(top = 8.dp),
-                                contentAlignment = Alignment.TopCenter
-                            ) {
-                                this@scope.LensPlate(
-                                    title = when (selected) {
-                                        Routes.UPDATE -> "Update"
-                                        Routes.LOGS -> "Logs"
-                                        else -> "Settings"
-                                    },
-                                    config = glassConfig,
-                                    modifier = Modifier.onSizeChanged {
-                                        plateHeightDp = with(density) { it.height.toDp() }
+                        // Floating top lens on EVERY tab (Home wears
+                        // "Water0"). Pager-driven so titles never disagree
+                        // with what's displayed. Logs carries its range
+                        // options in the plate. Content flows beneath it.
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                                .padding(horizontal = 16.dp)
+                                .padding(top = 8.dp),
+                            contentAlignment = Alignment.TopCenter
+                        ) {
+                            this@scope.LensPlate(
+                                title = when (platePage) {
+                                    0 -> "Water0"
+                                    1 -> "Update"
+                                    2 -> "Logs"
+                                    else -> "Settings"
+                                },
+                                config = glassConfig,
+                                modifier = Modifier.onSizeChanged {
+                                    plateHeightDp = with(density) { it.height.toDp() } + 24.dp
+                                },
+                                options = if (platePage == 2) {
+                                    {
+                                        historyViewModel.rangeOptions.forEach { option ->
+                                            PlateOption(
+                                                label = "${option}d",
+                                                selected = option == daysBack,
+                                                onClick = { historyViewModel.setDaysBack(option) }
+                                            )
+                                        }
                                     }
-                                )
-                            }
+                                } else null
+                            )
                         }
                         // Directly in GlassBoxScope (no nested Box receiver).
                         GlassBottomBar(
@@ -312,15 +340,6 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val PREFS_NAME = "water0_prefs"
         private const val KEY_DARK_THEME = "dark_theme"
-    }
-
-    // POST_NOTIFICATIONS is runtime-gated on API 33+. Without it the
-    // worker still runs and reschedules — it just skips showing.
-    private fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT < 33) return
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
     }
 
     // Room Flow queries emit nothing until a row exists, so insert
