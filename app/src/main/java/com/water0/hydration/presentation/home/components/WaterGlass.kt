@@ -110,7 +110,7 @@ fun WaterGlass(
         initialValue = 0f,
         targetValue = (2 * PI).toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2600, easing = LinearEasing)
+            animation = tween(durationMillis = 1700, easing = LinearEasing)
         ),
         label = "phase"
     )
@@ -160,7 +160,7 @@ fun WaterGlass(
             // Unmixed bands, bottom-up. ONLY the top band waves — the
             // interfaces below stay flat like settled liquids.
             val twoPi = (2 * PI).toFloat()
-            val waveLength = size.width / 1.5f
+            val waveLength = size.width / 1.1f
             val amplitude = (7 + sloshBoostDp).dp.toPx()
             var bandBottom = size.height
             bands.forEachIndexed { index, band ->
@@ -170,8 +170,8 @@ fun WaterGlass(
                 drawRect(
                     brush = Brush.verticalGradient(
                         listOf(
-                            band.color.copy(alpha = 0.30f),
-                            band.color.copy(alpha = 0.52f)
+                            band.color.copy(alpha = 0.34f),
+                            band.color.copy(alpha = 0.58f)
                         ),
                         startY = bandTop,
                         endY = bandBottom
@@ -195,7 +195,7 @@ fun WaterGlass(
                     lineTo(0f, bandBottom)
                     close()
                 }
-                drawPath(crest, band.color.copy(alpha = 0.60f))
+                drawPath(crest, band.color.copy(alpha = 0.65f))
                 if (isTop) {
                     val crestLine = Path().apply {
                         moveTo(0f, bandTop + sin(phase) * amplitude)
@@ -357,6 +357,15 @@ private const val LipXFrac = 0.04f
 private const val LipYFrac = 0.08f
 
 /**
+ * Tank fill 0..1 from the same total/goal the caption prints — one
+ * formula for text and water, so they can never disagree. Pure and
+ * unit-tested: 50/100 -> 0.5, empty -> 0, over goal -> 1 (the glass
+ * itself can't show more; excess becomes spill, see WaterStage).
+ */
+fun tankLevel(totalMl: Int, goalMl: Int): Float =
+    if (goalMl > 0) (totalMl.toFloat() / goalMl).coerceIn(0f, 1f) else 0f
+
+/**
  * Translation that pins the pouring lip in place while the glass rotates
  * around its base pivot — the body swings, the mouth stays, like a real
  * pour. Pure function, unit-tested.
@@ -410,7 +419,7 @@ fun WaterStage(
     // Single source of truth with the "X / Y ml" caption below.
     val ratio = if (goalMl > 0) totalMl.toFloat() / goalMl else 0f
     val level by animateFloatAsState(
-        targetValue = ratio.coerceIn(0f, 1f),
+        targetValue = tankLevel(totalMl, goalMl),
         animationSpec = tween(durationMillis = 900),
         label = "level"
     )
@@ -429,7 +438,12 @@ fun WaterStage(
         ),
         label = "fall"
     )
-    val spillAlpha = ((-tiltDegrees - 10f) / 28f).coerceIn(0f, 1f)
+    val spillAlpha = maxOf(
+        ((-tiltDegrees - 10f) / 28f).coerceIn(0f, 1f),
+        // A full glass keeps gently overflowing instead of clipping
+        // silently: the excess has to go somewhere visible.
+        if (overfull) 0.35f + 0.15f * kotlin.math.sin(fall * 6.28f).toFloat() else 0f
+    )
     // Glass sits below a fall zone; both share one overlay box so the
     // droplets land exactly on the live surface.
     val fallHpx = with(density) { fallH.toPx() }

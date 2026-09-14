@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.water0.hydration.ui.theme.GlassConfig
 import com.water0.hydration.presentation.home.components.pourPinOffset
+import com.water0.hydration.presentation.home.components.tankLevel
 import com.water0.hydration.ui.theme.liquidglass.toLiquidParams
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -61,5 +62,17 @@ class LiquidGlassMappingTest {
             assertEquals(lipX, rx.toFloat(), 0.01f)
             assertEquals(lipY, ry.toFloat(), 0.01f)
         }
+    }
+
+    @Test
+    fun `tank level tracks quantity proportionally`() {
+        // The reported bug: glass stuck at full. These pin the math so any
+        // recurrence must be rendering, not data.
+        assertEquals(0.5f, tankLevel(50, 100), 0.001f)
+        assertEquals(0.25f, tankLevel(25, 100), 0.001f)
+        assertEquals(0f, tankLevel(0, 100), 0.0f)
+        assertEquals(1f, tankLevel(100, 100), 0.0f)
+        assertEquals(1f, tankLevel(5000, 100), 0.0f)
+        assertEquals(0f, tankLevel(50, 0), 0.0f)
     }
 }

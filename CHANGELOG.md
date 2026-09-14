@@ -29,6 +29,9 @@ All notable changes to Water0 are documented here. Format follows
 - Real liquid-glass bottom bar: ported backdrop-lens technique (refraction +
   blur + rim highlight sampled from content, AGSL on API 33+, gradient
   fallback below), driven live by the Glass Lab settings
+- Lens title plates on Update/Logs/Settings; touch-blob tab indicator that
+  follows the finger and morphs while held; tab-change zoom-blur pulse
+  only on home transitions; drink colors fitted to the theme palette
 - About section in Settings (version, GitHub link, license)
 - Real launcher icon (IconKitchen adaptive set + monochrome + store listing)
 - iPhone-style tab bar: hold to magnify nearby tabs with haptic scrub,
@@ -39,6 +42,8 @@ All notable changes to Water0 are documented here. Format follows
   stream); glass badge on the active tab (no dot); footer chrome removed
 - Living background: swirling washes + rising bubbles reacting to progress,
   twinkle specks, film grain against banding; washes turned up loud
+- Black-water background with random bioluminescent glow pulses (no fish,
+  just lights); full glass gently overflows instead of clipping
 - Ambient mega-tank: one persistent tumbler behind every tab (cropped hero
   on Home, dim refractive backdrop elsewhere); tumbler silhouette with
   thick base + rim; icon-only dock tabs

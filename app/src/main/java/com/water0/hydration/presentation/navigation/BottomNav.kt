@@ -45,6 +45,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.water0.hydration.ui.theme.GlassConfig
@@ -102,33 +103,57 @@ fun GlassBoxScope.GlassBottomBar(
     modifier: Modifier = Modifier
 ) {
     val selectedIndex = TABS.indexOfFirst { it.route == selected }.coerceAtLeast(0)
-    var barWidthPx by remember { mutableStateOf(0) }
     // iPhone-style hold-and-scrub: long-press magnifies nearby tabs with
     // haptic ticks, the highlight previews under the finger, release commits.
     var dragIndex by remember { mutableStateOf<Int?>(null) }
     var fingerX by remember { mutableStateOf<Float?>(null) }
     val activeIndex = dragIndex ?: selectedIndex
     val haptics = LocalHapticFeedback.current
-    fun indexAt(xPx: Float): Int =
-        ((xPx / barWidthPx.coerceAtLeast(1) * TABS.size).toInt()).coerceIn(0, TABS.size - 1)
+    val density = LocalDensity.current
+    // Dock geometry is fully explicit (72dp tabs + 4dp gaps + 12dp row
+    // padding), so centers come from constants — measured once, wrong
+    // forever (the old formula forgot the padding and sat 6dp off).
+    fun tabCenterPx(i: Int): Float = with(density) {
+        (12.dp + (72.dp + 4.dp) * i + 72.dp / 2).toPx()
+    }
+    fun indexAt(xPx: Float): Int = with(density) {
+        val step = (72.dp + 4.dp).toPx()
+        (((xPx - 12.dp.toPx()) / step).toInt()).coerceIn(0, TABS.size - 1)
+    }
 
     val surface = MaterialTheme.colorScheme.surface
     val params = remember(config, surface) { config.toLiquidParams(surface) }
-    // Badge glides after the finger with a soft spring instead of popping
-    // tab to tab; it settles on the selected tab at rest.
-    val density = LocalDensity.current
-    val badgeTargetX = with(density) {
-        if (dragIndex != null && barWidthPx != 0) fingerX!!.toDp()
-        else if (barWidthPx == 0) 0.dp
-        else (barWidthPx * (selectedIndex + 0.5f) / TABS.size).toDp()
+    // Touch-blob: glides after the finger, morphs while held (squishes
+    // from circle toward rounded square + swells), settles round at rest.
+    val dragging = fingerX != null
+    val blobCenterX: Dp = if (dragging) {
+        with(density) { fingerX!!.toDp() }
+    } else {
+        with(density) { tabCenterPx(selectedIndex).toDp() }
     }
-    val badgeX by animateDpAsState(
-        targetValue = badgeTargetX,
+    val blobX by animateDpAsState(
+        targetValue = blobCenterX,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessLow
         ),
-        label = "badge"
+        label = "blob"
+    )
+    val blobCorner by androidx.compose.animation.core.animateIntAsState(
+        targetValue = if (dragging) 34 else 50,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "blobCorner"
+    )
+    val blobScale by animateFloatAsState(
+        targetValue = if (dragging) 1.14f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "blobScale"
     )
 
     // Compact centered dock (not a footer): fixed-width tabs, lens hugging
@@ -150,15 +175,22 @@ fun GlassBoxScope.GlassBottomBar(
             shape = CircleShape
         ) {
             Box {
-                // One badge, gliding behind the icons (drawn first).
+                // Touch-blob: one morphing badge gliding behind the icons
+                // (drawn first). Follows the finger while held, settles on
+                // the selected tab at rest; squishes + swells on touch.
+                val blobShape = RoundedCornerShape(blobCorner)
                 Box(
                     modifier = Modifier
-                        .offset(x = badgeX - 22.dp)
+                        .offset(x = blobX - 22.dp)
+                        .graphicsLayer {
+                            scaleX = blobScale
+                            scaleY = blobScale
+                        }
                         .size(44.dp)
-                        .clip(CircleShape)
+                        .clip(blobShape)
                         .background(
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                            CircleShape
+                            blobShape
                         )
                         .border(
                             1.dp,
@@ -168,7 +200,7 @@ fun GlassBoxScope.GlassBottomBar(
                                     MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
                                 )
                             ),
-                            CircleShape
+                            blobShape
                         )
                 ) {
                     Box(
@@ -181,7 +213,6 @@ fun GlassBoxScope.GlassBottomBar(
                 }
                 Row(
                     modifier = Modifier
-                        .onSizeChanged { barWidthPx = it.width }
                         .pointerInput(Unit) {
                             detectDragGesturesAfterLongPress(
                                 onDragStart = { offset ->
@@ -212,19 +243,22 @@ fun GlassBoxScope.GlassBottomBar(
                                 }
                             )
                         }
-                        .padding(horizontal = 8.dp, vertical = 10.dp),
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val tabWidth = barWidthPx.toFloat() / TABS.size
                     TABS.forEachIndexed { index, tab ->
                         // Dock magnification: tabs swell near the finger with a
                         // gaussian falloff, each springing toward its target.
-                        val center = tabWidth * (index + 0.5f)
+                        // Geometry is constants-only (72dp tabs + 4dp gaps +
+                        // 12dp row padding) — no measurement, no skew.
+                        val center = with(density) {
+                            (12.dp + (72.dp + 4.dp) * index + 72.dp / 2).toPx()
+                        }
                         val fx = fingerX
-                        val target = if (fx == null || tabWidth == 0f) 1f
-                        else {
-                            val d = (center - fx) / (tabWidth * 0.9f)
+                        val target = if (fx == null) 1f
+                        else with(density) {
+                            val d = (center - fx) / (76.dp.toPx() * 0.9f)
                             1f + 0.45f * kotlin.math.exp(-d * d).toFloat()
                         }
                         val magnify by animateFloatAsState(
@@ -259,7 +293,7 @@ private fun GlassTab(
     else MaterialTheme.colorScheme.onSurfaceVariant
     // Fixed width: the dock wraps its tabs (no weight in a wrap-content Row).
     // Icon-only: the label lives in contentDescription for talkback.
-    TextButton(onClick = onClick, modifier = Modifier.width(60.dp)) {
+    TextButton(onClick = onClick, modifier = Modifier.width(72.dp)) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier

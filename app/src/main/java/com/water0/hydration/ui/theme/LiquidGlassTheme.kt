@@ -181,16 +181,14 @@ fun AuroraBackground(
             val oy = kotlin.math.sin(swirl + phase) * h * r
             return androidx.compose.ui.geometry.Offset(w * fx + ox, h * fy + oy)
         }
-        // Top-left water-blue wash. Loud on purpose: translucent cards
-        // and water drink straight from this mesh. Four stops instead of
-        // two — a bare color-to-transparent ramp quantizes into visible
-        // posterized rings; intermediate stops spread the error.
+        // Top-left water-blue wash. Barely-there depth only — the base is
+        // black water now, and these just keep it from going flat.
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    primary.copy(alpha = 0.36f),
-                    primary.copy(alpha = 0.20f),
-                    primary.copy(alpha = 0.08f),
+                    primary.copy(alpha = 0.12f),
+                    primary.copy(alpha = 0.07f),
+                    primary.copy(alpha = 0.02f),
                     Color.Transparent
                 ),
                 center = orbit(0.12f, 0.06f, 0.05f, 0f),
@@ -202,9 +200,9 @@ fun AuroraBackground(
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    secondary.copy(alpha = 0.26f),
-                    secondary.copy(alpha = 0.14f),
+                    secondary.copy(alpha = 0.09f),
                     secondary.copy(alpha = 0.05f),
+                    secondary.copy(alpha = 0.02f),
                     Color.Transparent
                 ),
                 center = orbit(0.92f, 0.94f, 0.04f, 2.1f),
@@ -216,9 +214,9 @@ fun AuroraBackground(
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    tertiary.copy(alpha = 0.16f),
-                    tertiary.copy(alpha = 0.09f),
+                    tertiary.copy(alpha = 0.06f),
                     tertiary.copy(alpha = 0.03f),
+                    tertiary.copy(alpha = 0.01f),
                     Color.Transparent
                 ),
                 center = orbit(0.5f, 0.45f, 0.06f, 4.2f),
@@ -256,6 +254,33 @@ fun AuroraBackground(
                 (1f + (i % 2)).dp.toPx() * 0.5f,
                 androidx.compose.ui.geometry.Offset(x, y)
             )
+        }
+        // Deep-water glow pulses: random soft lights breathing on their
+        // own slow cycles, like bioluminescence — no fish, just the lights.
+        // Staggered phases so the field never pulses in sync.
+        for (i in 0 until 14) {
+            val seed = ((i * 91) % 100) / 100f
+            val speed = 0.25f + (i % 5) * 0.12f
+            val glow = (rise * speed + seed) % 1f
+            val envelope = kotlin.math.sin(glow * 6.28f).toFloat()
+            val intensity = envelope * envelope * (0.10f + energy * 0.08f)
+            if (intensity > 0.004f) {
+                val gx = (((i * 47) % 100) / 100f) * w
+                val gy = (((i * 83) % 100) / 100f) * h
+                val radius = (36f + (i % 4) * 14f).dp.toPx()
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        listOf(
+                            secondary.copy(alpha = intensity),
+                            Color.Transparent
+                        ),
+                        center = androidx.compose.ui.geometry.Offset(gx, gy),
+                        radius = radius
+                    ),
+                    radius = radius,
+                    center = androidx.compose.ui.geometry.Offset(gx, gy)
+                )
+            }
         }
         if (hydrationTint != Color.Transparent) {
             drawRect(color = hydrationTint, size = size)

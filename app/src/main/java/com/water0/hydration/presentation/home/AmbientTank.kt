@@ -69,18 +69,21 @@ fun AmbientTank(
         }
     }
 
-    // Tab-change pulse: the tank swings back to middle, goes big and
-    // fullscreen-soft, then settles into its per-tab pose. Skipped on
-    // first composition (no route change yet).
+    // Tab-change pulse: ONLY on home↔other transitions the tank swings
+    // back to middle, goes big and fullscreen-soft, then settles into its
+    // per-tab pose. Skipped on first composition (no route change yet).
     var firstRoute by remember { mutableStateOf(true) }
+    var wasHome by remember { mutableStateOf(selectedRoute == Routes.HOME) }
     val pulse = remember { Animatable(0f) }
     LaunchedEffect(selectedRoute) {
+        val isHome = selectedRoute == Routes.HOME
         if (firstRoute) {
             firstRoute = false
-        } else {
+        } else if (isHome != wasHome) {
             pulse.snapTo(0f)
             pulse.animateTo(1f, tween(durationMillis = 700, easing = LinearEasing))
         }
+        wasHome = isHome
     }
     val pulseWave = kotlin.math.sin(pulse.value * kotlin.math.PI).toFloat()
     val pulseScale = 1f + 0.45f * pulseWave
@@ -103,7 +106,7 @@ fun AmbientTank(
         label = "tankW"
     )
     val tankH by animateDpAsState(
-        targetValue = if (home) 460.dp else 420.dp,
+        targetValue = if (home) 520.dp else 440.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessLow
@@ -121,7 +124,7 @@ fun AmbientTank(
         label = "tankX"
     )
     val tankAlpha by animateFloatAsState(
-        targetValue = if (home) 1f else 0.30f,
+        targetValue = if (home) 1f else 0.42f,
         animationSpec = anim,
         label = "tankAlpha"
     )

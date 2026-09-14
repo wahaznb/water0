@@ -272,20 +272,9 @@ class MainActivity : ComponentActivity() {
                 }
                 },
                     glassContent = scope@{
-                        // Lens title plate on non-Home tabs (Home has its
-                        // in-content header). Fades with the inset animation.
-                        // Labeled lambda: nested Boxes shadow the scope, so
-                        // extension calls below use an explicit receiver.
-                        androidx.compose.animation.AnimatedVisibility(
-                            visible = selected != Routes.HOME,
-                            enter = androidx.compose.animation.fadeIn(
-                                animationSpec = tween(durationMillis = 250)
-                            ),
-                            exit = androidx.compose.animation.fadeOut(
-                                animationSpec = tween(durationMillis = 200)
-                            ),
-                            label = "plate"
-                        ) {
+                        // Plate renders ONLY off-Home via plain conditional —
+                        // no AnimatedVisibility ghost frames, no stale title.
+                        if (selected != Routes.HOME) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
