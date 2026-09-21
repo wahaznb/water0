@@ -14,6 +14,7 @@ All notable changes to Water0 are documented here. Format follows
   hold-and-scrub with haptics; slower glide + page transitions
 - Ambient mega-tank with a pose per tab (hero low-left on Home,
   low-right on Update, upper-left on Logs, small-center on Settings)
+  reached on slow 1.1s glides with fading opacity
 - Time-of-day goal judgment: chugging the whole day early warns instead
   of celebrating; genuine evening finishes still celebrate (tests incl.
   the 1am case)
@@ -62,6 +63,16 @@ All notable changes to Water0 are documented here. Format follows
   floating dock — scrollable bottom gutters on every tab
 - Default black text/icons on dark theme; gradient banding; time-flaky
   quiet-hours test
+- Pour shoving the glass down (fixed rain zone now, glass never moves);
+  delete tilting the tank (rows flash red and vanish, level glides down)
+- Recency-sized sips: dry spell grows the next glass (250 + 75/dry-hour,
+  50s grid, 500 cap — never chug coaching), silent while on pace;
+  persistent notification shows current vs prorated by-now target +
+  the same sip (refreshes each tick, clears overnight)
+- Normal buzzing reminder alongside the persistent line, only with a
+  real recency nudge (same card as Home shows — on pace means silence)
+- Pour droplets dance on Home only: logging elsewhere just moves the
+  level, nothing banked, nothing replayed on return
 
 ## [0.1.0] - 2026-09-13
 

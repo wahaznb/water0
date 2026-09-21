@@ -12,12 +12,13 @@ class NotificationScheduler(private val context: Context) {
     private val workManager = WorkManager.getInstance(context)
 
     fun ensureScheduled() {
-        // Primer run: shows nothing, just computes the first real delay.
-        // KEEP policy so a launch never resets an already-running chain.
+        // Primer run: shows the persistent status line within minutes of
+        // launch, then computes the first real delay. KEEP policy so a
+        // launch never resets an already-running chain.
         workManager.enqueueUniqueWork(
             NotificationWorker.UNIQUE_WORK,
             ExistingWorkPolicy.KEEP,
-            NotificationWorker.nextRequest(INITIAL_DELAY_MILLIS, show = false)
+            NotificationWorker.nextRequest(INITIAL_DELAY_MILLIS, show = true)
         )
     }
 
@@ -26,6 +27,6 @@ class NotificationScheduler(private val context: Context) {
     }
 
     companion object {
-        private const val INITIAL_DELAY_MILLIS = 30 * 60 * 1000L
+        private const val INITIAL_DELAY_MILLIS = 5 * 60 * 1000L
     }
 }

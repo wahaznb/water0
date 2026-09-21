@@ -5,7 +5,6 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
@@ -352,7 +351,6 @@ fun SloshDriver(
 val GlassStageWidth = 200.dp
 val GlassStageHeight = 280.dp
 private val SpillRoom = 110.dp
-private val FallZone = 150.dp
 private const val LipXFrac = 0.04f
 private const val LipYFrac = 0.08f
 
@@ -424,11 +422,12 @@ fun WaterStage(
         label = "level"
     )
     val overfull = ratio > 1f
-    val fallH by animateDpAsState(
-        targetValue = if (pouring) FallZone else 0.dp,
-        animationSpec = tween(durationMillis = 300),
-        label = "fallZone"
-    )
+    // Fixed rain zone above the glass: droplets always have sky to fall
+    // through, so pouring never shoves the glass down. The glass sits at
+    // RAIN_TOP inside a symmetric stage (rain above, spill room below),
+    // which keeps its screen position identical to the old rest layout.
+    val rainTop = 55.dp
+    val stageHeadroom = 110.dp
     val pourClock = rememberInfiniteTransition(label = "pour")
     val fall by pourClock.animateFloat(
         initialValue = 0f,
@@ -441,14 +440,15 @@ fun WaterStage(
     // Spill runs only off the tilted lip while pouring out. An overfull
     // glass just wears its foam cap — no overflow stream.
     val spillAlpha = ((tiltDegrees - 10f) / 28f).coerceIn(0f, 1f)
-    // Glass sits below a fall zone; both share one overlay box so the
-    // droplets land exactly on the live surface.
-    val fallHpx = with(density) { fallH.toPx() }
+    // Glass sits below the fixed rain zone; both share one overlay box so
+    // the droplets land exactly on the live surface. Nothing here moves
+    // with pouring — layout is identical pouring or at rest.
+    val rainTopPx = with(density) { rainTop.toPx() }
     val glassHpx = with(density) { glassHeight.toPx() }
     val glassWpx = with(density) { glassWidth.toPx() }
-    val surfaceY = fallHpx + (1f - level) * glassHpx
+    val surfaceY = rainTopPx + (1f - level) * glassHpx
     // Pour-out lip is the RIGHT mouth corner (tips go right).
-    val lip = Offset(glassWpx * (1f - LipXFrac), fallHpx + glassHpx * LipYFrac)
+    val lip = Offset(glassWpx * (1f - LipXFrac), rainTopPx + glassHpx * LipYFrac)
     androidx.compose.foundation.layout.Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
@@ -456,7 +456,7 @@ fun WaterStage(
         Box(
             modifier = Modifier.size(
                 glassWidth,
-                fallH + glassHeight + SpillRoom
+                stageHeadroom + glassHeight + SpillRoom
             )
         ) {
             if (pouring) {
@@ -473,13 +473,13 @@ fun WaterStage(
                 glassWpx * (1f - LipXFrac),
                 glassHpx * LipYFrac,
                 pivotXPx = glassWpx / 2,
-                pivotYPx = fallHpx + glassHpx
+                pivotYPx = rainTopPx + glassHpx
             )
             Box(
                 modifier = Modifier
                     .size(glassWidth, glassHeight)
                     .align(Alignment.TopCenter)
-                    .offset(y = fallH)
+                    .offset(y = rainTop)
                     .graphicsLayer {
                         translationX = pin.x
                         translationY = pin.y

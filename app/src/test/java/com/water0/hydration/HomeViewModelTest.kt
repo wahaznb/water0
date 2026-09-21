@@ -72,7 +72,7 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `deleteEntry removes entry and kicks Slosh`() = runBlocking {
+    fun `deleteEntry removes entry with no glass kick`() = runBlocking {
         viewModel.quickAdd(250)
         viewModel.consumeGlassKick()
         val id = repository.getTodayEntries().first().single().id
@@ -80,10 +80,9 @@ class HomeViewModelTest {
         viewModel.deleteEntry(id)
 
         assertTrue(repository.getTodayEntries().first().isEmpty())
-        val kick = viewModel.glassKick.first()
-        assertTrue(kick is GlassKick.Slosh)
-        // The tank needs the deleted amount for its away-balance math.
-        assertEquals(250, (kick as GlassKick.Slosh).amountMl)
+        // Deletes vanish silently (red flash in the row); the tank level
+        // glides down on its own — no tilt kick.
+        assertNull(viewModel.glassKick.first())
     }
 
     @Test

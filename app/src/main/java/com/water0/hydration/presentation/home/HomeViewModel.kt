@@ -122,13 +122,9 @@ class HomeViewModel(
     fun deleteEntry(entryId: Long) {
         viewModelScope.launch {
             try {
-                // Read the amount BEFORE deleting (already in UiState): the
-                // tank needs the net delta to replay the animation on Home.
-                val amountMl = (_uiState.value as? UiState.Success)
-                    ?.entries?.find { it.id == entryId }
-                    ?.effectiveHydrationMl ?: 0
+                // No glass kick: deletes just vanish (red flash in the row)
+                // and the tank level glides down on its own.
                 deleteHydration(entryId)
-                _glassKick.value = GlassKick.Slosh(amountMl)
             } catch (e: Exception) {
                 _notice.value = e.message ?: "Delete failed"
             }

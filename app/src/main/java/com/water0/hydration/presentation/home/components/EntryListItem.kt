@@ -34,7 +34,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -75,7 +74,8 @@ fun TodayEntriesList(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             entries.forEach { entry ->
-                // Tetris line-clear: flash white, then collapse upward.
+                // Tetris line-clear: flash red, then vanish upward while the
+                // tank layers above fall to fill the gap.
                 AnimatedVisibility(
                     visible = entry.id !in markedForDelete,
                     exit = fadeOut(tween(150, delayMillis = 150)) +
@@ -119,9 +119,9 @@ fun EntryListItem(
         " ($effectiveMl ml effective)"
     } else ""
 
-    // Marked-for-delete rows flash white before collapsing.
+    // Marked-for-delete rows flash red, then vanish.
     val container by androidx.compose.animation.animateColorAsState(
-        targetValue = if (marked) Color.White.copy(alpha = 0.85f)
+        targetValue = if (marked) MaterialTheme.colorScheme.error.copy(alpha = 0.55f)
         else glassCardContainer(),
         animationSpec = tween(durationMillis = 150),
         label = "deleteFlash"

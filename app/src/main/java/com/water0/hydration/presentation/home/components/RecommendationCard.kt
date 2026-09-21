@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.LocalCafe
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Timeline
@@ -82,8 +83,9 @@ fun RecommendationCard(
                     com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.STREAK_MAINTENANCE -> Icons.Filled.EmojiEvents
                     com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.OVER_LIMIT -> Icons.Filled.Warning
                     com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.PACING -> Icons.Filled.Speed
-                    com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.GOAL_MET -> Icons.Filled.CheckCircle
-                    com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.PERSONAL_PACE -> Icons.Filled.Timeline
+                com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.GOAL_MET -> Icons.Filled.CheckCircle
+                com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.PERSONAL_PACE -> Icons.Filled.Timeline
+                com.water0.hydration.domain.engine.RecommendationEngine.Recommendation.Reason.RECENCY_GAP -> Icons.Filled.Schedule
                 }
                 Box(
                     modifier = Modifier

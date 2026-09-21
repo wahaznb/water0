@@ -2,10 +2,8 @@ package com.water0.hydration.presentation.home
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -53,22 +51,18 @@ fun AmbientTank(
     // Counts Slosh kicks so each one runs its keyframes to completion even
     // after the shared kick is consumed.
     var sloshRunId by remember { mutableIntStateOf(0) }
-    // Net ml logged/deleted while AWAY from Home. Animations play ONLY on
-    // Home: other tabs stay silent and this accumulates (+ pours, − sloshes)
-    // until the homecoming replay below spends it as one animation.
-    var pendingDeltaMl by remember { mutableIntStateOf(0) }
     val home = selectedRoute == Routes.HOME
 
-    // One-shot pour/slosh choreography per kick — on Home only.
+    // Pour choreography runs on Home ONLY. Logging from another tab just
+    // moves the level (data); the droplets dance strictly at home — no
+    // banking pours for later, no replay on return.
     LaunchedEffect(kick) {
-        when (val k = kick) {
+        when (kick) {
             is GlassKick.Pour -> {
                 if (home) {
                     pouring = true
                     delay(650)
                     pouring = false
-                } else {
-                    pendingDeltaMl += k.amountMl
                 }
                 viewModel.consumeGlassKick()
             }
@@ -77,26 +71,10 @@ fun AmbientTank(
                     // Slosh consumption happens in SloshDriver when done.
                     sloshRunId++
                 } else {
-                    pendingDeltaMl -= k.amountMl
                     viewModel.consumeGlassKick()
                 }
             }
             null -> Unit
-        }
-    }
-
-    // Homecoming replay: one animation for the whole away balance.
-    LaunchedEffect(home) {
-        if (home && pendingDeltaMl != 0) {
-            val net = pendingDeltaMl
-            pendingDeltaMl = 0
-            if (net > 0) {
-                pouring = true
-                delay(650)
-                pouring = false
-            } else {
-                sloshRunId++
-            }
         }
     }
 
@@ -117,14 +95,16 @@ fun AmbientTank(
         wasHome = isHome
     }
     val pulseWave = kotlin.math.sin(pulse.value * kotlin.math.PI).toFloat()
-    // Move-and-shrink transition only: the pose springs handle travel, this
+    // Move-and-shrink transition only: the pose tweens handle travel, this
     // dips the scale a touch mid-flight. No blur, no grow — per request.
     val pulseScale = 1f - 0.06f * pulseWave
 
     val state = uiState as? HomeViewModel.UiState.Success ?: return
-    // Every tab gets its own tank pose, so switching tabs visibly moves
-    // the glass: hero low-left on Home, low-right on Update, upper-left
-    // on Logs, small centered on Settings. Springs glide it there.
+    // Four slow poses — one per tab, no jumps: left foreground on Home,
+    // left background on Update, middle on Logs, right on Settings. Long
+    // tweens glide the glass there; opacity fades along the way.
+    val slowGlide = tween<Float>(durationMillis = 1100)
+    val slowGlideDp = tween<androidx.compose.ui.unit.Dp>(durationMillis = 1100)
     val poseW: androidx.compose.ui.unit.Dp
     val poseH: androidx.compose.ui.unit.Dp
     val poseX: androidx.compose.ui.unit.Dp
@@ -133,19 +113,19 @@ fun AmbientTank(
     val poseAlign: Alignment
     when (selectedRoute) {
         Routes.UPDATE -> {
-            poseW = 280.dp; poseH = 460.dp
-            poseX = 110.dp; poseY = 30.dp
-            poseAlpha = 0.32f; poseAlign = Alignment.CenterEnd
+            poseW = 260.dp; poseH = 440.dp
+            poseX = -110.dp; poseY = 30.dp
+            poseAlpha = 0.25f; poseAlign = Alignment.CenterStart
         }
         Routes.LOGS -> {
-            poseW = 280.dp; poseH = 460.dp
-            poseX = -110.dp; poseY = -30.dp
-            poseAlpha = 0.32f; poseAlign = Alignment.CenterStart
+            poseW = 260.dp; poseH = 420.dp
+            poseX = 0.dp; poseY = 0.dp
+            poseAlpha = 0.22f; poseAlign = Alignment.Center
         }
         Routes.SETTINGS -> {
-            poseW = 260.dp; poseH = 400.dp
-            poseX = 0.dp; poseY = 0.dp
-            poseAlpha = 0.28f; poseAlign = Alignment.Center
+            poseW = 260.dp; poseH = 420.dp
+            poseX = 130.dp; poseY = 30.dp
+            poseAlpha = 0.22f; poseAlign = Alignment.CenterEnd
         }
         else -> {
             poseW = 320.dp; poseH = 644.dp
@@ -153,45 +133,29 @@ fun AmbientTank(
             poseAlpha = 1f; poseAlign = Alignment.CenterStart
         }
     }
-    val anim = spring<Float>(
-        dampingRatio = Spring.DampingRatioNoBouncy,
-        stiffness = Spring.StiffnessLow
-    )
     val tankW by animateDpAsState(
         targetValue = poseW,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
+        animationSpec = slowGlideDp,
         label = "tankW"
     )
     val tankH by animateDpAsState(
         targetValue = poseH,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
+        animationSpec = slowGlideDp,
         label = "tankH"
     )
     val tankX by animateDpAsState(
         targetValue = poseX,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
+        animationSpec = slowGlideDp,
         label = "tankX"
     )
     val tankY by animateDpAsState(
         targetValue = poseY,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
+        animationSpec = slowGlideDp,
         label = "tankY"
     )
     val tankAlpha by animateFloatAsState(
         targetValue = poseAlpha,
-        animationSpec = anim,
+        animationSpec = slowGlide,
         label = "tankAlpha"
     )
 
@@ -207,7 +171,7 @@ fun AmbientTank(
                 onDone = { viewModel.consumeGlassKick() }
             )
         }
-        // Transition covers the spring: a small dip while it travels.
+        // Transition covers the glide: a small dip while it travels.
         Box(
             modifier = Modifier
                 .graphicsLayer {

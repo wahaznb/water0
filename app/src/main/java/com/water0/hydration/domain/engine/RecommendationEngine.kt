@@ -59,7 +59,8 @@ class RecommendationEngine {
             OVER_LIMIT,
             PACING,
             GOAL_MET,
-            PERSONAL_PACE
+            PERSONAL_PACE,
+            RECENCY_GAP
         }
 
         val hasAmount: Boolean get() = suggestedAmountMl > 0
@@ -123,6 +124,61 @@ class RecommendationEngine {
     fun dayFraction(currentHour: Int, wakeUpHour: Int, sleepHour: Int): Float {
         val active = (sleepHour - wakeUpHour).coerceAtLeast(1)
         return ((currentHour - wakeUpHour + 1).coerceIn(0, active)).toFloat() / active
+    }
+
+    /**
+     * Recency-sized sip: 250ml base +75 per dry hour past the first,
+     * snapped to 50s, hard-capped at 500. The cap is the point: a long
+     * gap earns a bigger glass, never chug coaching (see OVER_LIMIT).
+     * Shared by the UI nudge and the notification so both agree.
+     */
+    fun suggestSipMl(gapHours: Float): Int {
+        val snapped = ((250f + (gapHours - 1f) * 75f) / 50f).roundToInt() * 50
+        return snapped.coerceIn(150, 500)
+    }
+
+    /**
+     * "Haven't drunk since X" nudge. Sizes by the gap (see suggestSipMl),
+     * fires only while behind the prorated pace — ahead-of-pace silence,
+     * even after a long gap. Null outside the active window and within
+     * 45min of the last drink.
+     */
+    fun recencySuggestion(
+        consumedTodayMl: Int,
+        goalMl: Int,
+        lastDrinkMs: Long?,
+        nowMs: Long,
+        wakeUpHour: Int,
+        sleepHour: Int
+    ): Recommendation? {
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = nowMs }
+        val currentHour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+        if (currentHour < wakeUpHour || currentHour >= sleepHour) return null
+        val gapH = if (lastDrinkMs == null) {
+            (currentHour - wakeUpHour + 1).coerceAtLeast(1).toFloat()
+        } else {
+            ((nowMs - lastDrinkMs) / 3600000f).coerceAtLeast(0f)
+        }
+        if (gapH < 0.75f) return null
+        val expected = goalMl * dayFraction(currentHour, wakeUpHour, sleepHour)
+        if (consumedTodayMl >= expected) return null
+        val mid = suggestSipMl(gapH)
+        val (lo, hi) = amountRange(mid)
+        val ago = if (lastDrinkMs == null) "since waking"
+        else {
+            val clock = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                .format(java.util.Date(lastDrinkMs))
+            val hours = gapH.roundToInt().coerceAtLeast(1)
+            "since $clock (~${hours}h ago)"
+        }
+        return Recommendation(
+            message = "Nothing $ago. Around ${mid}ml to get back on track?",
+            priority = Recommendation.Priority.MEDIUM,
+            suggestedAmountMl = mid,
+            reason = Recommendation.Reason.RECENCY_GAP,
+            suggestedMinMl = lo,
+            suggestedMaxMl = hi
+        )
     }
 
     fun generateRecommendations(
@@ -208,6 +264,17 @@ class RecommendationEngine {
             profile, pastWeekEntries, status.consumedMl, currentHour
         )?.let { recommendations.add(it) }
 
+        // Recency gap: nothing since X sizes the next glass (capped —
+        // a dry spell earns a bigger sip, never a chug).
+        recencySuggestion(
+            status.consumedMl,
+            status.goalMl,
+            recentEntries.firstOrNull()?.timestamp,
+            System.currentTimeMillis(),
+            profile.wakeUpHour,
+            profile.sleepHour
+        )?.let { recommendations.add(it) }
+
         // Evening wind down: only when close but NOT yet at goal.
         // Previously `percentage > 90` with no upper bound, so it kept
         // showing "small sip before bed" at 100%+ even after goal met.
@@ -236,7 +303,8 @@ class RecommendationEngine {
                     it.reason == Recommendation.Reason.PACING ||
                     it.reason == Recommendation.Reason.AFTER_EXERCISE ||
                     it.reason == Recommendation.Reason.HOT_WEATHER ||
-                    it.reason == Recommendation.Reason.PERSONAL_PACE
+                    it.reason == Recommendation.Reason.PERSONAL_PACE ||
+                    it.reason == Recommendation.Reason.RECENCY_GAP
             }
             if (dayFraction(currentHour, profile.wakeUpHour, profile.sleepHour) < 0.85f) {
                 recommendations.add(Recommendation(

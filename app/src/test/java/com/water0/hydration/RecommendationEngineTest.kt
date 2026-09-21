@@ -5,6 +5,7 @@ import com.water0.hydration.data.local.entity.UserBehavior
 import com.water0.hydration.data.local.entity.UserProfile
 import com.water0.hydration.domain.engine.RecommendationEngine
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -277,9 +278,68 @@ class RecommendationEngineTest {
         )
     }
 
+    /** Fixed clock for recency tests: today at the given hour. */
+    private fun todayAt(hour: Int): Long {
+        return java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, hour)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+
     @Test
-    fun `quiet hours stretch the interval`() {
-        // 0-24 covers every possible current hour -> always quiet.
+    fun `recency sizes by gap and snaps to 50s`() {
+        // 3 dry hours behind pace: 250 + 2*75 = 400, band 300–450ish.
+        val rec = engine.recencySuggestion(
+            consumedTodayMl = 500, goalMl = 3000,
+            lastDrinkMs = todayAt(9), nowMs = todayAt(12),
+            wakeUpHour = 7, sleepHour = 23
+        )!!
+        assertEquals(RecommendationEngine.Recommendation.Reason.RECENCY_GAP, rec.reason)
+        assertEquals(400, rec.suggestedAmountMl)
+        assertEquals(0, rec.suggestedAmountMl % 50)
+        assertTrue(rec.suggestedMinMl < rec.suggestedAmountMl)
+        assertTrue(rec.suggestedMaxMl > rec.suggestedAmountMl)
+    }
+
+    @Test
+    fun `recency caps at 500`() {
+        val rec = engine.recencySuggestion(
+            consumedTodayMl = 500, goalMl = 3000,
+            lastDrinkMs = todayAt(2), nowMs = todayAt(12),
+            wakeUpHour = 7, sleepHour = 23
+        )!!
+        assertEquals(500, rec.suggestedAmountMl)
+    }
+
+    @Test
+    fun `recency silent within 45min, ahead of pace, or off-hours`() {
+        assertNull(
+            engine.recencySuggestion(
+                500, 3000, todayAt(12) - 30 * 60_000L, todayAt(12), 7, 23
+            )
+        )
+        assertNull(
+            engine.recencySuggestion(
+                2000, 3000, todayAt(9), todayAt(12), 7, 23
+            )
+        )
+        assertNull(engine.recencySuggestion(0, 3000, null, todayAt(23), 7, 23))
+        assertNull(engine.recencySuggestion(0, 3000, todayAt(1), todayAt(5), 7, 23))
+    }
+
+    @Test
+    fun `recency with empty day counts since wake`() {
+        // Nothing logged, 10am, wake 7: 4 dry hours -> 250+3*75 = 475 -> 500.
+        val rec = engine.recencySuggestion(
+            100, 3000, null, todayAt(10), 7, 23
+        )!!
+        assertEquals(500, rec.suggestedAmountMl)
+    }
+
+    @Test
+    fun `quiet hours stretch the interval`() {        // 0-24 covers every possible current hour -> always quiet.
         val quiet = profile.copy(quietHoursStart = 0, quietHoursEnd = 24)
         val behavior = UserBehavior(averageResponseRate = 0.5f)
         val status = engine.calculateStatus(2500, 3140) // 79% -> ON_TRACK
