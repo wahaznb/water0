@@ -113,7 +113,8 @@ fun HomeScreen(
     topGutter: androidx.compose.ui.unit.Dp = 0.dp,
     // Accepting a recommendation hands its midpoint to the Update tab
     // (prefilled, unlogged) instead of logging behind your back.
-    onRecLog: (Int) -> Unit = {}
+    onRecLog: (Int) -> Unit = {},
+    bottomGutter: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
@@ -128,7 +129,8 @@ fun HomeScreen(
     HomeUiFrame(
         uiState = uiState,
         modifier = modifier,
-        onRetry = { viewModel.refresh() }
+        onRetry = { viewModel.refresh() },
+        bottomGutter = bottomGutter
     ) { state ->
         // Title lives on the floating "Water0" lens; this scrollable gutter
         // holds initial clearance, then scrolls away so content refracts
@@ -286,6 +288,9 @@ fun HomeUiFrame(
     uiState: HomeViewModel.UiState,
     modifier: Modifier = Modifier,
     onRetry: () -> Unit,
+    // Scrollable room above the floating dock: the last card scrolls clear
+    // of the lens instead of dying underneath it.
+    bottomGutter: androidx.compose.ui.unit.Dp = 0.dp,
     content: @Composable ColumnScope.(HomeViewModel.UiState.Success) -> Unit
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -300,6 +305,9 @@ fun HomeUiFrame(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     content(state)
+                    androidx.compose.foundation.layout.Spacer(
+                        modifier = Modifier.height(bottomGutter)
+                    )
                 }
             }
             HomeViewModel.UiState.Loading -> {

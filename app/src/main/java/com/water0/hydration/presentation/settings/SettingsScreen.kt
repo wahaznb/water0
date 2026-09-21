@@ -84,7 +84,10 @@ fun SettingsScreen(
     ),
     // Floating "Settings" lens clearance: scrolls away, then cards glide
     // behind the glass instead of clipping at its edge.
-    topGutter: androidx.compose.ui.unit.Dp = 0.dp
+    topGutter: androidx.compose.ui.unit.Dp = 0.dp,
+    // Room above the floating dock so the About card (and its GitHub
+    // link) scrolls clear and stays tappable.
+    bottomGutter: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     val profile by viewModel.profile.collectAsStateWithLifecycle()
 
@@ -123,6 +126,9 @@ fun SettingsScreen(
                     GlassLabSection(config = glassConfig, onChange = onGlassConfigChange)
                     DataSection(viewModel = viewModel)
                     AboutSection()
+                    androidx.compose.foundation.layout.Spacer(
+                        modifier = Modifier.height(bottomGutter)
+                    )
                 }
             }
         }

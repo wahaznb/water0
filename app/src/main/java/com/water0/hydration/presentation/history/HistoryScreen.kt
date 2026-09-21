@@ -79,7 +79,9 @@ fun HistoryScreen(
     ),
     // Floating "Logs" lens clearance: list starts below it, then scrolls
     // behind the glass instead of clipping at its edge.
-    topGutter: androidx.compose.ui.unit.Dp = 0.dp
+    topGutter: androidx.compose.ui.unit.Dp = 0.dp,
+    // Room above the floating dock so the last day card scrolls clear.
+    bottomGutter: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -122,7 +124,8 @@ fun HistoryScreen(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            top = topGutter
+                            top = topGutter,
+                            bottom = bottomGutter + 16.dp
                         )
                     ) {
                         items(state.days, key = { it.dayStartMillis }) { day ->

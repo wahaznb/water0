@@ -2,7 +2,7 @@
 
 Offline-first Android hydration tracker with a liquid-glass UI. No account, no tracking — your data never leaves the phone unless you export it yourself.
 
-## Features (v0.1.1)
+## Features (v0.2)
 - Hero tumbler tank — pours in on log, tips right and spills on delete, unmixed drink layers, foam cap, splash drops
 - Ambient mega-tank behind every tab, gliding to a pose per tab
 - 4-tab glass shell (Home / Update / Logs / Settings): floating top lenses, full-width dock with a jelly blob that trails your finger, swipe or hold-and-scrub to navigate

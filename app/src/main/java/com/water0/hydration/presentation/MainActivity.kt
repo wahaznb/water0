@@ -182,6 +182,10 @@ class MainActivity : ComponentActivity() {
                     label = "topInset"
                 )
                 val daysBack by historyViewModel.daysBack.collectAsStateWithLifecycle()
+                // Scrollable room above the floating dock: measured off the
+                // lens itself, so the last card on any tab scrolls clear
+                // instead of dying underneath it.
+                val bottomGutter = barHeightDp + 20.dp
                 // Background state comes from the shared HomeViewModel so the
                 // ONE root Aurora below matches the glass everywhere.
                 val homeUiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -264,6 +268,7 @@ class MainActivity : ComponentActivity() {
                                         viewModel = viewModel,
                                         snackbarHostState = snackbarHostState,
                                         topGutter = topInset,
+                                        bottomGutter = bottomGutter,
                                         onRecLog = { amount ->
                                             updatePrefill = amount
                                             navigate(Routes.UPDATE)
@@ -273,13 +278,15 @@ class MainActivity : ComponentActivity() {
                                         viewModel = viewModel,
                                         snackbarHostState = snackbarHostState,
                                         topGutter = topInset,
+                                        bottomGutter = bottomGutter,
                                         prefillAmount = updatePrefill,
                                         onPrefillConsumed = { updatePrefill = null }
                                     )
                                     2 -> HistoryScreen(
                                         snackbarHostState = snackbarHostState,
                                         viewModel = historyViewModel,
-                                        topGutter = topInset
+                                        topGutter = topInset,
+                                        bottomGutter = bottomGutter
                                     )
                                     else -> SettingsScreen(
                                         darkTheme = darkTheme,
@@ -292,7 +299,8 @@ class MainActivity : ComponentActivity() {
                                             glassPrefs.saveApplied(it)
                                             glassConfig = it
                                         },
-                                        topGutter = topInset
+                                        topGutter = topInset,
+                                        bottomGutter = bottomGutter
                                     )
                                 }
                                 }

@@ -47,7 +47,8 @@ fun LogScreen(
     // Midpoint handed over by a tapped recommendation: opens the custom
     // dialog prefilled, unlogged. Cleared on first open either way.
     prefillAmount: Int? = null,
-    onPrefillConsumed: () -> Unit = {}
+    onPrefillConsumed: () -> Unit = {},
+    bottomGutter: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
@@ -97,7 +98,8 @@ fun LogScreen(
     HomeUiFrame(
         uiState = uiState,
         modifier = modifier,
-        onRetry = { viewModel.refresh() }
+        onRetry = { viewModel.refresh() },
+        bottomGutter = bottomGutter
     ) { state ->
         // Scrollable clearance for the floating "Update" lens — scrolls
         // away so entries later glide behind the glass.
