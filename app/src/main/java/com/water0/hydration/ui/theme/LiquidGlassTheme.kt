@@ -142,15 +142,19 @@ fun glassCardBorder(): BorderStroke =
         )
     )
 
-// One background bubble's dice roll: spawn x, size, own lifespan (each
-// bubble rises on its own clock — no shared loop), sway, and birth time.
-// Like the glow orbs: everything re-rolls unseeded on every respawn.
+// One background bubble's dice roll: spawn x, size, own lifespan, and its
+// own motion signature — rise curve, sway rhythm, peak brightness. No two
+// bubbles share timing or shape, so the field can't read as a loop.
+// Everything re-rolls unseeded on every respawn.
 private data class BgBubble(
     val xFrac: Float,
     val sizeDp: Float,
     val lifeMs: Long,
     val swayDp: Float,
     val phase: Float,
+    val risePow: Float,
+    val swayCycles: Float,
+    val alphaPeak: Float,
     val birthUptimeMs: Long
 )
 
@@ -229,19 +233,22 @@ fun AuroraBackground(
     val bubbles = remember(bgSeed) {
         val rng = kotlin.random.Random(bgSeed)
         val now = android.os.SystemClock.uptimeMillis()
-        // Big, slow, and plenty: large blue risers, each on its own
-        // 20–45s risetime (way slower than the tumbler's fizz), births
-        // staggered so the field opens mid-story.
+        // Independent risers, each with its own 20–45s life, rise curve,
+        // sway rhythm, and brightness. Births staggered so the field opens
+        // mid-story.
         androidx.compose.runtime.mutableStateListOf<BgBubble>().apply {
-            repeat(36) {
+            repeat(24) {
                 val life = 20_000L + rng.nextLong(25_000L)
                 add(
                     BgBubble(
                         xFrac = rng.nextFloat(),
-                        sizeDp = 9f + rng.nextFloat() * 16.2f,
+                        sizeDp = 7f + rng.nextFloat() * 11f,
                         lifeMs = life,
                         swayDp = 6f + rng.nextFloat() * 14f,
                         phase = rng.nextFloat(),
+                        risePow = 0.7f + rng.nextFloat() * 0.6f,
+                        swayCycles = 0.5f + rng.nextFloat() * 1.0f,
+                        alphaPeak = 0.5f + rng.nextFloat() * 0.5f,
                         birthUptimeMs = now - rng.nextLong(life)
                     )
                 )
@@ -296,10 +303,13 @@ fun AuroraBackground(
                     val life = 20_000L + (rng.nextFloat() * 25_000L).toLong()
                     bubbles[i] = BgBubble(
                         xFrac = rng.nextFloat(),
-                        sizeDp = 9f + rng.nextFloat() * 16.2f,
+                        sizeDp = 7f + rng.nextFloat() * 11f,
                         lifeMs = life,
                         swayDp = 6f + rng.nextFloat() * 14f,
                         phase = rng.nextFloat(),
+                        risePow = 0.7f + rng.nextFloat() * 0.6f,
+                        swayCycles = 0.5f + rng.nextFloat() * 1.0f,
+                        alphaPeak = 0.5f + rng.nextFloat() * 0.5f,
                         birthUptimeMs = now
                     )
                 }
@@ -349,26 +359,25 @@ fun AuroraBackground(
                 size = size
             )
         }
-        // Rising bubbles: each on its own risetime — born at a random x
-        // at the bottom, swaying up on its own clock, fading out at the
-        // surface, respawned somewhere new. Individual lives, like the
-        // glow orbs; no shared loop anywhere.
+        // Rising bubbles: independent lives — each spawned at a random x,
+        // rising on its own curve and rhythm, fading on its own brightness.
+        // No shared loop, no synchronized births anywhere.
         val bubbleNow = android.os.SystemClock.uptimeMillis()
-        val visibleBubbles = (24 + energy * 12).toInt()
+        val visibleBubbles = (14 + energy * 8).toInt()
         for (b in bubbles.take(visibleBubbles)) {
             val progress = ((bubbleNow - b.birthUptimeMs).toFloat() / b.lifeMs)
                 .coerceIn(0f, 1f)
             if (progress >= 1f) continue // surfaced, awaiting respawn
             val fade = kotlin.math.sin(progress * kotlin.math.PI).toFloat()
             val x = b.xFrac * w +
-                kotlin.math.sin(progress * 6.28f + b.phase * 6.28f).toFloat() *
+                kotlin.math.sin(progress * 6.28f * b.swayCycles + b.phase * 6.28f).toFloat() *
                 b.swayDp.dp.toPx()
-            val y = h * 1.05f - progress * h * 1.1f
+            val y = h * 1.05f - Math.pow(progress.toDouble(), b.risePow.toDouble()).toFloat() * h * 1.1f
             drawCircle(
                 // Dark: bright blue risers on black. Light: dark blue dots
-                // on white.
-                color = if (dark) primary.copy(alpha = (0.065f + energy * 0.065f) * fade)
-                else primary.copy(alpha = (0.14f + energy * 0.12f) * fade),
+                // on white. Each bubble peaks at its own brightness.
+                color = if (dark) primary.copy(alpha = (0.065f + energy * 0.065f) * fade * b.alphaPeak)
+                else primary.copy(alpha = (0.14f + energy * 0.12f) * fade * b.alphaPeak),
                 b.sizeDp.dp.toPx() * 0.5f,
                 androidx.compose.ui.geometry.Offset(x, y)
             )

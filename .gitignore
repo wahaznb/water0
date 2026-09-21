@@ -18,6 +18,8 @@ Thumbs.db
 
 # Android
 *.apk
+# ...except the curated release packages in release/
+!/release/**/*.apk
 *.ap_
 *.aab
 *.dex

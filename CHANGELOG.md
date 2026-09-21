@@ -91,6 +91,8 @@ All notable changes to Water0 are documented here. Format follows
   plain list again; range pill jellies like the dock;
   bubbles ×1.8 size/brightness, up to 36; dock glide + page slide slowed
 - Stats panel quips: rotating playful lines per status, sometimes >.<
+- Bubbles fully independent (own rise curve, sway rhythm, peak glow;
+  24 max, 7–18dp), sips dotted >.< faces
 - Bubbles go lifespan-driven like the glows (own 20–45s risetime each,
   respawned at random x — no shared loop); sips capped so the panel
   stays balanced; info zone reordered (recs up, stats down, one shared
