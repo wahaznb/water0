@@ -1,16 +1,18 @@
 # Water0 - Hydration Tracker
 
-Open-source Android app for tracking hydration with personalized recommendations.
+Offline-first Android hydration tracker with a liquid-glass UI. No account, no tracking — your data never leaves the phone unless you export it yourself.
 
-## Features (v1.0)
-- Log water intake with quick-add buttons (water, coffee, tea, juice, soda, alcohol, other)
-- Daily progress ring with personalized goal (weight × activity × climate)
-- Smart recommendations (morning nudge, catch-up, caffeine offset, hot weather, streaks)
-- History with per-day totals, 7/14/30-day ranges, and delete
-- Settings: profile, goal breakdown, reminders, quiet hours, units
-- Adaptive reminder notifications (WorkManager, intervals adapt to progress and responsiveness)
-- Local SQLite storage (Room)
-- Offline-first, no tracking, no account
+## Features (v0.1.1)
+- Hero tumbler tank — pours in on log, tips right and spills on delete, unmixed drink layers, foam cap, splash drops
+- Ambient mega-tank behind every tab, gliding to a pose per tab
+- 4-tab glass shell (Home / Update / Logs / Settings): floating top lenses, full-width dock with a jelly blob that trails your finger, swipe or hold-and-scrub to navigate
+- Time-of-day goal judgment — chugging the whole day at 1am warns instead of celebrating
+- Range recommendations ("drink around 500 ml"); tapping one opens Update with the amount prefilled
+- Backdated logging (Now / 1h ago / 3h ago / pick a time) + quick-add drops sized by amount + custom ml
+- Logs with per-day cards and a sliding glass 7d/14d/30d switch; working delete everywhere
+- Settings: typed weight entry, goal breakdown, opt-in reminders (permission asked only when enabling), Glass Lab (blur/tint/bevel, live), training-data export
+- Pitch-black dark mode and white light mode, each with its own living background (lifespan glow orbs + rising bubbles that spawn, drift, and die — nothing loops)
+- TV Girl tinted lenses (blue top bar, pink dock), `>.<` launcher icon and stats quips
 
 ## Tech Stack
 - Kotlin, Jetpack Compose, Material3

@@ -56,6 +56,7 @@ keystore.properties
 
 # Local-only learning notes (never push)
 learning-guide/
+session-*.md
 
 # Phone screenshots shared for review (never push; wildcard because
 # the folder name contains characters that don't survive literally)

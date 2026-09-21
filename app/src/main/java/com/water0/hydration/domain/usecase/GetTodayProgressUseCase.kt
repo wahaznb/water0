@@ -38,8 +38,16 @@ class GetTodayProgressUseCase(
                 profile, entries, behavior, pastWeek ->
             val goal = recommendationEngine.calculateDailyGoal(profile).totalMl
             val totalEffective = entries.sumOf { it.effectiveHydrationMl }
-            val status = recommendationEngine.calculateStatus(totalEffective, goal)
+            // Time-aware judgment: the same total at 1am vs 9pm means very
+            // different things (chug vs finish).
             val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+            val status = recommendationEngine.calculateStatus(
+                totalEffective,
+                goal,
+                currentHour = currentHour,
+                wakeUpHour = profile.wakeUpHour,
+                sleepHour = profile.sleepHour
+            )
             val recommendations = recommendationEngine.generateRecommendations(
                 profile, behavior, status, entries, currentHour, pastWeek
             )

@@ -2,10 +2,10 @@ package com.water0.hydration.presentation.navigation
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,10 +26,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +52,7 @@ import com.water0.hydration.ui.theme.GlassConfig
 import com.water0.hydration.ui.theme.liquidglass.GlassBoxScope
 import com.water0.hydration.ui.theme.liquidglass.LiquidGlassBox
 import com.water0.hydration.ui.theme.liquidglass.toLiquidParams
+import kotlin.math.roundToInt
 
 object Routes {
     const val HOME = "home"
@@ -92,11 +90,10 @@ private val TABS = listOf(
     Tab(Routes.SETTINGS, "Settings", Icons.Filled.Settings)
 )
 
-// Floating liquid-glass tab bar — deliberately NOT a footer panel: no
-// surrounding chrome, just the lens itself with slim margins. Real
-// backdrop lens on API 33+ (ported Mortd3kay technique), gradient
-// fallback below. Hold-and-scrub with magnification + haptics; the
-// active tab wears a blue-tinted glass badge instead of a dot.
+// Floating neutral liquid-glass tab bar — full-width dock, no tap
+// animation. Real backdrop lens on API 33+ (ported Mortd3kay technique),
+// gradient fallback below. Hold-and-scrub with haptics; one morphing blob
+// glides with the finger and settles on the active tab.
 @Composable
 fun GlassBoxScope.GlassBottomBar(
     selected: String,
@@ -106,55 +103,68 @@ fun GlassBoxScope.GlassBottomBar(
     modifier: Modifier = Modifier
 ) {
     val selectedIndex = TABS.indexOfFirst { it.route == selected }.coerceAtLeast(0)
-    // iPhone-style hold-and-scrub: long-press magnifies nearby tabs with
-    // haptic ticks, the highlight previews under the finger, release commits.
+    // Hold-and-scrub: long-press + drag previews under the finger with
+    // haptic ticks, release commits. No tap/magnify animation — icons stay
+    // put; only the blob glides.
     var dragIndex by remember { mutableStateOf<Int?>(null) }
     var fingerX by remember { mutableStateOf<Float?>(null) }
     val activeIndex = dragIndex ?: selectedIndex
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
-    // Full-width dock: tabs share the measured row width equally, so
-    // centers come from measurement — never from hard-coded widths.
+    // Full-width dock: tabs share the measured CONTENT width equally. The
+    // Row's 8dp side padding is part of its measured width, so centers
+    // subtract it first — forgetting this sat edge tabs (Home/Settings)
+    // a few dp off-center.
     var rowWidthPx by remember { mutableStateOf<Float?>(null) }
-    fun tabCenterPx(i: Int): Float {
-        val w = rowWidthPx ?: return with(density) {
-            (12.dp + (72.dp + 4.dp) * i + 72.dp / 2).toPx()
-        }
-        return w * (i + 0.5f) / TABS.size
-    }
-    fun indexAt(xPx: Float): Int {
-        val w = rowWidthPx ?: return with(density) {
-            val step = (72.dp + 4.dp).toPx()
-            (((xPx - 12.dp.toPx()) / step).toInt()).coerceIn(0, TABS.size - 1)
-        }
-        return ((xPx / w) * TABS.size).toInt().coerceIn(0, TABS.size - 1)
-    }
+    val rowPadPx = with(density) { 8.dp.toPx() }
+    fun contentWidthPx(): Float = (rowWidthPx ?: with(density) { 324.dp.toPx() }) - rowPadPx * 2
+    fun tabCenterPx(i: Int): Float =
+        rowPadPx + contentWidthPx() * (i + 0.5f) / TABS.size
+    fun indexAt(xPx: Float): Int =
+        (((xPx - rowPadPx) / contentWidthPx()) * TABS.size).toInt()
+            .coerceIn(0, TABS.size - 1)
 
-    val surface = MaterialTheme.colorScheme.surface
-    val params = remember(config, surface) { config.toLiquidParams(surface) }
-    // ONE floating glass bubble (56dp) that glides with the finger and
-    // settles on the selected tab — never pops. While held it tracks
-    // fingerX through a liquid spring (trails slightly); at rest it springs
-    // to the selected tab center. Y stays layout-centered (CenterStart), so
-    // only X is math — no vertical drift possible.
+    // TV Girl pink dock: hot pink #EE2689 from the Who Really Cares
+    // palette, at the Glass Lab tint strength.
+    val params = remember(config) { config.toLiquidParams(Color(0xFFEE2689)) }
+    // ONE floating blob (56dp) that glides with the finger and settles on
+    // the selected tab — never pops. While held it tracks fingerX through
+    // a liquid spring (trails slightly); at rest it springs to the tab
+    // center. Y stays layout-centered (CenterStart), so only X is math.
+    val dragging = fingerX != null
     val bubbleR = 28.dp
     val bubbleCenterDp: Dp = with(density) {
-        val wPx = rowWidthPx
+        val wPx = rowWidthPx ?: 324.dp.toPx()
         val rawPx = fingerX ?: tabCenterPx(selectedIndex)
-        if (wPx == null || wPx <= 0f) {
-            (rawPx.coerceIn(28.dp.toPx(), 324.dp.toPx() - 28.dp.toPx())).toDp()
-        } else {
-            (rawPx.coerceIn(bubbleR.toPx(), wPx - bubbleR.toPx())).toDp()
-        }
+        (rawPx.coerceIn(bubbleR.toPx(), wPx - bubbleR.toPx())).toDp()
     }
     val bubbleX by animateDpAsState(
         targetValue = bubbleCenterDp - bubbleR,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessLow
+            stiffness = 120f
         ),
         label = "bubble"
     )
+    // Jelly blob: a calm circle at rest, a squishing dot while the finger
+    // moves. Each corner gets its own radius on its own phase, so the four
+    // never agree — always an asymmetric blob, never a rounded rectangle.
+    // Squash and stretch run opposite phases (volume-preserving jelly).
+    val fxForShape = fingerX ?: 0f
+    fun wob(divDp: Float, phase: Float): Float =
+        kotlin.math.sin(fxForShape / with(density) { divDp.dp.toPx() } + phase).toFloat()
+    fun blobCorner(divDp: Float, phase: Float): Int {
+        if (!dragging) return 50
+        return (50 + 18 * wob(divDp, phase)).roundToInt().coerceIn(28, 72)
+    }
+    val cTL = blobCorner(37f, 0f)
+    val cTR = blobCorner(29f, 1.3f)
+    val cBR = blobCorner(43f, 2.1f)
+    val cBL = blobCorner(31f, 4.0f)
+    val blobShape = RoundedCornerShape(cTL, cTR, cBR, cBL)
+    val squish = if (!dragging) 0f else wob(53f, 0f)
+    val blobScaleX = 1f + 0.10f * squish
+    val blobScaleY = 1f - 0.10f * squish
 
     // Full-width floating dock: spans the screen with slim side margins,
     // content flows beneath it. Height is hoisted for the toast lift.
@@ -178,17 +188,22 @@ fun GlassBoxScope.GlassBottomBar(
             Box(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Floating bubble, drawn first so icons sit on top of it.
-                // X glides with the finger; Y is layout-centered.
+                // Floating blob, drawn first so icons sit on top of it.
+                // X glides with the finger; Y is layout-centered; shape
+                // wobbles while scrubbing, circle at rest.
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
                         .offset(x = bubbleX)
+                        .graphicsLayer {
+                            scaleX = blobScaleX
+                            scaleY = blobScaleY
+                        }
                         .size(bubbleR * 2)
-                        .clip(CircleShape)
+                        .clip(blobShape)
                         .background(
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-                            CircleShape
+                            blobShape
                         )
                         .border(
                             1.dp,
@@ -199,7 +214,7 @@ fun GlassBoxScope.GlassBottomBar(
                                     MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
                                 )
                             ),
-                            CircleShape
+                            blobShape
                         )
                 )
                 Row(
@@ -241,35 +256,15 @@ fun GlassBoxScope.GlassBottomBar(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TABS.forEachIndexed { index, tab ->
-                        // Dock magnification: tabs swell near the finger with
-                        // a gaussian falloff, each springing toward its
-                        // target. Centers come from the measured row width.
-                        val center = tabCenterPx(index)
-                        val fx = fingerX
-                        val target = if (fx == null) 1f
-                        else with(density) {
-                            val wPx = rowWidthPx ?: 76.dp.toPx() * 4
-                            val d = (center - fx) / ((wPx / 4) * 0.9f)
-                            1f + 0.45f * kotlin.math.exp(-d * d).toFloat()
-                        }
-                        val magnify by animateFloatAsState(
-                            targetValue = target,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            ),
-                            label = "magnify$index"
-                        )
                         GlassTab(
                             selected = index == activeIndex,
                             onClick = { onSelect(tab.route) },
-                            iconScale = magnify,
                             modifier = Modifier.weight(1f),
                             icon = {
                                 Icon(
                                     tab.icon,
                                     contentDescription = tab.label,
-                                    modifier = Modifier.size(30.dp)
+                                    modifier = Modifier.size(34.dp)
                                 )
                             }
                         )
@@ -284,7 +279,6 @@ fun GlassBoxScope.GlassBottomBar(
 private fun GlassTab(
     selected: Boolean,
     onClick: () -> Unit,
-    iconScale: Float = 1f,
     modifier: Modifier = Modifier,
     icon: @Composable () -> Unit
 ) {
@@ -292,24 +286,24 @@ private fun GlassTab(
     else MaterialTheme.colorScheme.onSurfaceVariant
     // Full-width dock: each tab takes an equal share (weight comes from
     // the Row scope caller). Icon-only: the label lives in
-    // contentDescription for talkback. The ONE floating bubble (above) is
-    // the selection — tabs just tint.
-    TextButton(
-        onClick = onClick,
-        modifier = modifier
+    // contentDescription for talkback. No tap animation — no magnify, no
+    // ripple; the floating blob is the only motion. Tabs just tint.
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier.clickable(
+            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+            indication = null,
+            role = androidx.compose.ui.semantics.Role.Button,
+            onClick = onClick
+        )
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .graphicsLayer {
-                    scaleX = iconScale
-                    scaleY = iconScale
-                }
-                .size(60.dp)
+            modifier = Modifier.size(60.dp)
         ) {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.size(34.dp)
+                modifier = Modifier.size(38.dp)
             ) {
                 androidx.compose.runtime.CompositionLocalProvider(
                     androidx.compose.material3.LocalContentColor provides color
@@ -323,62 +317,152 @@ private fun GlassTab(
 
 
 /**
- * Lens title plate for non-Home tabs, with an optional options row
- * (used by Logs for the 7/14/30-day range). A real backdrop lens like
- * the dock. Call from glassContent; the caller measures it for the
- * content top inset.
+ * Floating lens title plate for every tab, with an optional options slot
+ * (used by Logs for the 7/14/30-day range, sitting beside the title). A
+ * real backdrop lens like the dock. Call from glassContent; the caller
+ * measures it for the content top gutter.
  */
 @Composable
 fun GlassBoxScope.LensPlate(
     title: String,
     config: GlassConfig,
     modifier: Modifier = Modifier,
+    // Home only: big centered brand title. Other tabs stay left-aligned.
+    centeredTitle: Boolean = false,
     options: (@Composable RowScope.() -> Unit)? = null
 ) {
-    // Blue-tinted lens: primary hue at the Glass Lab tint strength.
-    val primary = MaterialTheme.colorScheme.primary
-    val params = remember(config, primary) { config.toLiquidParams(primary) }
+    // TV Girl blue top lens: vivid blue #0351A3 from the Who Really Cares
+    // palette, at the Glass Lab tint strength.
+    val params = remember(config) {
+        config.toLiquidParams(Color(0xFF0351A3))
+    }
+    // Title: TV Girl blue in dark, pure black in light.
+    val lensBg = MaterialTheme.colorScheme.background
+    val lensDark = 0.2126f * lensBg.red + 0.7152f * lensBg.green +
+        0.0722f * lensBg.blue < 0.5f
+    val titleColor = if (lensDark) Color(0xFF0351A3) else Color.Black
     this@LensPlate.LiquidGlassBox(
         modifier = modifier.fillMaxWidth(),
         params = params,
         shape = RoundedCornerShape(20.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(if (options == null) 0.dp else 8.dp)
-        ) {
+        if (options == null) {
             Text(
                 text = title,
-                fontSize = 20.sp,
+                fontSize = if (centeredTitle) 26.sp else 20.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = titleColor,
+                textAlign = if (centeredTitle) androidx.compose.ui.text.style.TextAlign.Center
+                else androidx.compose.ui.text.style.TextAlign.Start,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
             )
-            options?.let { slot ->
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = titleColor
+                )
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    slot()
+                    options()
                 }
             }
         }
     }
 }
 
-/** Compact range chip for plate option rows. */
+/** Segmented glass range switch for the Logs plate: one frosted track
+ * with the options as fixed-width segments and a mini liquid-glass pill
+ * gliding to the selected one — the dock's language, shrunk into the top
+ * bar. Segments are fixed dp (never measured): measuring collapsed to 0
+ * and the whole bar vanished. */
 @Composable
-fun RowScope.PlateOption(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
+fun PlateRangeBar(
+    options: List<Int>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    if (selected) {
-        androidx.compose.material3.Button(onClick = {}) {
-            Text(text = label)
-        }
-    } else {
-        OutlinedButton(onClick = onClick) {
-            Text(text = label)
+    val primary = MaterialTheme.colorScheme.primary
+    val segWdp = 60.dp
+    val index = options.indexOf(selected).coerceAtLeast(0)
+    val pillX by animateDpAsState(
+        targetValue = 4.dp + segWdp * index,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = 140f
+        ),
+        label = "rangePill"
+    )
+    // Jelly like the dock blob: per-index corner presets on a bouncy
+    // spring, stretched along travel while gliding.
+    val cornerSets = listOf(
+        intArrayOf(46, 54, 52, 48),
+        intArrayOf(54, 46, 48, 52),
+        intArrayOf(48, 52, 46, 54)
+    )
+    val set = cornerSets[index % cornerSets.size]
+    val jelly = spring<Int>(
+        dampingRatio = Spring.DampingRatioMediumBouncy,
+        stiffness = Spring.StiffnessMedium
+    )
+    val pTL by androidx.compose.animation.core.animateIntAsState(set[0], jelly, label = "pTL")
+    val pTR by androidx.compose.animation.core.animateIntAsState(set[1], jelly, label = "pTR")
+    val pBR by androidx.compose.animation.core.animateIntAsState(set[2], jelly, label = "pBR")
+    val pBL by androidx.compose.animation.core.animateIntAsState(set[3], jelly, label = "pBL")
+    val pillShape = RoundedCornerShape(pTL, pTR, pBR, pBL)
+    // Stretch while traveling: exactly 1.0 at rest.
+    val traveling = pillX != 4.dp + segWdp * index
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(primary.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
+            .border(1.dp, primary.copy(alpha = 0.30f), RoundedCornerShape(14.dp))
+            .padding(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .offset(x = pillX)
+                .graphicsLayer {
+                    scaleX = if (traveling) 1.12f else 1f
+                    scaleY = if (traveling) 0.92f else 1f
+                }
+                .size(width = segWdp, height = 30.dp)
+                .clip(pillShape)
+                .background(primary.copy(alpha = 0.35f), pillShape)
+                .border(1.dp, primary.copy(alpha = 0.60f), pillShape)
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            options.forEach { option ->
+                val isSel = option == selected
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(width = segWdp, height = 30.dp)
+                        .clickable { onSelect(option) }
+                ) {
+                    Text(
+                        text = "${option}d",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isSel) Color.White
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }

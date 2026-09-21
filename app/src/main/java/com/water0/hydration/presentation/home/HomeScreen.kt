@@ -28,6 +28,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +49,56 @@ import com.water0.hydration.domain.engine.RecommendationEngine
 import com.water0.hydration.ui.theme.Glass
 import com.water0.hydration.presentation.home.components.RecommendationCard
 import kotlinx.coroutines.launch
+import kotlin.math.sqrt
+
+// Info-zone card silhouette: ONLY the left edge slants, at the same lean
+// as the tumbler's tapered wall beside the cards (top wider than base ≈
+// 2°). No whole-card rotation — the card itself carries the angle.
+internal const val CardSlantFrac = 0.035f
+class SlantedCardShape(
+    private val slantFrac: Float = CardSlantFrac,
+    private val corner: androidx.compose.ui.unit.Dp = 12.dp
+) : androidx.compose.ui.graphics.Shape {
+    override fun createOutline(
+        size: androidx.compose.ui.geometry.Size,
+        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+        density: androidx.compose.ui.unit.Density
+    ): androidx.compose.ui.graphics.Outline {
+        val w = size.width
+        val h = size.height
+        // Top-left sits further right than bottom-left, paralleling the
+        // tank's right wall (top wider than base).
+        val s = h * slantFrac
+        val r = with(density) { corner.toPx() }.coerceAtMost(minOf(w / 4f, h / 4f))
+        // Unit vector up the slanted left edge (bottom-left -> top-left).
+        val edgeLen = sqrt(s * s + h * h)
+        val ux = s / edgeLen
+        val uy = -h / edgeLen
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(s + r, 0f)
+            lineTo(w - r, 0f)
+            quadraticBezierTo(w, 0f, w, r)
+            lineTo(w, h - r)
+            quadraticBezierTo(w, h, w - r, h)
+            lineTo(r, h)
+            quadraticBezierTo(0f, h, ux * r, h + uy * r)
+            lineTo(s - ux * r, -uy * r)
+            quadraticBezierTo(s, 0f, s + r, 0f)
+            close()
+        }
+        return androidx.compose.ui.graphics.Outline.Generic(path)
+    }
+}
+
+// Home frosted panels: dark keeps the exact 0.42 surface; light gets the
+// same slight black tint as the shared glass cards.
+@Composable
+private fun homePanelContainer(): Color {
+    val bg = MaterialTheme.colorScheme.background
+    val dark = 0.2126f * bg.red + 0.7152f * bg.green + 0.0722f * bg.blue < 0.5f
+    return if (dark) MaterialTheme.colorScheme.surface.copy(alpha = 0.42f)
+    else Color(0xFFECECEC).copy(alpha = 0.62f)
+}
 
 // Content-only: the single Scaffold (top bar, glass bottom bar, snackbar
 // host) lives in MainActivity. The host is passed in so toasts render in
@@ -59,17 +110,13 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     // Scrollable clearance for the floating top lens ("Water0" plate).
     // Scrolls away so content later glides behind the glass.
-    topGutter: androidx.compose.ui.unit.Dp = 0.dp
+    topGutter: androidx.compose.ui.unit.Dp = 0.dp,
+    // Accepting a recommendation hands its midpoint to the Update tab
+    // (prefilled, unlogged) instead of logging behind your back.
+    onRecLog: (Int) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
-
-    fun notify(message: String) {
-        scope.launch {
-            snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short)
-        }
-    }
 
     LaunchedEffect(notice) {
         notice?.let {
@@ -94,6 +141,9 @@ fun HomeScreen(
         // whole shell (see AmbientTank) so it never fights content.
         // Left ~40% stays empty for the cropped tank; the frosted panel
         // keeps text readable over it.
+        // Order in the info zone: recommendations up top, stats panel
+        // below — every card shares the same left edge, so each sits the
+        // same distance from the tumbler wall.
         androidx.compose.foundation.layout.Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -118,59 +168,19 @@ fun HomeScreen(
                     )
             )
             Column(
-                modifier = Modifier
-                    .weight(1.3f)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.42f),
-                        RoundedCornerShape(20.dp)
-                    )
-                    .border(
-                        1.dp,
-                        Brush.verticalGradient(
-                            listOf(
-                                Color.White.copy(alpha = 0.16f),
-                                MaterialTheme.colorScheme.outline.copy(
-                                    alpha = Glass.BORDER_ALPHA
-                                )
-                            )
-                        ),
-                        RoundedCornerShape(20.dp)
-                    )
-                    .padding(14.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.weight(1.3f),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                GreetingBox()
-                Text(
-                    text = "${state.percentage}%",
-                    fontSize = 40.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "${state.totalEffectiveMl} / ${state.goalMl} ml",
-                    fontSize = 15.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = if (state.remainingMl > 0) "${state.remainingMl} ml to go"
-                    else "Goal reached",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "${state.entries.size} logs today",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                RecommendationsSection(
+                    recommendations = state.recommendations,
+                    onAction = { amount -> onRecLog(amount) }
                 )
             }
         }
 
-        // Status pill ("Ahead of goal" / "Behind goal" …) + recommendations
-        // live in the RIGHT info zone, never under the tank. Same
-        // 0.7 / 2dp / 1.3 split as the stats row above, so their left
-        // edges line up exactly with the percentage panel.
+        // Status pill + stats panel below, same 0.7 / 2dp / 1.3 split so
+        // their left edges line up exactly with the recommendations above.
         androidx.compose.foundation.layout.Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -190,13 +200,33 @@ fun HomeScreen(
             ) {
                 StatusIndicator(status = state.status)
 
-                RecommendationsSection(
-                    recommendations = state.recommendations,
-                    onAction = { amount ->
-                        viewModel.quickAdd(amount)
-                        notify("Added $amount ml")
-                    }
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(SlantedCardShape())
+                        .background(
+                            homePanelContainer(),
+                            SlantedCardShape()
+                        )
+                        .border(
+                            1.dp,
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.White.copy(alpha = 0.16f),
+                                    MaterialTheme.colorScheme.outline.copy(
+                                        alpha = Glass.BORDER_ALPHA
+                                    )
+                                )
+                            ),
+                            SlantedCardShape()
+                        )
+                        .padding(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    GreetingBox()
+                    StatsPages(state = state)
+                }
             }
         }
     }
@@ -362,11 +392,11 @@ fun StatusIndicator(status: RecommendationEngine.HydrationStatus.Status) {
         modifier = Modifier
             .fillMaxWidth()
             .height(36.dp)
-            .background(color.copy(alpha = 0.14f), RoundedCornerShape(10.dp))
+            .background(color.copy(alpha = 0.14f), SlantedCardShape())
             .border(
                 1.dp,
                 color.copy(alpha = 0.35f),
-                RoundedCornerShape(10.dp)
+                SlantedCardShape()
             )
             .padding(horizontal = 16.dp)
     ) {
@@ -382,15 +412,163 @@ fun StatusIndicator(status: RecommendationEngine.HydrationStatus.Status) {
     }
 }
 
+/**
+ * Percentage panel pages: swipe sideways between the headline number and
+ * the full breakdown — snap carousel with dots, same language as the
+ * recommendations below.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun ColumnScope.StatsPages(
+    state: HomeViewModel.UiState.Success
+) {
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    androidx.compose.foundation.lazy.LazyRow(
+        state = listState,
+        flingBehavior = androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(
+            lazyListState = listState
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        item {
+            Column(
+                modifier = Modifier.fillParentMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "${state.percentage}%",
+                    fontSize = 40.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "${state.totalEffectiveMl} / ${state.goalMl} ml",
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = statsQuip(state.percentage, state.status),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        item {
+            Column(
+                modifier = Modifier.fillParentMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                StatLine(
+                    label = "Drunk",
+                    value = "${state.totalEffectiveMl} ml"
+                )
+                StatLine(label = "Goal", value = "${state.goalMl} ml")
+                StatLine(
+                    label = "Left",
+                    value = if (state.remainingMl > 0) "${state.remainingMl} ml" else "—"
+                )
+                StatLine(
+                    label = "Logs",
+                    value = "${state.entries.size} today"
+                )
+            }
+        }
+        item {
+            SipsPage(entries = state.entries)
+        }
+    }
+    val page by remember {
+        androidx.compose.runtime.derivedStateOf { listState.firstVisibleItemIndex.coerceIn(0, 2) }
+    }
+    SwipeDots(count = 3, current = page)
+}
+
+@Composable
+private fun StatLine(label: String, value: String) {
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+/** One stable quip per day-ish: playful microcopy, sometimes `>.<`. */
+private fun statsQuip(
+    percentage: Int,
+    status: RecommendationEngine.HydrationStatus.Status
+): String {
+    val day = java.util.Calendar.getInstance()
+        .get(java.util.Calendar.DAY_OF_YEAR)
+    val pool = when (status) {
+        RecommendationEngine.HydrationStatus.Status.BEHIND -> listOf(
+            "sip sip >.<",
+            "glug glug, let's go",
+            "your kidneys thank you in advance",
+            ">.< small sips, big arc"
+        )
+        RecommendationEngine.HydrationStatus.Status.ON_TRACK -> listOf(
+            "steady >.<",
+            "hydration arc loading…",
+            "nice pacing",
+            "be like water >.<"
+        )
+        RecommendationEngine.HydrationStatus.Status.AHEAD -> listOf(
+            ">.< approved",
+            "juicy. very juicy.",
+            "overflow energy >.<",
+            "sip superstar"
+        )
+        RecommendationEngine.HydrationStatus.Status.OVER -> listOf(
+            "okay >.< that's enough",
+            "put the glass down gently",
+            "hydration complete-ish"
+        )
+    }
+    return pool[((day + percentage / 25) % pool.size + pool.size) % pool.size]
+}
+@Composable
+private fun SwipeDots(count: Int, current: Int) {
+    if (count < 2) return
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(count) { i ->
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 3.dp)
+                    .size(if (i == current) 7.dp else 5.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(
+                        if (i == current) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    )
+            )
+        }
+    }
+}
+
 @Composable
 fun RecommendationsSection(
     recommendations: List<RecommendationEngine.Recommendation>,
     onAction: (Int) -> Unit
 ) {
-    // Cards cascade in once on first composition; static afterwards so
-    // recomposition (every log) never replays the entrance.
-    var entered by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { entered = true }
+    // Plain vertical list — every card visible in one scroll, no swiping.
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -399,21 +577,74 @@ fun RecommendationsSection(
         if (recommendations.isEmpty()) {
             AllClearCard()
         } else {
-            recommendations.forEachIndexed { index, rec ->
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = entered,
-                    enter = androidx.compose.animation.fadeIn(
-                        animationSpec = tween(durationMillis = 300, delayMillis = index * 70)
-                    ) + androidx.compose.animation.slideInVertically(
-                        animationSpec = tween(durationMillis = 300, delayMillis = index * 70)
-                    ) { it / 3 },
-                    label = "recEnter$index"
+            recommendations.forEach { rec ->
+                RecommendationCard(
+                    recommendation = rec,
+                    onAction = onAction
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Third stats-panel page: today's drinks grouped by type — same drinks
+ * added together ("WATER · 1100ml × 3"), no chronological ordering, just
+ * the totals at a glance.
+ */
+@Composable
+private fun SipsPage(
+    entries: List<com.water0.hydration.data.local.entity.HydrationEntry>
+) {
+    // Group preserves first-seen order; totals summed per drink type.
+    val groups = entries.groupBy { it.type }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Today's sips",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (groups.isEmpty()) {
+            Text(
+                text = "Nothing yet today.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            // Capped so this page never stretches the panel past its
+            // siblings — the carousel stays balanced.
+            groups.entries.take(4).forEach { (type, sips) ->
+                val total = sips.sumOf { it.amountMl }
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    RecommendationCard(
-                        recommendation = rec,
-                        onAction = onAction
+                    Text(
+                        text = if (sips.size > 1) "${type.name.lowercase()} ×${sips.size}"
+                        else type.name.lowercase(),
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "${total}ml",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
+            }
+            if (groups.size > 4) {
+                Text(
+                    text = "+${groups.size - 4} more",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -432,10 +663,10 @@ private fun AllClearCard() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(SlantedCardShape())
             .background(
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.42f),
-                RoundedCornerShape(20.dp)
+                homePanelContainer(),
+                SlantedCardShape()
             )
             .border(
                 1.dp,
@@ -447,7 +678,7 @@ private fun AllClearCard() {
                         )
                     )
                 ),
-                RoundedCornerShape(20.dp)
+                SlantedCardShape()
             )
             .padding(horizontal = 20.dp, vertical = 18.dp)
     ) {

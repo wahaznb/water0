@@ -239,7 +239,7 @@ class RecommendationEngineTest {
         val met = engine.calculateStatus(2972, 2972)
         val recs = engine.generateRecommendations(
             profile, UserBehavior(), met, emptyList(),
-            currentHour = 14, pastWeekEntries = pastWeek(1..5)
+            currentHour = 21, pastWeekEntries = pastWeek(1..5)
         )
         assertTrue(recs.none {
             it.reason == RecommendationEngine.Recommendation.Reason.PERSONAL_PACE
@@ -247,6 +247,24 @@ class RecommendationEngineTest {
         assertTrue(recs.any {
             it.reason == RecommendationEngine.Recommendation.Reason.GOAL_MET
         })
+    }
+
+    @Test
+    fun `full day chugged early warns instead of celebrating`() {
+        // The 1am case: whole goal done before the day is out.
+        val met = engine.calculateStatus(2972, 2972)
+        for (hour in listOf(1, 14)) {
+            val recs = engine.generateRecommendations(
+                profile, UserBehavior(), met, emptyList(),
+                currentHour = hour, pastWeekEntries = pastWeek(1..5)
+            )
+            assertTrue(recs.none {
+                it.reason == RecommendationEngine.Recommendation.Reason.GOAL_MET
+            })
+            assertTrue(recs.any {
+                it.reason == RecommendationEngine.Recommendation.Reason.PACING
+            })
+        }
     }
 
     @Test

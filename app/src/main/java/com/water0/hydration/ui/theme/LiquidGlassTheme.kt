@@ -78,12 +78,12 @@ object GlassColors {
     // Omarchy ships light-mode pairings too; keep a bright water theme
     // so the app respects the system setting instead of forcing dark.
     val light = lightColorScheme(
-        background = Color(0xFFEAF3FE),
+        background = Color(0xFFFFFFFF),
         surface = Color(0xFFFFFFFF),
         surfaceVariant = Color(0xFFDCE9FA),
-        onBackground = Color(0xFF16213B),
-        onSurface = Color(0xFF16213B),
-        onSurfaceVariant = Color(0xFF4A5A7A),
+        onBackground = Color(0xFF000000),
+        onSurface = Color(0xFF000000),
+        onSurfaceVariant = Color(0xFF333333),
         primary = Color(0xFF005FCC),
         onPrimary = Color(0xFFFFFFFF),
         primaryContainer = Color(0xFFD6E7FF),
@@ -119,8 +119,14 @@ object Glass {
 }
 
 @Composable
-fun glassCardContainer(): Color =
-    MaterialTheme.colorScheme.surface.copy(alpha = Glass.CARD_ALPHA)
+fun glassCardContainer(): Color {
+    // Dark: unchanged frosted surface. Light: light grey with a small
+    // black tint so cards sit visibly on the white field.
+    val bg = MaterialTheme.colorScheme.background
+    val dark = 0.2126f * bg.red + 0.7152f * bg.green + 0.0722f * bg.blue < 0.5f
+    return if (dark) MaterialTheme.colorScheme.surface.copy(alpha = Glass.CARD_ALPHA)
+    else Color(0xFFECECEC).copy(alpha = 0.60f)
+}
 
 // Beveled rim: bright top edge fading into the hairline outline, the
 // cheap version of a lens edge. Shared by every card in the app.
@@ -136,14 +142,30 @@ fun glassCardBorder(): BorderStroke =
         )
     )
 
-// One background bubble's dice roll. Generated once per composition root
-// from a fixed seed: random layout, stable identities, no reshuffle.
+// One background bubble's dice roll: spawn x, size, own lifespan (each
+// bubble rises on its own clock — no shared loop), sway, and birth time.
+// Like the glow orbs: everything re-rolls unseeded on every respawn.
 private data class BgBubble(
     val xFrac: Float,
     val sizeDp: Float,
-    val speed: Float,
+    val lifeMs: Long,
+    val swayDp: Float,
     val phase: Float,
-    val swayDp: Float
+    val birthUptimeMs: Long
+)
+
+// One glow orb's dice roll: spawn point, drift heading + distance, size,
+// and birth time. Lifespan is fixed (10s); everything else re-rolls from
+// unseeded randomness on every respawn, so the field never repeats.
+private const val OrbLifeMs = 10_000L
+
+private data class GlowOrb(
+    val xFrac: Float,
+    val yFrac: Float,
+    val angleRad: Float,
+    val travelFrac: Float,
+    val radiusDp: Float,
+    val birthUptimeMs: Long
 )
 
 // Fixed mesh background with living water: three Canvas radial washes
@@ -161,6 +183,12 @@ fun AuroraBackground(
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
     val tertiary = MaterialTheme.colorScheme.tertiary
+    // Theme-aware field: dark stays pure black (values below are
+    // pixel-identical to before); light gets its own luminous blue field.
+    // Luminance follows the APP theme, so in-app toggling works.
+    val background = MaterialTheme.colorScheme.background
+    val dark = 0.2126f * background.red + 0.7152f * background.green +
+        0.0722f * background.blue < 0.5f
     val drift = rememberInfiniteTransition(label = "aurora")
     // Slow calm swirl (~34s); bubbles loop ~11s; blooms breathe on a 7s
     // clock — one slow breath per light, staggered so never in sync.
@@ -183,15 +211,6 @@ fun AuroraBackground(
         ),
         label = "rise"
     )
-    // Blooms breathe on a 7s clock — much slower than before per request.
-    val bloom by drift.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 7000, easing = LinearEasing)
-        ),
-        label = "bloom"
-    )
     // Bubble dice, rolled once from the per-launch seed minted in
     // Water0Application.onCreate: a fresh random sky every cold start,
     // stable across rotations, never reshuffling mid-session.
@@ -209,33 +228,147 @@ fun AuroraBackground(
     }
     val bubbles = remember(bgSeed) {
         val rng = kotlin.random.Random(bgSeed)
-        List(14) {
-            BgBubble(
-                xFrac = rng.nextFloat(),
-                sizeDp = 2f + rng.nextFloat() * 3.5f,
-                speed = 0.35f + rng.nextFloat() * 0.5f,
-                phase = rng.nextFloat(),
-                swayDp = 4f + rng.nextFloat() * 10f
-            )
+        val now = android.os.SystemClock.uptimeMillis()
+        // Big, slow, and plenty: large blue risers, each on its own
+        // 20–45s risetime (way slower than the tumbler's fizz), births
+        // staggered so the field opens mid-story.
+        androidx.compose.runtime.mutableStateListOf<BgBubble>().apply {
+            repeat(36) {
+                val life = 20_000L + rng.nextLong(25_000L)
+                add(
+                    BgBubble(
+                        xFrac = rng.nextFloat(),
+                        sizeDp = 9f + rng.nextFloat() * 16.2f,
+                        lifeMs = life,
+                        swayDp = 6f + rng.nextFloat() * 14f,
+                        phase = rng.nextFloat(),
+                        birthUptimeMs = now - rng.nextLong(life)
+                    )
+                )
+            }
+        }
+    }
+    // Lifespan orbs: three lights with staggered births so the field opens
+    // mid-story instead of flashing all at once. First lives roll from the
+    // per-launch seed; every respawn rolls unseeded randomness.
+    val orbs = remember(bgSeed) {
+        val rng = kotlin.random.Random(bgSeed)
+        val now = android.os.SystemClock.uptimeMillis()
+        androidx.compose.runtime.mutableStateListOf<GlowOrb>().apply {
+            repeat(3) { i ->
+                add(
+                    GlowOrb(
+                        xFrac = rng.nextFloat(),
+                        yFrac = rng.nextFloat(),
+                        angleRad = rng.nextFloat() * 6.28f,
+                        travelFrac = 0.10f + rng.nextFloat() * 0.10f,
+                        radiusDp = 100f + rng.nextFloat() * 160f,
+                        birthUptimeMs = now - (i * OrbLifeMs / 3 + rng.nextLong(2000L))
+                    )
+                )
+            }
+        }
+    }
+    // Reaper: once a second, respawn anything past its lifespan — glow
+    // orbs at fresh random spots, bubbles at a fresh random x. Unseeded
+    // rolls every time, so neither field ever repeats. The state-list
+    // writes recompose; per-frame motion comes from the wall clock in
+    // draw, so nothing here costs a frame.
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(1000L)
+            val now = android.os.SystemClock.uptimeMillis()
+            val rng = kotlin.random.Random.Default
+            for (i in orbs.indices) {
+                if (now - orbs[i].birthUptimeMs >= OrbLifeMs) {
+                    orbs[i] = GlowOrb(
+                        xFrac = rng.nextFloat(),
+                        yFrac = rng.nextFloat(),
+                        angleRad = rng.nextFloat() * 6.28f,
+                        travelFrac = 0.10f + rng.nextFloat() * 0.10f,
+                        radiusDp = 100f + rng.nextFloat() * 160f,
+                        birthUptimeMs = now
+                    )
+                }
+            }
+            for (i in bubbles.indices) {
+                if (now - bubbles[i].birthUptimeMs >= bubbles[i].lifeMs) {
+                    val life = 20_000L + (rng.nextFloat() * 25_000L).toLong()
+                    bubbles[i] = BgBubble(
+                        xFrac = rng.nextFloat(),
+                        sizeDp = 9f + rng.nextFloat() * 16.2f,
+                        lifeMs = life,
+                        swayDp = 6f + rng.nextFloat() * 14f,
+                        phase = rng.nextFloat(),
+                        birthUptimeMs = now
+                    )
+                }
+            }
         }
     }
     androidx.compose.foundation.Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
-        // Pure black base — no washes. The old blue/cyan/violet washes are
-        // what turned the field grey; glows now float on true black and
-        // read by contrast instead of blending into haze.
-        drawRect(color = Color.Black, size = size)
-        // Rising bubbles: few and dim so black dominates.
-        val visibleBubbles = (8 + energy * 6).toInt()
+        // Pure black base in dark; theme background in light.
+        drawRect(
+            color = if (dark) Color.Black else background,
+            size = size
+        )
+        // Each wash orbits slowly — light field only. Dark has no washes;
+        // that's what keeps it pitch black.
+        fun orbit(fx: Float, fy: Float, r: Float, phase: Float): androidx.compose.ui.geometry.Offset {
+            val ox = kotlin.math.cos(swirl + phase) * w * r
+            val oy = kotlin.math.sin(swirl + phase) * h * r
+            return androidx.compose.ui.geometry.Offset(w * fx + ox, h * fy + oy)
+        }
+        if (!dark) {
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        primary.copy(alpha = 0.10f),
+                        primary.copy(alpha = 0.06f),
+                        primary.copy(alpha = 0.02f),
+                        Color.Transparent
+                    ),
+                    center = orbit(0.12f, 0.06f, 0.05f, 0f),
+                    radius = w * 0.75f
+                ),
+                size = size
+            )
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        secondary.copy(alpha = 0.08f),
+                        secondary.copy(alpha = 0.05f),
+                        secondary.copy(alpha = 0.02f),
+                        Color.Transparent
+                    ),
+                    center = orbit(0.92f, 0.94f, 0.04f, 2.1f),
+                    radius = w * 0.70f
+                ),
+                size = size
+            )
+        }
+        // Rising bubbles: each on its own risetime — born at a random x
+        // at the bottom, swaying up on its own clock, fading out at the
+        // surface, respawned somewhere new. Individual lives, like the
+        // glow orbs; no shared loop anywhere.
+        val bubbleNow = android.os.SystemClock.uptimeMillis()
+        val visibleBubbles = (24 + energy * 12).toInt()
         for (b in bubbles.take(visibleBubbles)) {
-            val t = (rise * b.speed + b.phase) % 1f
-            val fade = kotlin.math.sin(t * kotlin.math.PI).toFloat()
+            val progress = ((bubbleNow - b.birthUptimeMs).toFloat() / b.lifeMs)
+                .coerceIn(0f, 1f)
+            if (progress >= 1f) continue // surfaced, awaiting respawn
+            val fade = kotlin.math.sin(progress * kotlin.math.PI).toFloat()
             val x = b.xFrac * w +
-                kotlin.math.sin(t * 6.28f + b.phase * 6.28f).toFloat() * b.swayDp.dp.toPx()
-            val y = h * 1.05f - t * h * 1.1f
+                kotlin.math.sin(progress * 6.28f + b.phase * 6.28f).toFloat() *
+                b.swayDp.dp.toPx()
+            val y = h * 1.05f - progress * h * 1.1f
             drawCircle(
-                primary.copy(alpha = (0.04f + energy * 0.04f) * fade),
+                // Dark: bright blue risers on black. Light: dark blue dots
+                // on white.
+                color = if (dark) primary.copy(alpha = (0.065f + energy * 0.065f) * fade)
+                else primary.copy(alpha = (0.14f + energy * 0.12f) * fade),
                 b.sizeDp.dp.toPx() * 0.5f,
                 androidx.compose.ui.geometry.Offset(x, y)
             )
@@ -247,66 +380,82 @@ fun AuroraBackground(
             val y = (((i * 67) % 100) / 100f) * h
             val twinkle = 0.5f + 0.5f * kotlin.math.sin(rise * 6.28f + seed * 6.28f).toFloat()
             drawCircle(
-                Color.White.copy(alpha = (0.020f + energy * 0.040f) * twinkle),
+                // Dark: cool white pinpoints. Light: blue pinpoints (white
+                // is invisible on a luminous field).
+                color = if (dark) Color.White.copy(alpha = (0.020f + energy * 0.040f) * twinkle)
+                else primary.copy(alpha = (0.12f + energy * 0.12f) * twinkle),
                 (1f + (i % 2)).dp.toPx() * 0.5f,
                 androidx.compose.ui.geometry.Offset(x, y)
             )
         }
-        // Deep-water blooms: THREE lights only, slow 7s breaths with a
-        // bright star burning in the middle of each. Dim halo + hot core =
-        // contrast against pure black instead of grey haze.
-        for (i in 0 until 3) {
-            val seed = ((i * 91) % 100) / 100f
-            // Same 7s period for every light, staggered phase only — slow,
-            // sparse, never pulsing in sync.
-            val glow = (bloom + seed) % 1f
-            val envelope = kotlin.math.sin(glow * 6.28f).toFloat()
+        // Lifespan glow orbs: each spawns at a random spot, drifts while it
+        // burns for exactly 10s (fade in → glow → fade out), dies, and a
+        // reaper respawns it somewhere new. Nothing loops, nothing syncs —
+        // positions, headings, and sizes re-roll every single life.
+        val now = android.os.SystemClock.uptimeMillis()
+        for (orb in orbs) {
+            val progress = ((now - orb.birthUptimeMs).toFloat() / OrbLifeMs)
+                .coerceIn(0f, 1f)
+            if (progress >= 1f) continue // dead, awaiting respawn
+            val envelope = kotlin.math.sin(progress * kotlin.math.PI).toFloat()
             val core = envelope * envelope
-            val intensity = core * (0.08f + energy * 0.06f)
-            if (intensity > 0.004f) {
-                val gx = (((i * 47) % 100) / 100f) * w
-                val gy = (((i * 83) % 100) / 100f) * h
-                val radius = (100f + (i % 5) * 40f).dp.toPx()
-                val center = androidx.compose.ui.geometry.Offset(gx, gy)
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        listOf(
-                            secondary.copy(alpha = intensity),
-                            Color.Transparent
-                        ),
-                        center = center,
-                        radius = radius
+            // Dark halo stays dim on black; light halo is deep TV Girl navy
+            // #1B2268 so the glows read dark on white.
+            val intensity = core * if (dark) (0.08f + energy * 0.06f)
+            else (0.12f + energy * 0.10f)
+            val haloColor = if (dark) secondary.copy(alpha = intensity)
+            else Color(0xFF1B2268).copy(alpha = intensity)
+            if (intensity <= 0.004f) continue
+            // Drift along the rolled heading plus a small breathing wobble,
+            // so it visibly travels while alive.
+            val dx = kotlin.math.cos(orb.angleRad) * orb.travelFrac * progress
+            val dy = kotlin.math.sin(orb.angleRad) * orb.travelFrac * progress +
+                kotlin.math.sin(progress * 6.28f + orb.angleRad).toFloat() * 0.02f
+            val gx = ((orb.xFrac + dx) * w).coerceIn(0f, w)
+            val gy = ((orb.yFrac + dy) * h).coerceIn(0f, h)
+            val radius = orb.radiusDp.dp.toPx()
+            val center = androidx.compose.ui.geometry.Offset(gx, gy)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(
+                        haloColor,
+                        Color.Transparent
                     ),
-                    radius = radius,
-                    center = center
-                )
-                // Star core: tight bright glow + hot pinpoint + 4-point
-                // sparkle, all breathing on the same envelope as its halo.
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.35f * core),
-                    radius = 7.dp.toPx(),
-                    center = center
-                )
-                drawCircle(
-                    color = Color.White.copy(alpha = (0.70f + energy * 0.25f) * core),
-                    radius = 2.2.dp.toPx(),
-                    center = center
-                )
-                val sparkLen = 9.dp.toPx() * (0.4f + 0.6f * core)
-                val sparkAlpha = 0.45f * core
-                drawLine(
-                    color = Color.White.copy(alpha = sparkAlpha),
-                    start = center - androidx.compose.ui.geometry.Offset(sparkLen, 0f),
-                    end = center + androidx.compose.ui.geometry.Offset(sparkLen, 0f),
-                    strokeWidth = 1.dp.toPx()
-                )
-                drawLine(
-                    color = Color.White.copy(alpha = sparkAlpha),
-                    start = center - androidx.compose.ui.geometry.Offset(0f, sparkLen),
-                    end = center + androidx.compose.ui.geometry.Offset(0f, sparkLen),
-                    strokeWidth = 1.dp.toPx()
-                )
-            }
+                    center = center,
+                    radius = radius
+                ),
+                radius = radius,
+                center = center
+            )
+            // Warm starlight in dark (reads through the lenses); deeper
+            // amber in light (pale yellow is invisible on luminous).
+            val starlight = if (dark) Color(0xFFFFF1BE) else Color(0xFFB26A00)
+            // Star core: tight bright glow + hot pinpoint + 4-point
+            // sparkle, all breathing on the same envelope as its halo.
+            drawCircle(
+                color = starlight.copy(alpha = 0.30f * core),
+                radius = 4.5.dp.toPx(),
+                center = center
+            )
+            drawCircle(
+                color = starlight.copy(alpha = (0.70f + energy * 0.25f) * core),
+                radius = 1.6.dp.toPx(),
+                center = center
+            )
+            val sparkLen = 6.dp.toPx() * (0.4f + 0.6f * core)
+            val sparkAlpha = 0.45f * core
+            drawLine(
+                color = starlight.copy(alpha = sparkAlpha),
+                start = center - androidx.compose.ui.geometry.Offset(sparkLen, 0f),
+                end = center + androidx.compose.ui.geometry.Offset(sparkLen, 0f),
+                strokeWidth = 0.75.dp.toPx()
+            )
+            drawLine(
+                color = starlight.copy(alpha = sparkAlpha),
+                start = center - androidx.compose.ui.geometry.Offset(0f, sparkLen),
+                end = center + androidx.compose.ui.geometry.Offset(0f, sparkLen),
+                strokeWidth = 0.75.dp.toPx()
+            )
         }
         if (hydrationTint != Color.Transparent) {
             drawRect(color = hydrationTint, size = size)
@@ -317,7 +466,7 @@ fun AuroraBackground(
             val gy = (((i * 97) % 100) / 100f) * h
             drawCircle(
                 (if (i % 2 == 0) Color.White else Color.Black).copy(
-                    alpha = if (i % 2 == 0) 0.010f else 0.03f
+                    alpha = if (i % 2 == 0) (if (dark) 0.010f else 0.020f) else 0.03f
                 ),
                 1.dp.toPx() * 0.5f,
                 androidx.compose.ui.geometry.Offset(gx, gy)

@@ -97,7 +97,11 @@ class HomeViewModel(
         }
     }
 
-    fun logWater(amountMl: Int, type: HydrationEntry.DrinkType = HydrationEntry.DrinkType.WATER) {
+    fun logWater(
+        amountMl: Int,
+        type: HydrationEntry.DrinkType = HydrationEntry.DrinkType.WATER,
+        timestampMs: Long = System.currentTimeMillis()
+    ) {
         val state = _uiState.value
         if (state is UiState.Success &&
             state.totalEffectiveMl >= RecommendationEngine.safeMaxMl(state.goalMl)
@@ -106,7 +110,7 @@ class HomeViewModel(
             return
         }
         viewModelScope.launch {
-            logHydration(amountMl, type)
+            logHydration(amountMl, type, timestampMs = timestampMs)
             _glassKick.value = GlassKick.Pour(amountMl)
         }
     }

@@ -66,16 +66,16 @@ class TumblerShape : androidx.compose.ui.graphics.Shape {
         val topInset = w * 0.055f
         val botInset = w * 0.125f
         val r = w * 0.10f
+        // Square-cut mouth: sharp top corners, tapered walls; only the
+        // base keeps its round. No rounded shoulders up top.
         val path = Path().apply {
-            moveTo(topInset + r, 0f)
-            lineTo(w - topInset - r, 0f)
-            quadraticBezierTo(w - topInset, 0f, w - topInset, r)
+            moveTo(topInset, 0f)
+            lineTo(w - topInset, 0f)
             lineTo(w - botInset, h - r)
             quadraticBezierTo(w - botInset, h, w - botInset - r, h)
             lineTo(botInset + r, h)
             quadraticBezierTo(botInset, h, botInset, h - r)
-            lineTo(topInset, r)
-            quadraticBezierTo(topInset, 0f, topInset + r, 0f)
+            lineTo(topInset, 0f)
             close()
         }
         return androidx.compose.ui.graphics.Outline.Generic(path)
@@ -264,13 +264,13 @@ fun WaterGlass(
                     )
                 }
             }
-            // Rim ellipse: the mouth of the tumbler, back edge brighter.
+            // Rim: flat sharp mouth line to match the square-cut top.
             drawOval(
                 color = Color.White.copy(alpha = 0.35f),
-                topLeft = Offset(size.width * 0.04f, -8.dp.toPx()),
-                size = Size(size.width * 0.92f, 20.dp.toPx()),
+                topLeft = Offset(size.width * 0.04f, -5.dp.toPx()),
+                size = Size(size.width * 0.92f, 10.dp.toPx()),
                 style = androidx.compose.ui.graphics.drawscope.Stroke(
-                    width = 3.dp.toPx()
+                    width = 2.dp.toPx()
                 )
             )
             // Glass highlight down the left edge.
@@ -304,10 +304,10 @@ fun WaterGlass(
 
 /**
  * Runs the pour-out keyframes once per Slosh kick and reports completion
- * so a shared kick can be consumed only when done: tip deep to the left
- * lip, hold while the spill stream runs, snap back with a spring, then
- * let the crest settle. Maximum motion by design — perf cleanup later
- * if a device ever complains.
+ * so a shared kick can be consumed only when done: tip deep to the RIGHT
+ * lip, hold while the spill stream + falling drops run, snap back with a
+ * spring, then let the crest settle. Maximum motion by design — perf
+ * cleanup later if a device ever complains.
  */
 @Composable
 fun SloshDriver(
@@ -320,9 +320,9 @@ fun SloshDriver(
         val tiltAnim = Animatable(0f)
         val sloshAnim = Animatable(0f)
         val tiltJob = launch {
-            tiltAnim.animateTo(-38f, tween(320))
+            tiltAnim.animateTo(38f, tween(320))
             kotlinx.coroutines.delay(350)
-            tiltAnim.animateTo(6f, tween(300))
+            tiltAnim.animateTo(-6f, tween(300))
             tiltAnim.animateTo(
                 0f,
                 spring(
@@ -438,19 +438,17 @@ fun WaterStage(
         ),
         label = "fall"
     )
-    val spillAlpha = maxOf(
-        ((-tiltDegrees - 10f) / 28f).coerceIn(0f, 1f),
-        // A full glass keeps gently overflowing instead of clipping
-        // silently: the excess has to go somewhere visible.
-        if (overfull) 0.35f + 0.15f * kotlin.math.sin(fall * 6.28f).toFloat() else 0f
-    )
+    // Spill runs only off the tilted lip while pouring out. An overfull
+    // glass just wears its foam cap — no overflow stream.
+    val spillAlpha = ((tiltDegrees - 10f) / 28f).coerceIn(0f, 1f)
     // Glass sits below a fall zone; both share one overlay box so the
     // droplets land exactly on the live surface.
     val fallHpx = with(density) { fallH.toPx() }
     val glassHpx = with(density) { glassHeight.toPx() }
     val glassWpx = with(density) { glassWidth.toPx() }
     val surfaceY = fallHpx + (1f - level) * glassHpx
-    val lip = Offset(glassWpx * LipXFrac, fallHpx + glassHpx * LipYFrac)
+    // Pour-out lip is the RIGHT mouth corner (tips go right).
+    val lip = Offset(glassWpx * (1f - LipXFrac), fallHpx + glassHpx * LipYFrac)
     androidx.compose.foundation.layout.Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
@@ -472,7 +470,7 @@ fun WaterStage(
                 tiltDegrees,
                 glassWpx,
                 glassHpx,
-                glassWpx * LipXFrac,
+                glassWpx * (1f - LipXFrac),
                 glassHpx * LipYFrac,
                 pivotXPx = glassWpx / 2,
                 pivotYPx = fallHpx + glassHpx
@@ -506,6 +504,16 @@ fun WaterStage(
                     modifier = Modifier.fillMaxSize(),
                     alpha = spillAlpha,
                     lip = lip
+                )
+            }
+            // Falling drops off the pouring lip, mirroring the add-side
+            // DropletPour — only while tilted deep, not on gentle overflow.
+            if (tiltDegrees > 12f) {
+                SpillDrops(
+                    modifier = Modifier.fillMaxSize(),
+                    phase = fall,
+                    lip = lip,
+                    alpha = ((tiltDegrees - 12f) / 26f).coerceIn(0f, 1f)
                 )
             }
         }
@@ -557,7 +565,7 @@ private fun DropletPour(
     }
 }
 
-/** Gravity arc out of the pinned mouth, screen space (never rotates). */
+/** Gravity arc out of the pinned RIGHT mouth, screen space (never rotates). */
 @Composable
 private fun SpillStream(
     modifier: Modifier = Modifier,
@@ -566,8 +574,8 @@ private fun SpillStream(
 ) {
     val water = MaterialTheme.colorScheme.primary
     Canvas(modifier = modifier) {
-        val end = Offset(lip.x - 52.dp.toPx(), lip.y + 88.dp.toPx())
-        val ctrl = Offset(lip.x - 30.dp.toPx(), lip.y + 44.dp.toPx())
+        val end = Offset(lip.x + 52.dp.toPx(), lip.y + 88.dp.toPx())
+        val ctrl = Offset(lip.x + 30.dp.toPx(), lip.y + 44.dp.toPx())
         val path = Path().apply {
             moveTo(lip.x, lip.y)
             quadraticBezierTo(ctrl.x, ctrl.y, end.x, end.y)
@@ -597,6 +605,41 @@ private fun SpillStream(
                 water.copy(alpha = 0.6f * alpha),
                 (2.5f + i * 0.75f).dp.toPx() * 0.5f,
                 Offset(x, y + 6.dp.toPx())
+            )
+        }
+    }
+}
+
+/**
+ * Pour-out droplets: staggered drops spill off the right lip and
+ * accelerate downward with a slight outward drift, like the add-side
+ * DropletPour mirrored. Deterministic in the loop phase — no state.
+ */
+@Composable
+private fun SpillDrops(
+    modifier: Modifier = Modifier,
+    phase: Float,
+    lip: Offset,
+    alpha: Float
+) {
+    val water = MaterialTheme.colorScheme.primary
+    Canvas(modifier = modifier) {
+        val fallPx = 110.dp.toPx()
+        for (i in 0 until 4) {
+            val t = (phase + i * 0.25f) % 1f
+            val y = lip.y + fallPx * t * t
+            val x = lip.x + 14.dp.toPx() * t +
+                sin(t * PI.toFloat() * 2 + i * 1.9f) * 4.dp.toPx()
+            val fade = (1f - t * 0.35f) * alpha
+            drawCircle(
+                water.copy(alpha = 0.85f * fade),
+                (4f + t * 2.5f).dp.toPx() * 0.5f,
+                Offset(x, y)
+            )
+            drawCircle(
+                water.copy(alpha = 0.30f * fade),
+                (4f + t * 2.5f).dp.toPx() * 0.5f,
+                Offset(x, y - 8.dp.toPx())
             )
         }
     }

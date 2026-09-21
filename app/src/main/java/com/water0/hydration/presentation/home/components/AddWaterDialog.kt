@@ -31,10 +31,17 @@ import androidx.compose.ui.unit.sp
 fun AddWaterDialog(
     onDismiss: () -> Unit,
     onConfirm: (Int) -> Unit,
-    presets: List<Int> = listOf(100, 250, 500, 750)
+    presets: List<Int> = listOf(100, 250, 500, 750),
+    // Prefilled by a tapped recommendation (its midpoint) — still fully
+    // editable before confirming.
+    initialAmount: Int = 250
 ) {
-    var amount by remember { mutableStateOf(250) }
-    var text by remember { mutableStateOf("250") }
+    var amount by remember(initialAmount) {
+        mutableStateOf(initialAmount.coerceIn(MIN_ML, MAX_ML))
+    }
+    var text by remember(initialAmount) {
+        mutableStateOf(initialAmount.coerceIn(MIN_ML, MAX_ML).toString())
+    }
 
     fun setAmount(value: Int) {
         amount = value.coerceIn(MIN_ML, MAX_ML)

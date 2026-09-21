@@ -52,7 +52,7 @@ import com.water0.hydration.presentation.home.LogScreen
 import com.water0.hydration.presentation.home.hydrationTintFor
 import com.water0.hydration.presentation.navigation.GlassBottomBar
 import com.water0.hydration.presentation.navigation.LensPlate
-import com.water0.hydration.presentation.navigation.PlateOption
+import com.water0.hydration.presentation.navigation.PlateRangeBar
 import com.water0.hydration.presentation.navigation.Routes
 import com.water0.hydration.presentation.settings.SettingsScreen
 import com.water0.hydration.ui.theme.GlassPrefs
@@ -136,6 +136,11 @@ class MainActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
                 // Keep bottom-bar selection in sync when user swipes.
                 var selected by remember { mutableStateOf(Routes.HOME) }
+                // Prefill waiting for the Update tab: a tapped recommendation
+                // hands its midpoint here, Update opens it in the custom
+                // dialog unlogged, then this clears (log or walk away — the
+                // behavior tracking notices either way).
+                var updatePrefill by remember { mutableStateOf<Int?>(null) }
                 LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
                     if (!pagerState.isScrollInProgress) {
                         selected = Routes.fromIndex(pagerState.currentPage)
@@ -144,7 +149,11 @@ class MainActivity : ComponentActivity() {
                 val navigate: (String) -> Unit = { route ->
                     selected = route
                     scope.launch {
-                        pagerState.animateScrollToPage(Routes.indexOf(route))
+                        // Slow deliberate page glide to match the dock.
+                        pagerState.animateScrollToPage(
+                            Routes.indexOf(route),
+                            animationSpec = tween(durationMillis = 450)
+                        )
                     }
                     Unit
                 }
@@ -254,12 +263,18 @@ class MainActivity : ComponentActivity() {
                                     0 -> HomeScreen(
                                         viewModel = viewModel,
                                         snackbarHostState = snackbarHostState,
-                                        topGutter = topInset
+                                        topGutter = topInset,
+                                        onRecLog = { amount ->
+                                            updatePrefill = amount
+                                            navigate(Routes.UPDATE)
+                                        }
                                     )
                                     1 -> LogScreen(
                                         viewModel = viewModel,
                                         snackbarHostState = snackbarHostState,
-                                        topGutter = topInset
+                                        topGutter = topInset,
+                                        prefillAmount = updatePrefill,
+                                        onPrefillConsumed = { updatePrefill = null }
                                     )
                                     2 -> HistoryScreen(
                                         snackbarHostState = snackbarHostState,
@@ -308,20 +323,21 @@ class MainActivity : ComponentActivity() {
                                     else -> "Settings"
                                 },
                                 config = glassConfig,
-                                modifier = Modifier.onSizeChanged {
-                                    plateHeightDp = with(density) { it.height.toDp() } + 24.dp
-                                },
-                                options = if (platePage == 2) {
-                                    {
-                                        historyViewModel.rangeOptions.forEach { option ->
-                                            PlateOption(
-                                                label = "${option}d",
-                                                selected = option == daysBack,
-                                                onClick = { historyViewModel.setDaysBack(option) }
+                                // Home only: big centered brand. Other tabs
+                                // stay left-aligned.
+                                centeredTitle = platePage == 0,
+                                    modifier = Modifier.onSizeChanged {
+                                        plateHeightDp = with(density) { it.height.toDp() } + 12.dp
+                                    },
+                                    options = if (platePage == 2) {
+                                        {
+                                            PlateRangeBar(
+                                                options = historyViewModel.rangeOptions,
+                                                selected = daysBack,
+                                                onSelect = { historyViewModel.setDaysBack(it) }
                                             )
                                         }
-                                    }
-                                } else null
+                                    } else null
                             )
                         }
                         // Directly in GlassBoxScope (no nested Box receiver).

@@ -122,12 +122,43 @@ fun AmbientTank(
     val pulseScale = 1f - 0.06f * pulseWave
 
     val state = uiState as? HomeViewModel.UiState.Success ?: return
+    // Every tab gets its own tank pose, so switching tabs visibly moves
+    // the glass: hero low-left on Home, low-right on Update, upper-left
+    // on Logs, small centered on Settings. Springs glide it there.
+    val poseW: androidx.compose.ui.unit.Dp
+    val poseH: androidx.compose.ui.unit.Dp
+    val poseX: androidx.compose.ui.unit.Dp
+    val poseY: androidx.compose.ui.unit.Dp
+    val poseAlpha: Float
+    val poseAlign: Alignment
+    when (selectedRoute) {
+        Routes.UPDATE -> {
+            poseW = 280.dp; poseH = 460.dp
+            poseX = 110.dp; poseY = 30.dp
+            poseAlpha = 0.32f; poseAlign = Alignment.CenterEnd
+        }
+        Routes.LOGS -> {
+            poseW = 280.dp; poseH = 460.dp
+            poseX = -110.dp; poseY = -30.dp
+            poseAlpha = 0.32f; poseAlign = Alignment.CenterStart
+        }
+        Routes.SETTINGS -> {
+            poseW = 260.dp; poseH = 400.dp
+            poseX = 0.dp; poseY = 0.dp
+            poseAlpha = 0.28f; poseAlign = Alignment.Center
+        }
+        else -> {
+            poseW = 320.dp; poseH = 644.dp
+            poseX = -135.dp; poseY = 64.dp
+            poseAlpha = 1f; poseAlign = Alignment.CenterStart
+        }
+    }
     val anim = spring<Float>(
         dampingRatio = Spring.DampingRatioNoBouncy,
         stiffness = Spring.StiffnessLow
     )
     val tankW by animateDpAsState(
-        targetValue = if (home) 320.dp else 300.dp,
+        targetValue = poseW,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessLow
@@ -135,33 +166,38 @@ fun AmbientTank(
         label = "tankW"
     )
     val tankH by animateDpAsState(
-        targetValue = if (home) 644.dp else 440.dp,
+        targetValue = poseH,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessLow
         ),
         label = "tankH"
     )
-    // Home: cropped further left so the right edge clears the info zone
-    // (status + recs start after the tank). Elsewhere: centered and dim,
-    // pure backdrop.
     val tankX by animateDpAsState(
-        targetValue = if (home) -135.dp else 0.dp,
+        targetValue = poseX,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessLow
         ),
         label = "tankX"
     )
+    val tankY by animateDpAsState(
+        targetValue = poseY,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "tankY"
+    )
     val tankAlpha by animateFloatAsState(
-        targetValue = if (home) 1f else 0.30f,
+        targetValue = poseAlpha,
         animationSpec = anim,
         label = "tankAlpha"
     )
 
     Box(
         modifier = modifier.fillMaxSize(),
-        contentAlignment = if (home) Alignment.CenterStart else Alignment.Center
+        contentAlignment = poseAlign
     ) {
         if (sloshRunId > 0) {
             SloshDriver(
@@ -190,7 +226,7 @@ fun AmbientTank(
                 glassHeight = tankH,
                 showCaption = false,
                 modifier = Modifier
-                    .offset(x = tankX)
+                    .offset(x = tankX, y = tankY)
                     .alpha(tankAlpha)
             )
         }

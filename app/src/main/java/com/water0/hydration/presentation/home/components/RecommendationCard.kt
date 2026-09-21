@@ -53,7 +53,7 @@ fun RecommendationCard(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = com.water0.hydration.presentation.home.SlantedCardShape(),
         colors = CardDefaults.cardColors(
             containerColor = glassCardContainer()
         ),
@@ -110,9 +110,11 @@ fun RecommendationCard(
                         lineHeight = 21.sp,
                         color = textColor
                     )
-                    if (recommendation.suggestedAmountMl > 0) {
+                    // Range, not a prescription: "450–550 ml".
+                    val range = recommendation.rangeLabel()
+                    if (range.isNotEmpty()) {
                         Text(
-                            text = "Suggested: ${recommendation.suggestedAmountMl} ml",
+                            text = "Around $range",
                             fontSize = 13.sp,
                             color = textColor.copy(alpha = 0.72f)
                         )
@@ -120,13 +122,16 @@ fun RecommendationCard(
                 }
             }
 
-            if (recommendation.suggestedAmountMl > 0) {
+            // Accepting a nudge doesn't log — it opens Update with the
+            // midpoint prefilled. Confirm or walk away; what happens next
+            // (log or nothing) feeds the behavior tracking either way.
+            if (recommendation.hasAmount) {
                 TextButton(
                     onClick = { onAction(recommendation.suggestedAmountMl) },
                     modifier = Modifier.align(Alignment.End)
                 ) {
                     Text(
-                        text = "Add ${recommendation.suggestedAmountMl} ml",
+                        text = "Add ~${recommendation.suggestedAmountMl} ml",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = textColor

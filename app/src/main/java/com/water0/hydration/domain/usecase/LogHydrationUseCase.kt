@@ -10,11 +10,14 @@ class LogHydrationUseCase(
     suspend operator fun invoke(
         amountMl: Int,
         type: HydrationEntry.DrinkType = HydrationEntry.DrinkType.WATER,
-        source: HydrationEntry.EntrySource = HydrationEntry.EntrySource.MANUAL
+        source: HydrationEntry.EntrySource = HydrationEntry.EntrySource.MANUAL,
+        // Backdated logs (user drank earlier, logs now): defaults to now so
+        // every existing call site keeps working unchanged.
+        timestampMs: Long = System.currentTimeMillis()
     ) {
         val entry = HydrationEntry(
             amountMl = amountMl,
-            timestamp = System.currentTimeMillis(),
+            timestamp = timestampMs,
             type = type,
             source = source
         )

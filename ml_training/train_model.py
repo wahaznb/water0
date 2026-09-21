@@ -13,8 +13,17 @@ Models:
   - Optional small Keras MLP -> TFLite export for on-device use
     (runs only if `tensorflow` is installed; see requirements.txt).
 
+Real-world logs are estimates: nobody measures every glass, and timestamps
+are guesses. To keep the model honest about that, training augments the
+train split with a noisy copy — Gaussian jitter on the intake volumes,
+rounded to typical guess sizes (see --noise-ml / --round-to) — and reports
+metrics on both clean and noisy test splits. If the noisy MAE blows up
+relative to clean, the model is memorizing exact numbers instead of
+learning habits.
+
 Usage:
     python train_model.py --data data/hydration_logs.csv --out-dir model
+    python train_model.py --noise-ml 0  # exact numbers only (not advised)
 """
 
 import argparse
@@ -37,6 +46,28 @@ FEATURES = [
 REG_TARGET = "total_day_ml"
 CLF_TARGET = "met_goal"
 
+# Volume features a human can only ever estimate (nobody weighs a glass).
+NOISY_VOLUME_COLS = ["prev_day_total_ml", "avg_7d_ml"]
+
+
+def add_estimation_noise(df: pd.DataFrame, seed: int,
+                         sigma_ml: float = 150.0, round_to: int = 50) -> pd.DataFrame:
+    """Simulate sloppy human logging: jitter volumes, then snap to the round
+    numbers people actually type (250, 500, …). Goal stays exact — it is
+    computed, not estimated — and met_goal is recomputed so labels stay
+    consistent with the noisy totals."""
+    rng = np.random.default_rng(seed)
+    noisy = df.copy()
+    for col in NOISY_VOLUME_COLS + [REG_TARGET]:
+        if col not in noisy.columns:
+            continue
+        jittered = noisy[col].to_numpy(dtype=float) + rng.normal(0, sigma_ml, len(noisy))
+        jittered = np.round(jittered / round_to) * round_to
+        noisy[col] = np.clip(jittered, 0, None)
+    if CLF_TARGET in noisy.columns and "goal_ml" in noisy.columns:
+        noisy[CLF_TARGET] = (noisy[REG_TARGET] >= noisy["goal_ml"]).astype(int)
+    return noisy
+
 
 def split(df: pd.DataFrame, seed: int = 42):
     if df["user_id"].nunique() < 2:
@@ -53,25 +84,34 @@ def split(df: pd.DataFrame, seed: int = 42):
     return df.iloc[train_idx], df.iloc[test_idx]
 
 
-def train_sklearn(train: pd.DataFrame, test: pd.DataFrame, out_dir: Path) -> dict:
+def train_sklearn(train: pd.DataFrame, test: pd.DataFrame,
+                  test_noisy: pd.DataFrame, out_dir: Path) -> dict:
     X_train, y_reg_train = train[FEATURES], train[REG_TARGET]
     X_test, y_reg_test = test[FEATURES], test[REG_TARGET]
+    Xn_test, yn_reg_test = test_noisy[FEATURES], test_noisy[REG_TARGET]
     y_clf_train, y_clf_test = train[CLF_TARGET], test[CLF_TARGET]
+    yn_clf_test = test_noisy[CLF_TARGET]
 
     reg = HistGradientBoostingRegressor(max_iter=300, random_state=42)
     reg.fit(X_train, y_reg_train)
     pred = reg.predict(X_test)
+    pred_noisy = reg.predict(Xn_test)
     metrics = {
         "regression_mae_ml": round(float(mean_absolute_error(y_reg_test, pred)), 1),
         "regression_r2": round(float(r2_score(y_reg_test, pred)), 3),
+        "regression_mae_ml_noisy": round(float(mean_absolute_error(yn_reg_test, pred_noisy)), 1),
     }
-    print(f"[regression] MAE={metrics['regression_mae_ml']} ml  R2={metrics['regression_r2']}")
+    print(f"[regression] MAE={metrics['regression_mae_ml']} ml  R2={metrics['regression_r2']}  "
+          f"MAE(noisy)={metrics['regression_mae_ml_noisy']} ml")
 
     clf = HistGradientBoostingClassifier(max_iter=300, random_state=42)
     clf.fit(X_train, y_clf_train)
     acc = accuracy_score(y_clf_test, clf.predict(X_test))
+    acc_noisy = accuracy_score(yn_clf_test, clf.predict(Xn_test))
     metrics["classifier_accuracy"] = round(float(acc), 3)
-    print(f"[classifier] accuracy={metrics['classifier_accuracy']}")
+    metrics["classifier_accuracy_noisy"] = round(float(acc_noisy), 3)
+    print(f"[classifier] accuracy={metrics['classifier_accuracy']}  "
+          f"accuracy(noisy)={metrics['classifier_accuracy_noisy']}")
 
     joblib.dump(reg, out_dir / "intake_regressor.joblib")
     joblib.dump(clf, out_dir / "goal_classifier.joblib")
@@ -195,6 +235,12 @@ def main() -> None:
     parser.add_argument("--data", type=str, default="data/hydration_logs.csv")
     parser.add_argument("--out-dir", type=str, default="model")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--noise-ml", type=float, default=150.0,
+                        help="std of the Gaussian jitter simulating human "
+                             "estimation error (0 disables augmentation)")
+    parser.add_argument("--round-to", type=int, default=50,
+                        help="snap noisy volumes to this ml grid, like the "
+                             "round numbers people actually log")
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -209,7 +255,19 @@ def main() -> None:
     train, test = split(df, args.seed)
     print(f"train users: {train['user_id'].nunique()}, test users: {test['user_id'].nunique()}")
 
-    metrics = train_sklearn(train, test, out_dir)
+    if args.noise_ml > 0:
+        # Clean rows + one noisy twin each: the model learns habits, not
+        # exact numbers.
+        train_noisy = add_estimation_noise(train, args.seed + 1, args.noise_ml, args.round_to)
+        train_aug = pd.concat([train, train_noisy], ignore_index=True)
+        test_noisy = add_estimation_noise(test, args.seed + 2, args.noise_ml, args.round_to)
+        print(f"noise augmentation on (sigma={args.noise_ml}ml, grid={args.round_to}ml): "
+              f"{len(train)} -> {len(train_aug)} train rows")
+    else:
+        train_aug, test_noisy = train, test
+        print("noise augmentation off")
+
+    metrics = train_sklearn(train_aug, test, test_noisy, out_dir)
     tflite_metrics = train_tflite(train, test, out_dir)
     if tflite_metrics:
         metrics.update(tflite_metrics)

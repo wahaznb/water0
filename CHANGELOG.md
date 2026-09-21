@@ -3,7 +3,7 @@
 All notable changes to Water0 are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [0.1.1] - 2026-09-19
 
 ### Added
 - Profile sex (female 31ml/kg / male 33ml/kg, narrowed from 35 on NHANES
@@ -52,6 +52,58 @@ All notable changes to Water0 are documented here. Format follows
   3 blooms with hot cores for contrast); full-width dock (measured tabs,
   30dp icons, 56dp bubble); recs back in the right info zone; floating
   top lens on every tab ("Water0" included) with scroll-under content
+- Top lens: Water0 big + centered on Home, left-aligned elsewhere; Logs
+  7d/14d/30d chips sit beside the title as glass chips; dock icons 34dp,
+  blob morphs while scrubbing, edge tabs recentered, all tap animations
+  off (no magnify, no ripple — the blob is the only motion); bloom stars
+  smaller
+- TV Girl lenses (Who Really Cares palette): top bar vivid blue #0351A3,
+  dock hot pink #EE2689; pour-out tips RIGHT with spill stream + falling
+  drops off the lip (mirrors the add-side pour); bloom stars wander on
+  slow drift and burn back in new spots, warm yellowish starlight #FFF1BE
+  that reads through the glass
+- Light mode gets its own luminous blue field (dark stays pixel-identical
+  pure black — every particle color branches on theme luminance); Home
+  info cards canted −2° to echo the tumbler's tapered wall
+- Plate titles TV Girl blue #0351A3 in dark, black in light; light theme
+  goes white background + black text; light glows run dark (navy #1B2268
+  halos, deeper-blue particles); all cards carry a slight black tint in
+  light (dark untouched); tumbler mouth square-cut with a flat rim
+- Card blur reverted (Haze removed entirely): home/logs/settings cards
+  back to plain translucent tints; Home info cards keep the −2° cant but
+  pivot on their left edge now
+- Home cards carry the angle in their silhouette now (no rotation): only
+  the left edge slants at the tumbler's ~2° wall lean; dock blob is true
+  jelly — four corners on four phases plus volume-preserving squash,
+  never a rounded rectangle
+- Panel sits tighter under the top lens; stats + recommendations swipe
+  sideways (snap carousels with dots); backdated logging (Now/1h/3h/pick
+  time, same-day); quick-add drops scale with amount; Logs range is a
+  sliding glass segmented bar; training augments noisy human estimates
+  (150ml jitter, 50ml grid) and reports clean+noisy metrics
+- Nudges suggest ranges ("around 500ml", ±20% to 50s) with the midpoint
+  prefilled; goal judged by time of day (full day chugged early warns
+  instead of celebrating); tapping Add opens Update with the amount
+  prefilled — confirm logs it, walking away starves the pace tracker
+- Overflow stream deleted (foam cap stays); tank takes a pose per tab
+  (Update right, Logs left, Settings small-center); sips live in the
+  stats panel grouped by type (WATER · 1100ml ×3, no time order), recs
+  plain list again; range pill jellies like the dock;
+  bubbles ×1.8 size/brightness, up to 36; dock glide + page slide slowed
+- Stats panel quips: rotating playful lines per status, sometimes >.<
+- Bubbles go lifespan-driven like the glows (own 20–45s risetime each,
+  respawned at random x — no shared loop); sips capped so the panel
+  stays balanced; info zone reordered (recs up, stats down, one shared
+  left edge equidistant from the tank)
+- Logs range fixed (segments are fixed dp — self-measuring collapsed to
+  zero and hid 7d/14d/30d); quick-add stacked vertical so amounts never
+  clip; tank sunk lower on Home; Today's sips card fills the lower info
+  zone; background bubbles big (5–14dp), slow (30s+ crossings), frequent
+- Glow orbs go lifespan-driven: each spawns at a random spot, drifts while
+  it burns exactly 10s, dies, and a reaper respawns it somewhere new —
+  no loops, no sync, nothing repeats
+- New launcher icon from IconKitchen (>_< bubble face): all densities +
+  monochrome + store listing refreshed
 - About section in Settings (version, GitHub link, license)
 - Real launcher icon (IconKitchen adaptive set + monochrome + store listing)
 - iPhone-style tab bar: hold to magnify nearby tabs with haptic scrub,
