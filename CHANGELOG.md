@@ -76,6 +76,9 @@ All notable changes to Water0 are documented here. Format follows
 - Custom temporal-conv net (7-day windows, MAE 484 in 7.6KB, zero-loss
   TFLite) ships on-device as the Settings advisor line; LSTM tied it
   but needs flex; minSdk 26 (was already the documented floor)
+- Manifest honesty: unjustified exact-alarm permissions removed (the
+  chain was always inexact WorkManager); Health Connect declarations
+  still present but unwired — no client library, no reads
 - Pour droplets dance on Home only: logging elsewhere just moves the
   level, nothing banked, nothing replayed on return
 
