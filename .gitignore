@@ -60,6 +60,9 @@ keystore.properties
 learning-guide/
 session-*.md
 
+# Private project docs for owner + AI (never push; see actual shii/00-START-HERE.md)
+/actual shii/
+
 # Phone screenshots shared for review (never push; wildcard because
 # the folder name contains characters that don't survive literally)
 /screenshots */

@@ -30,6 +30,8 @@ cd ml_training
 uv venv .venv --python 3.11
 uv pip install --python .venv/bin/python -r requirements.txt
 .venv/bin/python -c "import sklearn, pandas; print(sklearn.__version__)"
+# No uv? Plain pip works too (the repo-root `.venv` already has
+# everything, TF included): `python -m pip install -r requirements.txt`
 ```
 
 Why not system Python: ours is 3.14 and sklearn has no build for it.
@@ -59,11 +61,28 @@ noisy), `--users 50` (small data, worse scores — feel the data hunger).
 cat model/metrics.json
 ```
 
-Baselines (seed 42): MAE ≈ 523 ml, R² ≈ 0.29, accuracy ≈ 0.76.
-Interpretation that matters: R² 0.29 means habits explain about a
-third of tomorrow's intake; the rest is irreducible daily randomness.
+Baselines (seed 42): MAE ≈ 555 ml, R² ≈ 0.22, accuracy ≈ 0.75.
+Interpretation that matters: habits explain a fraction of tomorrow's
+intake; the rest is irreducible daily randomness.
 That limitation is the whole product argument — it is why the app
 blends `0.5 × rules + 0.5 × model` instead of trusting the model.
+
+## Step 3b — Noise: humans estimate (5 min)
+
+Re-read your `metrics.json`: alongside every clean number sits a
+`_noisy` twin (MAE 568, accuracy 0.74). Those come from the
+augmentation in `main()`: every train row gets a jittered twin
+(±150 ml Gaussian, snapped to 50 ml grids — the round numbers people
+actually type), labels recomputed. Try it:
+
+```bash
+.venv/bin/python train_model.py --noise-ml 0  # exact numbers only
+```
+
+Watch clean MAE stay ~555 while the (unreported now) robustness story
+vanishes: without noisy twins you can't tell memorization from
+habits. The 13-ml clean/noisy gap is the number that says the model
+learned shapes, not digits.
 
 Note what trains in seconds on CPU: `HistGradientBoosting` on 12k rows
 × 12 features. The TFLite path (optional, needs `pip install

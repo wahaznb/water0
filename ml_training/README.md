@@ -75,12 +75,17 @@ python generate_data.py --users 200 --days 60 --seed 42
 python train_model.py --data data/hydration_logs.csv --out-dir model
 ```
 
-Expected output (defaults, seed 42): regression MAE ≈ 523 ml at R² ≈ 0.29,
-goal-met accuracy ≈ 0.76 (majority baseline ≈ 0.65). Exact numbers vary
-with `--seed`. Day-to-day intake is deliberately noisy — the model
-captures *habit-level* differences between users; the rest is irreducible
-daily randomness. That limitation is itself the point: it motivates
-blending the model with the rule engine rather than trusting it blindly.
+Expected output (defaults, seed 42): regression MAE ≈ 555 ml
+(R² ≈ 0.22), **568 ml on the noisy split**, goal-met accuracy ≈ 0.75
+(0.74 noisy; majority baseline ≈ 0.65). The train split is doubled with
+human-estimate twins (±150 ml Gaussian jitter snapped to 50 ml grids,
+labels recomputed), so clean/noisy adjacency is the robustness proof.
+Exact numbers vary with `--seed` — and MLP scores wobble run to run
+(stochastic training); sklearn is deterministic. Day-to-day intake is
+deliberately noisy — the model captures *habit-level* differences
+between users; the rest is irreducible daily randomness. That
+limitation is itself the point: it motivates blending the model with
+the rule engine rather than trusting it blindly.
 
 ## What gets trained
 
@@ -97,7 +102,9 @@ Same features the app knows at prediction time (`weight_kg`,
 
 `train_model.py` compares 3 MLP sizes (tiny 16-8 / small 32-16 / base
 64-32) × 3 quantization levels (dynamic / float16 / full-int8) and
-exports the winner to `model/`:
+exports the winner to `model/` (measured 2026-09-22: **base/dynamic,
+7.9 KB**, MLP MAE ≈ 666–718 vs sklearn's 555 — tiny nets underfit, and
+quantization changes nothing here):
 
 - **Winner rule:** smallest model within 5% of the best test MAE.
 - **Hard budget:** must be ≤ 100 KB (typical winner: int8, ~10–30 KB).
@@ -105,6 +112,13 @@ exports the winner to `model/`:
   `model/model_selection.json`.
 - Full-int8 uses a representative dataset so mobile DSPs/NPUs can run it;
   `model/scaler.json` stores the preprocessing the app must replicate.
+
+> **Honest status:** `model/hydration_goal.tflite` exists and is
+> measured — but at ~666+ MAE it loses to the sklearn baseline, so it
+> is **not bundled into the app**. Shipping it would be marketing.
+> The app's live intelligence stays rules + behavior tracking until a
+> personal-data retrain beats the baseline (see Step 6 in
+> `LEARNING_GUIDE.md`).
 
 Needs `pip install tensorflow` (Python ≤ 3.11 recommended) — without it
 the script trains/evaluates the sklearn baselines and skips export.

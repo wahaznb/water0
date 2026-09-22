@@ -169,8 +169,11 @@ def train_tflite(train: pd.DataFrame, test: pd.DataFrame, out_dir: Path) -> dict
                 converter.target_spec.supported_types = [tf.float16]
             else:  # full int8: smallest + fastest on mobile DSPs/NPUs
                 converter.optimizations = [tf.lite.Optimize.DEFAULT]
+                # TF ≥2.16 calibrator wants {input_name: sample} dicts, not
+                # bare arrays — pull the name off the built model.
+                input_name = model.inputs[0].name.split(":")[0]
                 converter.representative_dataset = lambda: (
-                    np.expand_dims(x, 0) for x in rep_data
+                    {input_name: np.expand_dims(x, 0)} for x in rep_data
                 )
                 converter.target_spec.supported_ops = [
                     tf.lite.OpsSet.TFLITE_BUILTINS_INT8
@@ -199,6 +202,7 @@ def train_tflite(train: pd.DataFrame, test: pd.DataFrame, out_dir: Path) -> dict
                 "arch": spec["name"], "quant": quant,
                 "mae_ml": round(mae, 1), "kb": round(len(blob) / 1024, 1),
                 "ms_per_infer": round(ms, 3),
+                "_blob": blob,
             })
             print(f"[{spec['name']}/{quant}] MAE={mae:.1f} ml  "
                   f"{len(blob) / 1024:.1f} KB  {ms:.3f} ms/infer")
@@ -213,6 +217,12 @@ def train_tflite(train: pd.DataFrame, test: pd.DataFrame, out_dir: Path) -> dict
           f"(MAE={winner['mae_ml']} ml, {winner['kb']} KB)")
 
     # Re-export the winner deterministically for the artifact.
+    (out_dir / "hydration_goal.tflite").write_bytes(
+        next(r["_blob"] for r in results
+             if r["arch"] == winner["arch"] and r["quant"] == winner["quant"])
+    )
+    for r in results:
+        del r["_blob"]
     (out_dir / "model_selection.json").write_text(
         json.dumps(results, indent=2))
 

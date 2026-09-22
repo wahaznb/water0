@@ -19,7 +19,7 @@ Offline-first Android hydration tracker with a liquid-glass UI. No account, no t
 - Room Database, DataStore, WorkManager
 - Manual DI via AppContainer (Hilt returns in v0.2)
 - JUnit4 + MockK unit tests, Compose UI tests, GitHub Actions CI
-- Python (offline): NHANES grounding + personal-data retraining, optional TFLite export — see `ml_training/`
+- Python (offline): NHANES grounding + personal-data retraining, noise-robust training numbers, optional TFLite export — see `ml_training/`
 
 ## Building
 ```bash

@@ -11,12 +11,14 @@
 ## Release checklist
 
 1. **Bump version** in `app/build.gradle.kts`
-   (`versionCode + 1`, `versionName` per semver) and move the
-   `[Unreleased]` section of `CHANGELOG.md` under a dated version header.
-2. **App icon**: drop adaptive-icon artwork into
-   `app/src/main/res/mipmap-anydpi-v26/` (+ foreground/background
-   drawables), re-add `android:icon` / `android:roundIcon` to the
-   manifest (references were removed when no art existed).
+   (`versionCode + 1`, `versionName` per semver) and add a new dated
+   version header on top of `CHANGELOG.md` (sections stay dated —
+   no `[Unreleased]` bucket).
+2. **App icon**: adaptive set lives in
+   `app/src/main/res/mipmap-anydpi-v26/` (+ per-density
+   foreground/background/monochrome); `android:icon` / `android:roundIcon`
+   are already wired in the manifest. Replace the PNGs + store listing
+   (`fastlane/metadata/.../images/icon.png`) when the mark changes.
 3. **Tag + push**: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 4. **GitHub Release**: attach the CI-built `app-debug.apk`
    (Actions → CI run → Artifacts). Add release signing before any
