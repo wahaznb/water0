@@ -29,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -121,6 +122,7 @@ fun SettingsScreen(
                     GoalSection(profile = current, viewModel = viewModel)
                     RemindersSection(profile = current, viewModel = viewModel)
                     SleepSection(profile = current, viewModel = viewModel)
+                    FitnessSection()
                     UnitsSection(profile = current, viewModel = viewModel)
                     AppearanceSection(darkTheme = darkTheme, onToggleTheme = onToggleTheme)
                     GlassLabSection(config = glassConfig, onChange = onGlassConfigChange)
@@ -434,10 +436,75 @@ private fun SleepSection(profile: UserProfile, viewModel: SettingsViewModel) {
         )
         Slider(
             value = profile.sleepHour.toFloat(),
-            onValueChange = { viewModel.updateSleepWindow(profile.wakeUpHour, it.roundToInt()) },
+                onValueChange = { viewModel.updateSleepWindow(profile.wakeUpHour, it.roundToInt()) },
             valueRange = 0f..23f,
             steps = 22
         )
+    }
+}
+
+@Composable
+private fun FitnessSection() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val source = remember(context) {
+        com.water0.hydration.data.fitness.FitnessDataSource(context)
+    }
+    var statusLine by remember { mutableStateOf("Checking…") }
+    var sleepLine by remember { mutableStateOf<String?>(null) }
+    var showConnect by remember { mutableStateOf(false) }
+
+    fun refresh() {
+        scope.launch {
+            sleepLine = null
+            showConnect = false
+            if (!source.isAvailable()) {
+                statusLine = "Health Connect isn't on this phone — " +
+                    "workouts and sleep stay manual."
+                return@launch
+            }
+            if (!source.hasPermissions()) {
+                statusLine = "See workouts and last night's sleep here. " +
+                    "Reads stay on this phone, just like everything else."
+                showConnect = true
+                return@launch
+            }
+            statusLine = "Connected — workouts shape recs from now on."
+            sleepLine = source.lastNightSleep()?.let {
+                val fmt = java.text.SimpleDateFormat(
+                    "HH:mm", java.util.Locale.getDefault()
+                )
+                "Last night: ${fmt.format(java.util.Date(it.bedTimeMs))} → " +
+                    fmt.format(java.util.Date(it.wakeTimeMs))
+            }
+        }
+    }
+    LaunchedEffect(Unit) { refresh() }
+    val launcher = rememberLauncherForActivityResult(
+        com.water0.hydration.data.fitness.FitnessDataSource.requestContract()
+    ) { granted ->
+        if (granted.isNotEmpty()) refresh()
+        else statusLine = "Not connected — tap anytime to try again."
+    }
+
+    SectionCard(title = "Fitness") {
+        Text(
+            text = statusLine,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        sleepLine?.let {
+            Text(
+                text = it,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        if (showConnect) {
+            OutlinedButton(onClick = { launcher.launch(source.readPermissions()) }) {
+                Text("Connect Health Connect")
+            }
+        }
     }
 }
 

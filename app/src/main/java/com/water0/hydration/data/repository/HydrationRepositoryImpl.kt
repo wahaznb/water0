@@ -14,8 +14,13 @@ import kotlinx.coroutines.withContext
 class HydrationRepositoryImpl(
     private val entryDao: HydrationEntryDao,
     private val profileDao: UserProfileDao,
-    private val behaviorDao: UserBehaviorDao
+    private val behaviorDao: UserBehaviorDao,
+    appContext: android.content.Context? = null
 ) : HydrationRepository {
+
+    private val fitness = appContext?.let {
+        com.water0.hydration.data.fitness.FitnessDataSource(it.applicationContext)
+    }
 
     override fun getTodayEntries(): Flow<List<HydrationEntry>> = entryDao.getTodayEntries()
 
@@ -56,4 +61,19 @@ class HydrationRepositoryImpl(
         val updatedBehavior = currentBehavior.updateOnLog(amountMl, drinkType)
         behaviorDao.update(updatedBehavior)
     }
+
+    override suspend fun getLastNightSleep():
+        com.water0.hydration.data.fitness.SleepWindow? =
+        try {
+            fitness?.lastNightSleep()
+        } catch (_: Exception) {
+            null
+        }
+
+    override suspend fun hadRecentWorkout(): Boolean =
+        try {
+            fitness?.hadRecentWorkout() == true
+        } catch (_: Exception) {
+            false
+        }
 }

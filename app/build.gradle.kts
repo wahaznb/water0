@@ -84,6 +84,9 @@ dependencies {
     implementation(libs.work.runtime.ktx)
     // On-device intake forecast (tiny temporal-conv net, CPU only).
     implementation(libs.tensorflow.lite)
+    // Fitness plugin: Health Connect sleep + workouts (optional, graceful
+    // when the provider is missing).
+    implementation(libs.health.connect.client)
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.mockk)

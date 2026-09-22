@@ -7,6 +7,7 @@ import com.water0.hydration.domain.engine.RecommendationEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlin.math.roundToInt
 
 class GetTodayProgressUseCase(
     private val repository: HydrationRepository,
@@ -20,7 +21,10 @@ class GetTodayProgressUseCase(
         val percentage: Int,
         val remainingMl: Int,
         val status: RecommendationEngine.HydrationStatus.Status,
-        val recommendations: List<RecommendationEngine.Recommendation>
+        val recommendations: List<RecommendationEngine.Recommendation>,
+        // Pacing truth: what should be drunk by this hour. The tank
+        // headlines lag-vs-expected, not the whole day.
+        val expectedMl: Int
     )
 
     operator fun invoke(): Flow<ProgressResult> {
@@ -49,8 +53,16 @@ class GetTodayProgressUseCase(
                 sleepHour = profile.sleepHour
             )
             val recommendations = recommendationEngine.generateRecommendations(
-                profile, behavior, status, entries, currentHour, pastWeek
+                profile, behavior, status, entries, currentHour, pastWeek,
+                // Measured workouts (Health Connect) replace the old guess.
+                // False when unwired — the nudge simply stays silent.
+                workoutRecently = repository.hadRecentWorkout()
             )
+            // Pacing truth for the tank headline: what should be drunk
+            // by this hour, not the whole day.
+            val expectedMl = (goal * recommendationEngine.dayFraction(
+                currentHour, profile.wakeUpHour, profile.sleepHour
+            )).roundToInt()
 
             ProgressResult(
                 entries = entries,
@@ -59,7 +71,8 @@ class GetTodayProgressUseCase(
                 percentage = status.percentage,
                 remainingMl = status.remainingMl,
                 status = status.status,
-                recommendations = recommendations
+                recommendations = recommendations,
+                expectedMl = expectedMl
             )
         }
     }

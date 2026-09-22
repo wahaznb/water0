@@ -127,6 +127,15 @@ class RecommendationEngine {
     }
 
     /**
+     * Pace headline: consumed vs expected-by-now. Outside the active
+     * window (expected 0) there is no pace to judge — caller falls back
+     * to the day percentage.
+     */
+    fun pacePercentage(consumedMl: Int, expectedMl: Int): Int =
+        if (expectedMl <= 0) 100
+        else ((consumedMl * 100f) / expectedMl).roundToInt()
+
+    /**
      * Recency-sized sip: 250ml base +75 per dry hour past the first,
      * snapped to 50s, hard-capped at 500. The cap is the point: a long
      * gap earns a bigger glass, never chug coaching (see OVER_LIMIT).
@@ -187,7 +196,10 @@ class RecommendationEngine {
         status: HydrationStatus,
         recentEntries: List<HydrationEntry>,
         currentHour: Int,
-        pastWeekEntries: List<HydrationEntry> = emptyList()
+        pastWeekEntries: List<HydrationEntry> = emptyList(),
+        // True when Health Connect saw a workout finish recently. Replaces
+        // the old guess (a water entry ~1h ago "maybe" meant exercise).
+        workoutRecently: Boolean = false
     ): List<Recommendation> {
         val recommendations = mutableListOf<Recommendation>()
 
@@ -213,21 +225,15 @@ class RecommendationEngine {
             ))
         }
 
-        // After exercise (check recent entries for workout time)
-        val lastEntry = recentEntries.firstOrNull()
-        if (lastEntry != null) {
-            val hoursSinceLastEntry = (System.currentTimeMillis() - lastEntry.timestamp) / (1000 * 60 * 60)
-            if (hoursSinceLastEntry <= 1 && lastEntry.type == HydrationEntry.DrinkType.WATER) {
-                // User just drank water, maybe post-workout
-                if (currentHour >= 6 && currentHour <= 20) {
-                    recommendations.add(Recommendation(
-                        message = "Great job hydrating! Keep it up post-activity.",
-                        priority = Recommendation.Priority.LOW,
-                        suggestedAmountMl = 0,
-                        reason = Recommendation.Reason.AFTER_EXERCISE
-                    ))
-                }
-            }
+        // Post-workout, measured: Health Connect saw an exercise session
+        // finish recently (not the old "a water entry an hour ago" guess).
+        if (workoutRecently && currentHour >= 6 && currentHour <= 22) {
+            recommendations.add(nudgedRec(
+                message = "Workout logged. Around 400ml to recover?",
+                priority = Recommendation.Priority.MEDIUM,
+                midMl = 400,
+                reason = Recommendation.Reason.AFTER_EXERCISE
+            ))
         }
 
         // Hot weather

@@ -339,6 +339,21 @@ class RecommendationEngineTest {
     }
 
     @Test
+    fun `measured workout nudges a ranged recovery glass`() {
+        val status = engine.calculateStatus(500, 3140)
+        val recs = engine.generateRecommendations(
+            profile, UserBehavior(), status, emptyList(),
+            currentHour = 18, pastWeekEntries = pastWeek(1..5),
+            workoutRecently = true
+        )
+        val rec = recs.single {
+            it.reason == RecommendationEngine.Recommendation.Reason.AFTER_EXERCISE
+        }
+        assertEquals(400, rec.suggestedAmountMl)
+        assertTrue(rec.suggestedMinMl < 400 && rec.suggestedMaxMl > 400)
+    }
+
+    @Test
     fun `quiet hours stretch the interval`() {        // 0-24 covers every possible current hour -> always quiet.
         val quiet = profile.copy(quietHoursStart = 0, quietHoursEnd = 24)
         val behavior = UserBehavior(averageResponseRate = 0.5f)

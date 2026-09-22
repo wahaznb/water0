@@ -71,6 +71,9 @@ All notable changes to Water0 are documented here. Format follows
   50s grid, 500 cap — never chug coaching), silent while on pace;
   persistent notification shows current vs prorated by-now target +
   the same sip (refreshes each tick, clears overnight)
+- Fitness plugin wired (Health Connect 1.0.0-alpha11, Kotlin-1.9 line):
+  opt-in Settings card, last-night sleep display, measured post-workout
+  rec replaces the water-entry guess
 - Normal buzzing reminder alongside the persistent line, only with a
   real recency nudge (same card as Home shows — on pace means silence)
 - Custom temporal-conv net (7-day windows, MAE 484 in 7.6KB, zero-loss

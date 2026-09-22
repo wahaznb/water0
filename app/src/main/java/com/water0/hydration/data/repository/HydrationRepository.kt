@@ -30,4 +30,9 @@ interface HydrationRepository {
     suspend fun getUserBehaviorSuspend(): UserBehavior?
     suspend fun updateUserBehavior(behavior: UserBehavior)
     suspend fun onWaterLogged(amountMl: Int, drinkType: HydrationEntry.DrinkType)
+
+    // Fitness plugin (Health Connect, optional — null/false when
+    // unavailable, never throws)
+    suspend fun getLastNightSleep(): com.water0.hydration.data.fitness.SleepWindow?
+    suspend fun hadRecentWorkout(): Boolean
 }

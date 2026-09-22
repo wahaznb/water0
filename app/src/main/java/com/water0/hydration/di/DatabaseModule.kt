@@ -51,7 +51,8 @@ object AppContainer {
             repository ?: HydrationRepositoryImpl(
                 entryDao = getDatabase(context).hydrationEntryDao(),
                 profileDao = getDatabase(context).userProfileDao(),
-                behaviorDao = getDatabase(context).userBehaviorDao()
+                behaviorDao = getDatabase(context).userBehaviorDao(),
+                appContext = context.applicationContext
             ).also { repository = it }
         }
     }

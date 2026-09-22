@@ -2,6 +2,7 @@
 <health-permissions>
     <permission name="android.health.permission.READ_STEPS" />
     <permission name="android.health.permission.READ_SLEEP" />
+    <permission name="android.health.permission.READ_EXERCISE" />
     <permission name="android.health.permission.READ_EXERCISE_ROUTE" />
     <permission name="android.health.permission.READ_HEART_RATE" />
 </health-permissions>

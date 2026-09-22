@@ -76,4 +76,9 @@ class FakeHydrationRepository(
     override suspend fun onWaterLogged(amountMl: Int, drinkType: HydrationEntry.DrinkType) {
         behavior.value = behavior.value.updateOnLog(amountMl, drinkType)
     }
+
+    override suspend fun getLastNightSleep():
+        com.water0.hydration.data.fitness.SleepWindow? = null
+
+    override suspend fun hadRecentWorkout(): Boolean = false
 }
