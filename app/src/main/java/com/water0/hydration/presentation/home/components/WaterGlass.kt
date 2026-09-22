@@ -1,13 +1,10 @@
 package com.water0.hydration.presentation.home.components
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -24,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,7 +43,6 @@ import com.water0.hydration.ui.theme.Glass
 import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sin
-import kotlinx.coroutines.launch
 
 /**
  * Real tumbler silhouette: wider mouth, tapered walls, rounded shoulders,
@@ -298,52 +293,6 @@ fun WaterGlass(
                 )
             }
         }
-    }
-}
-
-/**
- * Runs the pour-out keyframes once per Slosh kick and reports completion
- * so a shared kick can be consumed only when done: tip deep to the RIGHT
- * lip, hold while the spill stream + falling drops run, snap back with a
- * spring, then let the crest settle. Maximum motion by design — perf
- * cleanup later if a device ever complains.
- */
-@Composable
-fun SloshDriver(
-    runId: Int,
-    onTiltFrame: (Float) -> Unit,
-    onSloshFrame: (Float) -> Unit,
-    onDone: () -> Unit
-) {
-    LaunchedEffect(runId) {
-        val tiltAnim = Animatable(0f)
-        val sloshAnim = Animatable(0f)
-        val tiltJob = launch {
-            tiltAnim.animateTo(38f, tween(320))
-            kotlinx.coroutines.delay(350)
-            tiltAnim.animateTo(-6f, tween(300))
-            tiltAnim.animateTo(
-                0f,
-                spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessLow
-                )
-            )
-        }
-        val sloshJob = launch {
-            sloshAnim.animateTo(12f, tween(200))
-            sloshAnim.animateTo(0f, tween(1100))
-        }
-        // Fan frames out until both settle. Polling at 60fps for ~1.5s is
-        // cheaper than snapshotFlow on two high-frequency states.
-        while (tiltJob.isActive || sloshJob.isActive) {
-            onTiltFrame(tiltAnim.value)
-            onSloshFrame(sloshAnim.value)
-            kotlinx.coroutines.delay(16)
-        }
-        onTiltFrame(0f)
-        onSloshFrame(0f)
-        onDone()
     }
 }
 

@@ -65,6 +65,8 @@ All notable changes to Water0 are documented here. Format follows
   quiet-hours test
 - Pour shoving the glass down (fixed rain zone now, glass never moves);
   delete tilting the tank (rows flash red and vanish, level glides down)
+- Housekeeping: dead Slosh animation code removed, one shared dark-theme
+  check, stray build APKs cleaned (release APK is the only kept binary)
 - Recency-sized sips: dry spell grows the next glass (250 + 75/dry-hour,
   50s grid, 500 cap — never chug coaching), silent while on pace;
   persistent notification shows current vs prorated by-now target +

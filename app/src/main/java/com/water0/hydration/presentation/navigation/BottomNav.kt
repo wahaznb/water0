@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.water0.hydration.ui.theme.GlassConfig
+import com.water0.hydration.ui.theme.isDarkScheme
 import com.water0.hydration.ui.theme.liquidglass.GlassBoxScope
 import com.water0.hydration.ui.theme.liquidglass.LiquidGlassBox
 import com.water0.hydration.ui.theme.liquidglass.toLiquidParams
@@ -337,10 +338,7 @@ fun GlassBoxScope.LensPlate(
         config.toLiquidParams(Color(0xFF0351A3))
     }
     // Title: TV Girl blue in dark, pure black in light.
-    val lensBg = MaterialTheme.colorScheme.background
-    val lensDark = 0.2126f * lensBg.red + 0.7152f * lensBg.green +
-        0.0722f * lensBg.blue < 0.5f
-    val titleColor = if (lensDark) Color(0xFF0351A3) else Color.Black
+    val titleColor = if (isDarkScheme()) Color(0xFF0351A3) else Color.Black
     this@LensPlate.LiquidGlassBox(
         modifier = modifier.fillMaxWidth(),
         params = params,

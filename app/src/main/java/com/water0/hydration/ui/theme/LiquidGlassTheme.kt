@@ -122,10 +122,15 @@ object Glass {
 fun glassCardContainer(): Color {
     // Dark: unchanged frosted surface. Light: light grey with a small
     // black tint so cards sit visibly on the white field.
-    val bg = MaterialTheme.colorScheme.background
-    val dark = 0.2126f * bg.red + 0.7152f * bg.green + 0.0722f * bg.blue < 0.5f
-    return if (dark) MaterialTheme.colorScheme.surface.copy(alpha = Glass.CARD_ALPHA)
+    return if (isDarkScheme()) MaterialTheme.colorScheme.surface.copy(alpha = Glass.CARD_ALPHA)
     else Color(0xFFECECEC).copy(alpha = 0.60f)
+}
+
+/** True when the app theme is dark — one source for every theme branch. */
+@Composable
+fun isDarkScheme(): Boolean {
+    val bg = MaterialTheme.colorScheme.background
+    return 0.2126f * bg.red + 0.7152f * bg.green + 0.0722f * bg.blue < 0.5f
 }
 
 // Beveled rim: bright top edge fading into the hairline outline, the
@@ -186,13 +191,11 @@ fun AuroraBackground(
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
-    val tertiary = MaterialTheme.colorScheme.tertiary
     // Theme-aware field: dark stays pure black (values below are
     // pixel-identical to before); light gets its own luminous blue field.
     // Luminance follows the APP theme, so in-app toggling works.
     val background = MaterialTheme.colorScheme.background
-    val dark = 0.2126f * background.red + 0.7152f * background.green +
-        0.0722f * background.blue < 0.5f
+    val dark = isDarkScheme()
     val drift = rememberInfiniteTransition(label = "aurora")
     // Slow calm swirl (~34s); bubbles loop ~11s; blooms breathe on a 7s
     // clock — one slow breath per light, staggered so never in sync.

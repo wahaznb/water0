@@ -15,14 +15,13 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 /**
- * One-shot animation kicks for the hero glass on the Glass tab.
- * Pour on every log (level rises); Slosh on every delete (glass tilts,
- * water settles lower). Consumed by HomeScreen, then cleared.
- * atNanos keeps rapid repeats distinct so StateFlow re-emits each one.
+ * One-shot animation kick for the hero glass: Pour on every Home log
+ * (level rises, droplets fall). Consumed, then cleared. atNanos keeps
+ * rapid repeats distinct so StateFlow re-emits each one. Deletes are
+ * silent (red flash in the row, level glides down).
  */
 sealed interface GlassKick {
     data class Pour(val amountMl: Int, val atNanos: Long = System.nanoTime()) : GlassKick
-    data class Slosh(val amountMl: Int, val atNanos: Long = System.nanoTime()) : GlassKick
 }
 
 class HomeViewModel(

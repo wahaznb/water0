@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.water0.hydration.domain.engine.RecommendationEngine
 import com.water0.hydration.ui.theme.Glass
+import com.water0.hydration.ui.theme.isDarkScheme
 import com.water0.hydration.presentation.home.components.RecommendationCard
 import kotlinx.coroutines.launch
 import kotlin.math.sqrt
@@ -94,9 +95,7 @@ class SlantedCardShape(
 // same slight black tint as the shared glass cards.
 @Composable
 private fun homePanelContainer(): Color {
-    val bg = MaterialTheme.colorScheme.background
-    val dark = 0.2126f * bg.red + 0.7152f * bg.green + 0.0722f * bg.blue < 0.5f
-    return if (dark) MaterialTheme.colorScheme.surface.copy(alpha = 0.42f)
+    return if (isDarkScheme()) MaterialTheme.colorScheme.surface.copy(alpha = 0.42f)
     else Color(0xFFECECEC).copy(alpha = 0.62f)
 }
 
