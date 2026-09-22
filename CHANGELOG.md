@@ -73,6 +73,9 @@ All notable changes to Water0 are documented here. Format follows
   the same sip (refreshes each tick, clears overnight)
 - Normal buzzing reminder alongside the persistent line, only with a
   real recency nudge (same card as Home shows — on pace means silence)
+- Custom temporal-conv net (7-day windows, MAE 484 in 7.6KB, zero-loss
+  TFLite) ships on-device as the Settings advisor line; LSTM tied it
+  but needs flex; minSdk 26 (was already the documented floor)
 - Pour droplets dance on Home only: logging elsewhere just moves the
   level, nothing banked, nothing replayed on return
 

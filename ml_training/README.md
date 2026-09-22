@@ -113,10 +113,12 @@ quantization changes nothing here):
 - Full-int8 uses a representative dataset so mobile DSPs/NPUs can run it;
   `model/scaler.json` stores the preprocessing the app must replicate.
 
-> **Honest status:** `model/hydration_goal.tflite` exists and is
-> measured — but at ~666+ MAE it loses to the sklearn baseline, so it
-> is **not bundled into the app**. Shipping it would be marketing.
-> The app's live intelligence stays rules + behavior tracking until a
+> **Honest status:** two `.tflite` files exist and are measured. The
+> custom temporal-conv net (`sequence_tcn.tflite`, 7.6KB, MAE ≈ 484)
+> **ships in the app** as an advisor line in Settings (`OnDeviceForecast`,
+> null-safe). The aggregate MLP (`hydration_goal.tflite`, MAE ≈ 666+)
+> stays unshipped — a worse model aboard would be marketing. The app's
+> live intelligence stays rules + behavior tracking until a
 > personal-data retrain beats the baseline (see Step 6 in
 > `LEARNING_GUIDE.md`).
 

@@ -82,6 +82,8 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.datastore.preferences)
     implementation(libs.work.runtime.ktx)
+    // On-device intake forecast (tiny temporal-conv net, CPU only).
+    implementation(libs.tensorflow.lite)
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.mockk)

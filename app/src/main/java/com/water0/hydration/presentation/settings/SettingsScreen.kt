@@ -315,12 +315,29 @@ private fun ProfileSection(profile: UserProfile, viewModel: SettingsViewModel) {
 @Composable
 private fun GoalSection(profile: UserProfile, viewModel: SettingsViewModel) {
     val breakdown = viewModel.breakdown(profile)
+    val context = LocalContext.current
+    // On-device guess, loaded once per composition: null = fewer than 7
+    // logged days (or model unavailable) — then the row stays hidden and
+    // rules carry the screen alone.
+    val forecast by androidx.compose.runtime.produceState<Int?>(
+        initialValue = null, profile
+    ) {
+        value = viewModel.modelForecastMl(context)
+    }
     SectionCard(title = "Daily goal: ${breakdown.totalMl} ml") {
         Text(
             text = breakdown.explanation,
             fontSize = 13.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        if (forecast != null) {
+            Text(
+                text = "On-device guess for tomorrow: ~${forecast} ml " +
+                    "(tiny temporal net, experimental — rules decide)",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
     }
 }
 

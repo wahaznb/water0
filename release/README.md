@@ -14,11 +14,12 @@ its SHA-256 checksum, and release notes.
 
 ## One APK for every phone
 
-The filename says `universal` and means it: Water0 ships **zero native
-code** (pure Kotlin/Compose), so there is nothing CPU-specific inside.
-The same APK installs on **arm64-v8a** (every modern phone), old
-**armeabi-v7a** devices, and **x86_64** (Chromebooks/emulators) —
-no per-ABI splits to hunt through.
+The filename says `universal` and means it: one APK installs on
+**arm64-v8a** (every modern phone), old **armeabi-v7a** devices, and
+**x86_64** (Chromebooks/emulators) — no per-ABI splits to hunt
+through. The app logic is pure Kotlin; the APK additionally bundles
+the tiny on-device model's CPU runtimes per architecture, so the file
+is bigger but there is still nothing to choose.
 
 Verify after download:
 
