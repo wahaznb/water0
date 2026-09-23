@@ -39,7 +39,10 @@ class HomeViewModel(
             val percentage: Int,
             val remainingMl: Int,
             val status: RecommendationEngine.HydrationStatus.Status,
-            val recommendations: List<RecommendationEngine.Recommendation>
+            val recommendations: List<RecommendationEngine.Recommendation>,
+            // Pacing truth: what should be drunk by this hour. The tank
+            // headlines lag-vs-expected; the day goal rides along small.
+            val expectedMl: Int
         ) : UiState
 
         object Loading : UiState
@@ -90,7 +93,8 @@ class HomeViewModel(
                     percentage = result.percentage,
                     remainingMl = result.remainingMl,
                     status = result.status,
-                    recommendations = result.recommendations
+                    recommendations = result.recommendations,
+                    expectedMl = result.expectedMl
                 )
             }
         }

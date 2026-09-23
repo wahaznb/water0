@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -382,9 +383,10 @@ fun GlassBoxScope.LensPlate(
 }
 
 /** Segmented glass range switch for the Logs plate: one frosted track
- * with the options as fixed-width segments and a mini liquid-glass pill
- * gliding to the selected one — the dock's language, shrunk into the top
- * bar. Segments are fixed dp (never measured): measuring collapsed to 0
+ * with fixed-width segments and a plain pill gliding between them — no
+ * morphing, no tap animation. Tap a segment or hold-and-swipe across
+ * the bar (haptic ticks, release commits), dock language throughout.
+ * Segments are fixed dp (never measured): measuring collapsed to 0
  * and the whole bar vanished. */
 @Composable
 fun PlateRangeBar(
@@ -404,25 +406,16 @@ fun PlateRangeBar(
         ),
         label = "rangePill"
     )
-    // Jelly like the dock blob: per-index corner presets on a bouncy
-    // spring, stretched along travel while gliding.
-    val cornerSets = listOf(
-        intArrayOf(46, 54, 52, 48),
-        intArrayOf(54, 46, 48, 52),
-        intArrayOf(48, 52, 46, 54)
-    )
-    val set = cornerSets[index % cornerSets.size]
-    val jelly = spring<Int>(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
-        stiffness = Spring.StiffnessMedium
-    )
-    val pTL by androidx.compose.animation.core.animateIntAsState(set[0], jelly, label = "pTL")
-    val pTR by androidx.compose.animation.core.animateIntAsState(set[1], jelly, label = "pTR")
-    val pBR by androidx.compose.animation.core.animateIntAsState(set[2], jelly, label = "pBR")
-    val pBL by androidx.compose.animation.core.animateIntAsState(set[3], jelly, label = "pBL")
-    val pillShape = RoundedCornerShape(pTL, pTR, pBR, pBL)
-    // Stretch while traveling: exactly 1.0 at rest.
-    val traveling = pillX != 4.dp + segWdp * index
+    val pillShape = RoundedCornerShape(10.dp)
+    // Hold-and-scrub: preview follows the finger, release commits.
+    var dragIndex by remember { mutableStateOf<Int?>(null) }
+    val haptics = LocalHapticFeedback.current
+    val density = LocalDensity.current
+    fun indexAt(xPx: Float): Int = with(density) {
+        (((xPx - 4.dp.toPx()) / segWdp.toPx()).toInt())
+            .coerceIn(0, options.size - 1)
+    }
+    val previewIndex = dragIndex ?: index
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
@@ -434,23 +427,51 @@ fun PlateRangeBar(
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .offset(x = pillX)
-                .graphicsLayer {
-                    scaleX = if (traveling) 1.12f else 1f
-                    scaleY = if (traveling) 0.92f else 1f
-                }
                 .size(width = segWdp, height = 30.dp)
                 .clip(pillShape)
                 .background(primary.copy(alpha = 0.35f), pillShape)
                 .border(1.dp, primary.copy(alpha = 0.60f), pillShape)
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            options.forEach { option ->
-                val isSel = option == selected
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { offset -> onSelect(options[indexAt(offset.x)]) }
+                    )
+                }
+                .pointerInput(Unit) {
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = { offset ->
+                            val idx = indexAt(offset.x)
+                            if (idx != dragIndex) {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                            dragIndex = idx
+                        },
+                        onDragCancel = {
+                            dragIndex = null
+                        },
+                        onDragEnd = {
+                            dragIndex?.let { onSelect(options[it]) }
+                            dragIndex = null
+                        },
+                        onDrag = { change, _ ->
+                            val idx = indexAt(change.position.x)
+                            if (idx != dragIndex) {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                            dragIndex = idx
+                            change.consume()
+                        }
+                    )
+                }
+        ) {
+            options.forEachIndexed { i, option ->
+                val isSel = i == previewIndex
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(width = segWdp, height = 30.dp)
-                        .clickable { onSelect(option) }
+                    modifier = Modifier.size(width = segWdp, height = 30.dp)
                 ) {
                     Text(
                         text = "${option}d",

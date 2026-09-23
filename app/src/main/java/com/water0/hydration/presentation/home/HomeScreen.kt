@@ -50,6 +50,7 @@ import com.water0.hydration.ui.theme.Glass
 import com.water0.hydration.ui.theme.isDarkScheme
 import com.water0.hydration.presentation.home.components.RecommendationCard
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 // Info-zone card silhouette: ONLY the left edge slants, at the same lean
@@ -438,19 +439,24 @@ private fun ColumnScope.StatsPages(
         modifier = Modifier.fillMaxWidth()
     ) {
         item {
+            // Headline is pace-vs-expected (lag, not the day): 9am shows
+            // where you stand against the morning's share, not 23% of the
+            // whole day. Day goal rides along small underneath.
+            val pace = if (state.expectedMl <= 0) state.percentage
+            else ((state.totalEffectiveMl * 100f) / state.expectedMl).roundToInt()
             Column(
                 modifier = Modifier.fillParentMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "${state.percentage}%",
+                    text = "${pace}%",
                     fontSize = 40.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "${state.totalEffectiveMl} / ${state.goalMl} ml",
+                    text = "${state.totalEffectiveMl} / ${state.expectedMl} ml by now",
                     fontSize = 15.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -472,6 +478,7 @@ private fun ColumnScope.StatsPages(
                     value = "${state.totalEffectiveMl} ml"
                 )
                 StatLine(label = "Goal", value = "${state.goalMl} ml")
+                StatLine(label = "By now", value = "${state.expectedMl} ml")
                 StatLine(
                     label = "Left",
                     value = if (state.remainingMl > 0) "${state.remainingMl} ml" else "—"

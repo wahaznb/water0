@@ -67,6 +67,9 @@ All notable changes to Water0 are documented here. Format follows
   delete tilting the tank (rows flash red and vanish, level glides down)
 - Housekeeping: dead Slosh animation code removed, one shared dark-theme
   check, stray build APKs cleaned (release APK is the only kept binary)
+- Tank headlines pace-vs-expected (1100 / 1800 ml by now), day goal
+  demoted to the breakdown; range pill fixed shape, zero tap animation,
+  hold-and-swipe across segments
 - Onboarding asks instead of assuming (weight, optional age, sex, sleep
   hours, reminders opt-in); age stored (DB v3, editable, exported);
   persistent notification fires within seconds of opting in
