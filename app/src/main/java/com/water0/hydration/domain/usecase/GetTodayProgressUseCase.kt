@@ -54,9 +54,11 @@ class GetTodayProgressUseCase(
             )
             val recommendations = recommendationEngine.generateRecommendations(
                 profile, behavior, status, entries, currentHour, pastWeek,
-                // Measured workouts (Health Connect) replace the old guess.
+                // Measured workouts (Health Connect) or the manual
+                // "just worked out" tap (degoogled / no provider).
                 // False when unwired — the nudge simply stays silent.
-                workoutRecently = repository.hadRecentWorkout()
+                workoutRecently = repository.hadRecentWorkout() ||
+                    repository.hasManualWorkoutBoost()
             )
             // Pacing truth for the tank headline: what should be drunk
             // by this hour, not the whole day.

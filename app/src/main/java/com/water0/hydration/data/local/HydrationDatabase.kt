@@ -23,13 +23,20 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Onboarding age, nullable = never assumed. No default needed.
+        db.execSQL("ALTER TABLE user_profile ADD COLUMN ageYr INTEGER")
+    }
+}
+
 @Database(
     entities = [
         HydrationEntry::class,
         UserProfile::class,
         UserBehavior::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -50,7 +57,7 @@ abstract class HydrationDatabase : RoomDatabase() {
                     HydrationDatabase::class.java,
                     "water0_database"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

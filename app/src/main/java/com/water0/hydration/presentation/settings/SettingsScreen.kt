@@ -250,6 +250,47 @@ private fun ProfileSection(profile: UserProfile, viewModel: SettingsViewModel) {
             )
         )
 
+        // Age: asked once in onboarding, editable here forever. Blank =
+        // skipped, never assumed. Reserved for personal calibration.
+        var ageText by remember(profile.ageYr) {
+            mutableStateOf(profile.ageYr?.toString() ?: "")
+        }
+        var ageError by remember { mutableStateOf<String?>(null) }
+        Text(
+            text = "Age",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        OutlinedTextField(
+            value = ageText,
+            onValueChange = { raw ->
+                val clean = raw.filter { it.isDigit() }.take(3)
+                ageText = clean
+                val parsed = clean.toIntOrNull()
+                when {
+                    parsed == null -> {
+                        ageError = null
+                        if (profile.ageYr != null) viewModel.updateAge(null)
+                    }
+                    parsed < 5 || parsed > 120 -> ageError = "5–120 years"
+                    else -> {
+                        ageError = null
+                        if (profile.ageYr != parsed) viewModel.updateAge(parsed)
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Age (years, optional)") },
+            suffix = { Text("yrs") },
+            supportingText = { Text(ageError ?: "5–120 years, blank to skip") },
+            isError = ageError != null,
+            singleLine = true,
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+            )
+        )
+
         Text(
             text = "Activity level",
             fontSize = 16.sp,
@@ -351,7 +392,14 @@ private fun RemindersSection(profile: UserProfile, viewModel: SettingsViewModel)
     // showing until the system permission is granted.
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* best-effort: toggle already saved */ }
+    ) { granted ->
+        // Granted now (or already): show the persistent line within
+        // seconds instead of whenever the chain wanders by.
+        if (granted) {
+            com.water0.hydration.di.AppContainer
+                .getNotificationScheduler(context).poke()
+        }
+    }
     SectionCard(title = "Reminders") {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -363,13 +411,22 @@ private fun RemindersSection(profile: UserProfile, viewModel: SettingsViewModel)
                 checked = profile.remindersEnabled,
                 onCheckedChange = {
                     viewModel.toggleReminders(it)
-                    if (it && android.os.Build.VERSION.SDK_INT >= 33) {
+                    if (!it) {
+                        com.water0.hydration.di.AppContainer
+                            .getNotificationScheduler(context).cancel()
+                    } else if (android.os.Build.VERSION.SDK_INT >= 33) {
                         val granted = androidx.core.content.ContextCompat.checkSelfPermission(
                             context, android.Manifest.permission.POST_NOTIFICATIONS
                         ) == android.content.pm.PackageManager.PERMISSION_GRANTED
                         if (!granted) {
                             permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            com.water0.hydration.di.AppContainer
+                                .getNotificationScheduler(context).poke()
                         }
+                    } else {
+                        com.water0.hydration.di.AppContainer
+                            .getNotificationScheduler(context).poke()
                     }
                 }
             )

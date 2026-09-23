@@ -17,8 +17,8 @@ import kotlin.math.roundToInt
  * total, and a 7-day average seeded with the goal as warm start.
  *
  * Limitations (documented, not silent): the profile is a snapshot — every
- * row uses the CURRENT weight/activity/climate/sex, since history isn't
- * versioned. Climate/wake/sleep use current values too.
+ * row uses the CURRENT weight/activity/climate/sex/age, since history isn't
+ * versioned. age_yr trails as a superset column (blank when skipped). Climate/wake/sleep use current values too.
  */
 class ExportTrainingDataUseCase(
     private val repository: HydrationRepository,
@@ -44,7 +44,7 @@ class ExportTrainingDataUseCase(
         sb.appendLine(
             "user_id,day,day_of_week,is_weekend,weight_kg,activity,climate," +
                 "sex,wake_hour,sleep_hour,goal_ml,prev_day_total_ml,avg_7d_ml," +
-                "streak_days,total_day_ml,met_goal"
+                "streak_days,total_day_ml,met_goal,age_yr"
         )
 
         var prevTotal = goalMl // warm start, same as generate_data.py
@@ -67,7 +67,10 @@ class ExportTrainingDataUseCase(
                     profile.weightKg, profile.activityLevel.ordinal,
                     profile.climate.ordinal, sexCode,
                     profile.wakeUpHour, profile.sleepHour, goalMl,
-                    prevTotal, avg7d, streak, total, met
+                    prevTotal, avg7d, streak, total, met,
+                    // Trailing superset column: trainers ignore unknown
+                    // fields (FEATURES allowlist), empty when skipped.
+                    profile.ageYr ?: ""
                 ).joinToString(",")
             )
 

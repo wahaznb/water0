@@ -61,12 +61,12 @@ class ExportTrainingDataUseCaseTest {
         assertEquals(
             "user_id,day,day_of_week,is_weekend,weight_kg,activity,climate," +
                 "sex,wake_hour,sleep_hour,goal_ml,prev_day_total_ml,avg_7d_ml," +
-                "streak_days,total_day_ml,met_goal",
+                "streak_days,total_day_ml,met_goal,age_yr",
             lines[0]
         )
         assertEquals(4, lines.size)
 
-        // Columns:                0  1  2    3   4     5  6  7  8  9  10    11    12    13  14    15
+        // Columns:                0  1  2    3   4     5  6  7  8  9  10    11    12    13  14    15   16
         val r0 = lines[1].split(",")
         val r1 = lines[2].split(",")
         val r2 = lines[3].split(",")
@@ -83,6 +83,7 @@ class ExportTrainingDataUseCaseTest {
             val dow = r[2].toInt()
             assertTrue(dow in 0..6)
             assertEquals(if (dow >= 5) "1" else "0", r[3])
+            assertEquals("", r[16]) // age skipped, never assumed
         }
         assertEquals(listOf("0", "1", "2"), listOf(r0[1], r1[1], r2[1]))
 

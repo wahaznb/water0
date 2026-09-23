@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -40,7 +41,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.water0.hydration.data.local.entity.UserBehavior
-import com.water0.hydration.data.local.entity.UserProfile
 import com.water0.hydration.di.AppContainer
 import com.water0.hydration.presentation.history.HistoryScreen
 import com.water0.hydration.presentation.history.HistoryViewModel
@@ -129,6 +129,41 @@ class MainActivity : ComponentActivity() {
                 }
             }
             Water0(darkTheme = darkTheme) {
+                // First run shows onboarding (no profile row yet) instead of
+                // silently seeded guesses. Existing installs skip straight
+                // to the pager.
+                var onboarded by remember { mutableStateOf<Boolean?>(null) }
+                LaunchedEffect(Unit) {
+                    onboarded = AppContainer.getDatabase(this@MainActivity)
+                        .userProfileDao().getProfileSuspend() != null
+                }
+                if (onboarded == null) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                } else if (onboarded == false) {
+                    com.water0.hydration.presentation.onboarding.OnboardingScreen(
+                        onFinish = { profile ->
+                            lifecycleScope.launch {
+                                AppContainer.getDatabase(this@MainActivity)
+                                    .userProfileDao().insert(profile)
+                                onboarded = true
+                                if (profile.remindersEnabled) {
+                                    val scheduler = AppContainer
+                                        .getNotificationScheduler(this@MainActivity)
+                                    scheduler.ensureScheduled()
+                                    // Wanted + granted: visible within seconds.
+                                    scheduler.poke()
+                                }
+                            }
+                        }
+                    )
+                } else {
                 val pagerState = rememberPagerState(
                     initialPage = 0,
                     pageCount = { 4 }
@@ -357,6 +392,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 )
+                } // else onboarded == true: the pager shell above
             }
         }
     }
@@ -366,15 +402,12 @@ class MainActivity : ComponentActivity() {
         private const val KEY_DARK_THEME = "dark_theme"
     }
 
-    // Room Flow queries emit nothing until a row exists, so insert
-    // defaults once. Without this the Home screen would load forever
-    // on a fresh install.
+    // Behavior row only: the profile row is born in onboarding now
+    // (no silent default guesses). Without behavior the Home screen
+    // would load forever on a fresh install.
     private fun seedDefaults() {
         lifecycleScope.launch {
             val db = AppContainer.getDatabase(this@MainActivity)
-            if (db.userProfileDao().getProfileSuspend() == null) {
-                db.userProfileDao().insert(UserProfile())
-            }
             if (db.userBehaviorDao().getBehaviorSuspend() == null) {
                 db.userBehaviorDao().insert(UserBehavior())
             }

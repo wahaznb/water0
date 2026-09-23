@@ -78,6 +78,10 @@ private class TestRepository : HydrationRepository {
         com.water0.hydration.data.fitness.SleepWindow? = null
 
     override suspend fun hadRecentWorkout(): Boolean = false
+
+    override suspend fun markManualWorkout() = Unit
+
+    override suspend fun hasManualWorkoutBoost(): Boolean = false
 }
 
 @RunWith(AndroidJUnit4::class)

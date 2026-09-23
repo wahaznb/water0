@@ -20,7 +20,10 @@ data class UserProfile(
     val reminderIntervalMinutes: Int = 60,
     val quietHoursStart: Int = 22,
     val quietHoursEnd: Int = 7,
-    val sex: Sex = Sex.FEMALE
+    val sex: Sex = Sex.FEMALE,
+    // Asked once in onboarding, editable in Settings. Null = skipped —
+    // never assumed. Reserved for personal calibration + training.
+    val ageYr: Int? = null
 ) : Serializable {
 
     enum class Sex(val baseMlPerKg: Float) {

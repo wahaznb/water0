@@ -15,7 +15,7 @@ class HydrationRepositoryImpl(
     private val entryDao: HydrationEntryDao,
     private val profileDao: UserProfileDao,
     private val behaviorDao: UserBehaviorDao,
-    appContext: android.content.Context? = null
+    private val appContext: android.content.Context? = null
 ) : HydrationRepository {
 
     private val fitness = appContext?.let {
@@ -76,4 +76,23 @@ class HydrationRepositoryImpl(
         } catch (_: Exception) {
             false
         }
+
+    override suspend fun markManualWorkout() {
+        prefs().edit().putLong(KEY_MANUAL_WORKOUT_AT, System.currentTimeMillis()).apply()
+    }
+
+    override suspend fun hasManualWorkoutBoost(): Boolean {
+        val at = prefs().getLong(KEY_MANUAL_WORKOUT_AT, 0L)
+        return at > 0L && System.currentTimeMillis() - at < MANUAL_WORKOUT_WINDOW_MILLIS
+    }
+
+    private fun prefs() = (appContext
+        ?: throw IllegalStateException("No context"))
+        .getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+
+    companion object {
+        private const val PREFS_NAME = "water0_prefs"
+        private const val KEY_MANUAL_WORKOUT_AT = "manual_workout_at"
+        private const val MANUAL_WORKOUT_WINDOW_MILLIS = 2 * 60 * 60 * 1000L
+    }
 }

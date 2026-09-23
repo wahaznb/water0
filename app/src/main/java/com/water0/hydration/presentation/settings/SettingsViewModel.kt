@@ -45,6 +45,7 @@ class SettingsViewModel(
     }
 
     fun updateWeight(weightKg: Float) = save { it.copy(weightKg = weightKg) }
+    fun updateAge(ageYr: Int?) = save { it.copy(ageYr = ageYr) }
     fun updateActivity(level: UserProfile.ActivityLevel) = save { it.copy(activityLevel = level) }
     fun updateClimate(climate: UserProfile.Climate) = save { it.copy(climate = climate) }
     fun updateSex(sex: UserProfile.Sex) = save { it.copy(sex = sex) }

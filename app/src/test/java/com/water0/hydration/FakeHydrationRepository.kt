@@ -81,4 +81,14 @@ class FakeHydrationRepository(
         com.water0.hydration.data.fitness.SleepWindow? = null
 
     override suspend fun hadRecentWorkout(): Boolean = false
+
+    private var manualWorkoutAt: Long = 0L
+
+    override suspend fun markManualWorkout() {
+        manualWorkoutAt = System.currentTimeMillis()
+    }
+
+    override suspend fun hasManualWorkoutBoost(): Boolean =
+        manualWorkoutAt > 0L &&
+            System.currentTimeMillis() - manualWorkoutAt < 2 * 60 * 60 * 1000L
 }

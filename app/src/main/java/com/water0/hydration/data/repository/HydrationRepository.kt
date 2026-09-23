@@ -35,4 +35,9 @@ interface HydrationRepository {
     // unavailable, never throws)
     suspend fun getLastNightSleep(): com.water0.hydration.data.fitness.SleepWindow?
     suspend fun hadRecentWorkout(): Boolean
+    // Manual fallback for phones without Google (degoogled / no Health
+    // Connect): user taps "just worked out", counts for 2h. Prefs, not
+    // Room — a flag, not data.
+    suspend fun markManualWorkout()
+    suspend fun hasManualWorkoutBoost(): Boolean
 }

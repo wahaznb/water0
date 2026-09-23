@@ -67,6 +67,9 @@ All notable changes to Water0 are documented here. Format follows
   delete tilting the tank (rows flash red and vanish, level glides down)
 - Housekeeping: dead Slosh animation code removed, one shared dark-theme
   check, stray build APKs cleaned (release APK is the only kept binary)
+- Onboarding asks instead of assuming (weight, optional age, sex, sleep
+  hours, reminders opt-in); age stored (DB v3, editable, exported);
+  persistent notification fires within seconds of opting in
 - Recency-sized sips: dry spell grows the next glass (250 + 75/dry-hour,
   50s grid, 500 cap — never chug coaching), silent while on pace;
   persistent notification shows current vs prorated by-now target +
@@ -74,6 +77,8 @@ All notable changes to Water0 are documented here. Format follows
 - Fitness plugin wired (Health Connect 1.0.0-alpha11, Kotlin-1.9 line):
   opt-in Settings card, last-night sleep display, measured post-workout
   rec replaces the water-entry guess
+- Degoogled path: manual "Just worked out" chip (2h prefs flag, no
+  Google needed) feeds the same recovery nudge
 - Normal buzzing reminder alongside the persistent line, only with a
   real recency nudge (same card as Home shows — on pace means silence)
 - Custom temporal-conv net (7-day windows, MAE 484 in 7.6KB, zero-loss

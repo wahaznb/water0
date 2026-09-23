@@ -25,7 +25,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.platform.LocalContext
 import com.water0.hydration.data.local.entity.HydrationEntry
+import com.water0.hydration.di.AppContainer
 import com.water0.hydration.presentation.home.components.AddWaterDialog
 import com.water0.hydration.presentation.home.components.QuickAddButtons
 import com.water0.hydration.presentation.home.components.TodayEntriesList
@@ -56,6 +58,13 @@ fun LogScreen(
     var showCustomAmount by remember { mutableStateOf(false) }
     var customInitial by remember { mutableStateOf(250) }
     var drinkType by remember { mutableStateOf(HydrationEntry.DrinkType.WATER) }
+    // Manual workout flag: the no-Google path to the post-workout nudge.
+    // Tapping stamps now (2h window); state refreshes from the repo.
+    val logContext = LocalContext.current
+    var workoutBoost by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        workoutBoost = AppContainer.getRepository(logContext).hasManualWorkoutBoost()
+    }
     // Backdate: null = right now, otherwise the past instant this drink
     // actually happened at (forgotten lunch, morning glass, …).
     var logTimeMs by remember { mutableStateOf<Long?>(null) }
@@ -170,6 +179,23 @@ fun LogScreen(
                 else "Pick time…",
                 selected = backdateChoice == 3,
                 onClick = { showTimePicker = true }
+            )
+            FilterChip(
+                selected = workoutBoost,
+                onClick = {
+                    scope.launch {
+                        val repo = AppContainer.getRepository(logContext)
+                        repo.markManualWorkout()
+                        workoutBoost = repo.hasManualWorkoutBoost()
+                        if (workoutBoost) notify("Workout noted — recovery nudge on")
+                    }
+                },
+                label = {
+                    Text(
+                        "Just worked out",
+                        fontSize = 13.sp
+                    )
+                }
             )
         }
 
