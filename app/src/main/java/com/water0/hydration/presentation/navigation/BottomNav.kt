@@ -184,7 +184,7 @@ fun GlassBoxScope.GlassBottomBar(
                     onHeight(with(density) { it.height.toDp() })
                 },
             params = params,
-            shape = RoundedCornerShape(28.dp)
+            shape = RoundedCornerShape(config.dockCorner.coerceIn(8.dp, 64.dp))
         ) {
             Box(
                 modifier = Modifier.fillMaxWidth()

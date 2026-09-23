@@ -15,7 +15,8 @@ class GlassPrefs(private val prefs: SharedPreferences) {
     fun applied(): GlassConfig = GlassConfig(
         blurRadius = prefs.getInt(KEY_BLUR_DP, 23).dp,
         tintAlpha = prefs.getFloat(KEY_TINT, GlassConfig.Defaults.TINT_ALPHA),
-        bevelAlpha = prefs.getFloat(KEY_BEVEL, GlassConfig.Defaults.BEVEL_ALPHA)
+        bevelAlpha = prefs.getFloat(KEY_BEVEL, GlassConfig.Defaults.BEVEL_ALPHA),
+        dockCorner = prefs.getInt(KEY_DOCK_DP, 28).dp
     )
 
     fun saveApplied(config: GlassConfig) {
@@ -23,6 +24,7 @@ class GlassPrefs(private val prefs: SharedPreferences) {
             .putInt(KEY_BLUR_DP, config.blurRadius.value.toInt())
             .putFloat(KEY_TINT, config.tintAlpha)
             .putFloat(KEY_BEVEL, config.bevelAlpha)
+            .putInt(KEY_DOCK_DP, config.dockCorner.value.toInt())
             .apply()
     }
 
@@ -36,6 +38,7 @@ class GlassPrefs(private val prefs: SharedPreferences) {
         private const val KEY_BLUR_DP = "glass_blur_dp"
         private const val KEY_TINT = "glass_tint"
         private const val KEY_BEVEL = "glass_bevel"
+        private const val KEY_DOCK_DP = "glass_dock_dp"
 
         fun from(context: Context): GlassPrefs {
             val prefs = context.getSharedPreferences("water0_prefs", Context.MODE_PRIVATE)

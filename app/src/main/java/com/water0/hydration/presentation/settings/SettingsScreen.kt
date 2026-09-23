@@ -659,8 +659,18 @@ private fun GlassLabSection(
             onValueChange = { onChange(config.copy(bevelAlpha = it)) },
             valueRange = 0f..0.20f
         )
+        Text(
+            text = "Dock roundness: ${config.dockCorner.value.toInt()}dp",
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Slider(
+            value = config.dockCorner.value,
+            onValueChange = { onChange(config.copy(dockCorner = it.dp)) },
+            valueRange = 8f..64f
+        )
         TextButton(onClick = { onChange(com.water0.hydration.ui.theme.GlassConfig()) }) {
-            Text("Reset defaults (23 / 31% / 5%)")
+            Text("Reset defaults (23 / 31% / 5% / 28dp)")
         }
     }
 }

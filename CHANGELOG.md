@@ -77,6 +77,7 @@ All notable changes to Water0 are documented here. Format follows
 - Fitness plugin wired (Health Connect 1.0.0-alpha11, Kotlin-1.9 line):
   opt-in Settings card, last-night sleep display, measured post-workout
   rec replaces the water-entry guess
+- Glass Lab dock roundness slider (8–64dp, default 28dp, persists)
 - Degoogled path: manual "Just worked out" chip (2h prefs flag, no
   Google needed) feeds the same recovery nudge
 - Normal buzzing reminder alongside the persistent line, only with a
