@@ -16,10 +16,11 @@ local.properties
 .DS_Store
 Thumbs.db
 
+# Design sources (IconKitchen export, not needed for build)
+IconKitchen-Output.zip
+
 # Android
 *.apk
-# ...except the curated release packages in release/
-!/release/**/*.apk
 *.ap_
 *.aab
 *.dex

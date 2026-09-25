@@ -2,7 +2,6 @@ package com.water0.hydration.presentation.home
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -17,7 +16,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -85,59 +83,16 @@ fun AmbientTank(
     val pulseScale = 1f - 0.06f * pulseWave
 
     val state = uiState as? HomeViewModel.UiState.Success ?: return
-    // Four slow poses — one per tab, no jumps: left foreground on Home,
-    // left background on Update, middle on Logs, right on Settings. Long
-    // tweens glide the glass there; opacity fades along the way.
-    val slowGlide = tween<Float>(durationMillis = 1100)
-    val slowGlideDp = tween<androidx.compose.ui.unit.Dp>(durationMillis = 1100)
-    val poseW: androidx.compose.ui.unit.Dp
-    val poseH: androidx.compose.ui.unit.Dp
-    val poseX: androidx.compose.ui.unit.Dp
-    val poseY: androidx.compose.ui.unit.Dp
-    val poseAlpha: Float
-    val poseAlign: Alignment
-    when (selectedRoute) {
-        Routes.UPDATE -> {
-            poseW = 260.dp; poseH = 440.dp
-            poseX = -110.dp; poseY = 30.dp
-            poseAlpha = 0.25f; poseAlign = Alignment.CenterStart
-        }
-        Routes.LOGS -> {
-            poseW = 260.dp; poseH = 420.dp
-            poseX = 0.dp; poseY = 0.dp
-            poseAlpha = 0.22f; poseAlign = Alignment.Center
-        }
-        Routes.SETTINGS -> {
-            poseW = 260.dp; poseH = 420.dp
-            poseX = 130.dp; poseY = 30.dp
-            poseAlpha = 0.22f; poseAlign = Alignment.CenterEnd
-        }
-        else -> {
-            poseW = 320.dp; poseH = 644.dp
-            poseX = -135.dp; poseY = 64.dp
-            poseAlpha = 1f; poseAlign = Alignment.CenterStart
-        }
-    }
-    val tankW by animateDpAsState(
-        targetValue = poseW,
-        animationSpec = slowGlideDp,
-        label = "tankW"
-    )
-    val tankH by animateDpAsState(
-        targetValue = poseH,
-        animationSpec = slowGlideDp,
-        label = "tankH"
-    )
-    val tankX by animateDpAsState(
-        targetValue = poseX,
-        animationSpec = slowGlideDp,
-        label = "tankX"
-    )
-    val tankY by animateDpAsState(
-        targetValue = poseY,
-        animationSpec = slowGlideDp,
-        label = "tankY"
-    )
+    // Anchored tank: one home on the left, no travel between tabs.
+    // Other tabs get the same tank faded dim — crossfade only, no
+    // 4-way glide. Travel was the "doesn't fit together" feeling plus
+    // 4 simultaneous Dp animations per switch (jank source).
+    val slowGlide = tween<Float>(durationMillis = 500)
+    val poseAlpha: Float = if (home) 1f else 0.22f
+    val tankW = 320.dp
+    val tankH = 644.dp
+    val tankX = -135.dp
+    val tankY = 64.dp
     val tankAlpha by animateFloatAsState(
         targetValue = poseAlpha,
         animationSpec = slowGlide,
@@ -146,7 +101,7 @@ fun AmbientTank(
 
     Box(
         modifier = modifier.fillMaxSize(),
-        contentAlignment = poseAlign
+        contentAlignment = Alignment.CenterStart
     ) {
         // Transition covers the glide: a small dip while it travels.
         Box(

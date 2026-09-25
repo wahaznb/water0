@@ -386,7 +386,8 @@ fun AuroraBackground(
             )
         }
         // Sparse pinpoint stars — few enough that black stays black.
-        for (i in 0 until 48) {
+        // Capped low: each dot is a per-frame draw, 48 was stutter fuel.
+        for (i in 0 until 24) {
             val seed = ((i * 71) % 100) / 100f
             val x = (((i * 41) % 100) / 100f) * w
             val y = (((i * 67) % 100) / 100f) * h
@@ -473,7 +474,9 @@ fun AuroraBackground(
             drawRect(color = hydrationTint, size = size)
         }
         // Film grain last: whisper-thin, so it never veils the black.
-        for (i in 0 until 300) {
+        // Static-feel speckle, capped at 80 — 300 per-frame circles
+        // was pure stutter fuel for zero visible gain.
+        for (i in 0 until 80) {
             val gx = (((i * 73) % 100) / 100f) * w
             val gy = (((i * 97) % 100) / 100f) * h
             drawCircle(

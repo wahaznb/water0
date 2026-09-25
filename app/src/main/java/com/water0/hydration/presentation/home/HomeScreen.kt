@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -421,82 +422,93 @@ fun StatusIndicator(status: RecommendationEngine.HydrationStatus.Status) {
 }
 
 /**
- * Percentage panel pages: swipe sideways between the headline number and
- * the full breakdown — snap carousel with dots, same language as the
- * recommendations below.
+ * Percentage panel pages: tap dots to switch between headline, breakdown,
+ * and sips. No horizontal swipe here — the outer tab pager owns the
+ * horizontal gesture, so an inner swipe carousel would fight it (swipe
+ * on page 2 used to flip tabs instead of pages). Fixed height so pages
+ * never squeeze.
  */
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun ColumnScope.StatsPages(
     state: HomeViewModel.UiState.Success
 ) {
-    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    androidx.compose.foundation.lazy.LazyRow(
-        state = listState,
-        flingBehavior = androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(
-            lazyListState = listState
-        ),
-        modifier = Modifier.fillMaxWidth()
+    var page by remember { mutableStateOf(0) }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(168.dp),
+        contentAlignment = Alignment.Center
     ) {
-        item {
-            // Headline is pace-vs-expected (lag, not the day): 9am shows
-            // where you stand against the morning's share, not 23% of the
-            // whole day. Day goal rides along small underneath.
-            val pace = if (state.expectedMl <= 0) state.percentage
-            else ((state.totalEffectiveMl * 100f) / state.expectedMl).roundToInt()
-            Column(
-                modifier = Modifier.fillParentMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "${pace}%",
-                    fontSize = 40.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "${state.totalEffectiveMl} / ${state.expectedMl} ml by now",
-                    fontSize = 15.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = statsQuip(state.percentage, state.status),
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        androidx.compose.animation.AnimatedContent(
+            targetState = page,
+            transitionSpec = {
+                (androidx.compose.animation.fadeIn(
+                    animationSpec = tween(180)
+                ) togetherWith androidx.compose.animation.fadeOut(
+                    animationSpec = tween(180)
+                ))
+            },
+            label = "statsPage"
+        ) { p ->
+            when (p) {
+                0 -> {
+                    // Headline is pace-vs-expected (lag, not the day): 9am shows
+                    // where you stand against the morning's share, not 23% of the
+                    // whole day. Day goal rides along small underneath.
+                    val pace = if (state.expectedMl <= 0) state.percentage
+                    else ((state.totalEffectiveMl * 100f) / state.expectedMl).roundToInt()
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "${pace}%",
+                            fontSize = 40.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "${state.totalEffectiveMl} / ${state.expectedMl} ml by now",
+                            fontSize = 15.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = statsQuip(state.percentage, state.status),
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                1 -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        StatLine(
+                            label = "Drunk",
+                            value = "${state.totalEffectiveMl} ml"
+                        )
+                        StatLine(label = "Goal", value = "${state.goalMl} ml")
+                        StatLine(label = "By now", value = "${state.expectedMl} ml")
+                        StatLine(
+                            label = "Left",
+                            value = if (state.remainingMl > 0) "${state.remainingMl} ml" else "—"
+                        )
+                        StatLine(
+                            label = "Logs",
+                            value = "${state.entries.size} today"
+                        )
+                    }
+                }
+                else -> {
+                    SipsPage(entries = state.entries)
+                }
             }
         }
-        item {
-            Column(
-                modifier = Modifier.fillParentMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                StatLine(
-                    label = "Drunk",
-                    value = "${state.totalEffectiveMl} ml"
-                )
-                StatLine(label = "Goal", value = "${state.goalMl} ml")
-                StatLine(label = "By now", value = "${state.expectedMl} ml")
-                StatLine(
-                    label = "Left",
-                    value = if (state.remainingMl > 0) "${state.remainingMl} ml" else "—"
-                )
-                StatLine(
-                    label = "Logs",
-                    value = "${state.entries.size} today"
-                )
-            }
-        }
-        item {
-            SipsPage(entries = state.entries)
-        }
     }
-    val page by remember {
-        androidx.compose.runtime.derivedStateOf { listState.firstVisibleItemIndex.coerceIn(0, 2) }
-    }
-    SwipeDots(count = 3, current = page)
+    SwipeDots(count = 3, current = page, onSelect = { page = it })
 }
 
 @Composable
@@ -555,7 +567,7 @@ private fun statsQuip(
     return pool[((day + percentage / 25) % pool.size + pool.size) % pool.size]
 }
 @Composable
-private fun SwipeDots(count: Int, current: Int) {
+private fun SwipeDots(count: Int, current: Int, onSelect: (Int) -> Unit = {}) {
     if (count < 2) return
     androidx.compose.foundation.layout.Row(
         modifier = Modifier.fillMaxWidth(),
@@ -572,6 +584,8 @@ private fun SwipeDots(count: Int, current: Int) {
                         if (i == current) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                     )
+                    .clickable { onSelect(i) }
+                    .padding(6.dp)
             )
         }
     }

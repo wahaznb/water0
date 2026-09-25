@@ -29,7 +29,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
@@ -274,28 +273,16 @@ class MainActivity : ComponentActivity() {
                             state = pagerState,
                             modifier = Modifier.fillMaxSize()
                         ) { page ->
-                            // Motion-blur fake: while dragging (|offset|>0),
-                            // fade + slight blur the outgoing page. At rest
-                            // offset=0 so no cost. Max blur follows the Glass
-                            // Lab setting (apply-on-restart). True motion blur
-                            // is not available in Compose; this approximates it.
+                            // Page glide: fade + slight parallax while dragging.
+                            // No blur here — blurring a full page per frame
+                            // drops frames on mid devices (stutter source).
                             val pageOffset = (
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
                                 ).absoluteValue
-                            val maxBlur = glassConfig.blurRadius.coerceAtMost(24.dp)
-                            val motionBlur = (pageOffset * maxBlur.value).dp.coerceAtMost(maxBlur)
-                            val motionModifier = if (pageOffset > 0.001f && android.os.Build.VERSION.SDK_INT >= 31) {
-                                Modifier
-                                    .graphicsLayer {
-                                        alpha = 1f - (pageOffset * 0.4f).coerceIn(0f, 0.6f)
-                                        translationX = -pagerState.currentPageOffsetFraction * 120f
-                                    }
-                                    .blur(motionBlur)
-                            } else {
-                                Modifier.graphicsLayer {
-                                    alpha = 1f - (pageOffset * 0.25f).coerceIn(0f, 0.5f)
-                                }
+                            val motionModifier = Modifier.graphicsLayer {
+                                alpha = 1f - (pageOffset * 0.3f).coerceIn(0f, 0.5f)
+                                translationX = -pagerState.currentPageOffsetFraction * 80f
                             }
                             Box(modifier = motionModifier.fillMaxSize()) {
                                 when (page) {
