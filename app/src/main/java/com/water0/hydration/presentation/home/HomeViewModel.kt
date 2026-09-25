@@ -56,6 +56,12 @@ class HomeViewModel(
     private val _notice = MutableStateFlow<String?>(null)
     val notice: StateFlow<String?> = _notice
 
+    // Data-change ticks for non-UI observers (e.g. MainActivity pokes the
+    // persistent notification so the shade never shows a stale total).
+    // 0 = nothing yet; every successful log/delete bumps it.
+    private val _dataChanged = MutableStateFlow(0)
+    val dataChanged: StateFlow<Int> = _dataChanged
+
     fun consumeNotice() {
         _notice.value = null
     }
@@ -115,6 +121,7 @@ class HomeViewModel(
         viewModelScope.launch {
             logHydration(amountMl, type, timestampMs = timestampMs)
             _glassKick.value = GlassKick.Pour(amountMl)
+            _dataChanged.value = _dataChanged.value + 1
         }
     }
 
@@ -128,6 +135,7 @@ class HomeViewModel(
                 // No glass kick: deletes just vanish (red flash in the row)
                 // and the tank level glides down on its own.
                 deleteHydration(entryId)
+                _dataChanged.value = _dataChanged.value + 1
             } catch (e: Exception) {
                 _notice.value = e.message ?: "Delete failed"
             }

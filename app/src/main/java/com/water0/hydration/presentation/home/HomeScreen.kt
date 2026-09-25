@@ -2,7 +2,6 @@ package com.water0.hydration.presentation.home
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,13 +9,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,17 +27,12 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,59 +40,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.water0.hydration.domain.engine.RecommendationEngine
-import com.water0.hydration.ui.theme.Glass
-import com.water0.hydration.ui.theme.isDarkScheme
+import com.water0.hydration.ui.theme.glassCardBorder
+import com.water0.hydration.ui.theme.glassCardContainer
 import com.water0.hydration.presentation.home.components.RecommendationCard
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
-
-// Info-zone card silhouette: ONLY the left edge slants, at the same lean
-// as the tumbler's tapered wall beside the cards (top wider than base ≈
-// 2°). No whole-card rotation — the card itself carries the angle.
-internal const val CardSlantFrac = 0.035f
-class SlantedCardShape(
-    private val slantFrac: Float = CardSlantFrac,
-    private val corner: androidx.compose.ui.unit.Dp = 12.dp
-) : androidx.compose.ui.graphics.Shape {
-    override fun createOutline(
-        size: androidx.compose.ui.geometry.Size,
-        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
-        density: androidx.compose.ui.unit.Density
-    ): androidx.compose.ui.graphics.Outline {
-        val w = size.width
-        val h = size.height
-        // Top-left sits further right than bottom-left, paralleling the
-        // tank's right wall (top wider than base).
-        val s = h * slantFrac
-        val r = with(density) { corner.toPx() }.coerceAtMost(minOf(w / 4f, h / 4f))
-        // Unit vector up the slanted left edge (bottom-left -> top-left).
-        val edgeLen = sqrt(s * s + h * h)
-        val ux = s / edgeLen
-        val uy = -h / edgeLen
-        val path = androidx.compose.ui.graphics.Path().apply {
-            moveTo(s + r, 0f)
-            lineTo(w - r, 0f)
-            quadraticBezierTo(w, 0f, w, r)
-            lineTo(w, h - r)
-            quadraticBezierTo(w, h, w - r, h)
-            lineTo(r, h)
-            quadraticBezierTo(0f, h, ux * r, h + uy * r)
-            lineTo(s - ux * r, -uy * r)
-            quadraticBezierTo(s, 0f, s + r, 0f)
-            close()
-        }
-        return androidx.compose.ui.graphics.Outline.Generic(path)
-    }
-}
-
-// Home frosted panels: dark keeps the exact 0.42 surface; light gets the
-// same slight black tint as the shared glass cards.
-@Composable
-private fun homePanelContainer(): Color {
-    return if (isDarkScheme()) MaterialTheme.colorScheme.surface.copy(alpha = 0.42f)
-    else Color(0xFFECECEC).copy(alpha = 0.62f)
-}
 
 // Content-only: the single Scaffold (top bar, glass bottom bar, snackbar
 // host) lives in MainActivity. The host is passed in so toasts render in
@@ -141,96 +85,40 @@ fun HomeScreen(
             modifier = Modifier.height(topGutter)
         )
 
-        // Numbers live here now; the tank itself is ambient behind the
-        // whole shell (see AmbientTank) so it never fights content.
-        // Left ~40% stays empty for the cropped tank; the frosted panel
-        // keeps text readable over it.
-        // Order in the info zone: recommendations up top, stats panel
-        // below — every card shares the same left edge, so each sits the
-        // same distance from the tumbler wall.
-        androidx.compose.foundation.layout.Row(
+        // Wide frosted cards over the ambient tank: the tumbler holds the
+        // left ~35% behind everything (see AmbientTank) and every card
+        // spans full width in shared glass, so the tank glows through the
+        // frost instead of fighting a split column for space. One edge
+        // language (16dp rounds) everywhere — no slant, no divider.
+        // Order: recommendations up top, status + stats below.
+        androidx.compose.foundation.layout.Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            androidx.compose.foundation.layout.Spacer(
-                modifier = Modifier.weight(0.7f)
+            RecommendationsSection(
+                recommendations = state.recommendations,
+                onAction = { amount -> onRecLog(amount) }
             )
-            // Strict red separator: tank zone ends here, information begins.
-            Box(
+            StatusIndicator(status = state.status)
+            Column(
                 modifier = Modifier
-                    .width(2.dp)
-                    .fillMaxHeight()
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
                     .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color.Transparent,
-                                Color(0xFFE5484D).copy(alpha = 0.7f),
-                                Color.Transparent
-                            )
-                        ),
-                        RoundedCornerShape(1.dp)
+                        glassCardContainer(),
+                        RoundedCornerShape(16.dp)
                     )
-            )
-            Column(
-                modifier = Modifier.weight(1.3f),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .border(
+                        glassCardBorder(),
+                        RoundedCornerShape(16.dp)
+                    )
+                    .padding(14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                RecommendationsSection(
-                    recommendations = state.recommendations,
-                    onAction = { amount -> onRecLog(amount) }
-                )
-            }
-        }
-
-        // Status pill + stats panel below, same 0.7 / 2dp / 1.3 split so
-        // their left edges line up exactly with the recommendations above.
-        androidx.compose.foundation.layout.Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            androidx.compose.foundation.layout.Spacer(
-                modifier = Modifier.weight(0.7f)
-            )
-            // Invisible twin of the red divider above: keeps alignment
-            // identical without drawing a second line.
-            androidx.compose.foundation.layout.Spacer(
-                modifier = Modifier.width(2.dp)
-            )
-            Column(
-                modifier = Modifier.weight(1.3f),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                StatusIndicator(status = state.status)
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(SlantedCardShape())
-                        .background(
-                            homePanelContainer(),
-                            SlantedCardShape()
-                        )
-                        .border(
-                            1.dp,
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color.White.copy(alpha = 0.16f),
-                                    MaterialTheme.colorScheme.outline.copy(
-                                        alpha = Glass.BORDER_ALPHA
-                                    )
-                                )
-                            ),
-                            SlantedCardShape()
-                        )
-                        .padding(14.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    GreetingBox()
-                    StatsPages(state = state)
-                }
+                GreetingBox()
+                StatsPages(state = state)
             }
         }
     }
@@ -402,11 +290,11 @@ fun StatusIndicator(status: RecommendationEngine.HydrationStatus.Status) {
         modifier = Modifier
             .fillMaxWidth()
             .height(36.dp)
-            .background(color.copy(alpha = 0.14f), SlantedCardShape())
+            .background(color.copy(alpha = 0.14f), RoundedCornerShape(12.dp))
             .border(
                 1.dp,
                 color.copy(alpha = 0.35f),
-                SlantedCardShape()
+                RoundedCornerShape(12.dp)
             )
             .padding(horizontal = 16.dp)
     ) {
@@ -423,93 +311,88 @@ fun StatusIndicator(status: RecommendationEngine.HydrationStatus.Status) {
 }
 
 /**
- * Percentage panel pages: tap dots to switch between headline, breakdown,
- * and sips. No horizontal swipe here — the outer tab pager owns the
- * horizontal gesture, so an inner swipe carousel would fight it (swipe
- * on page 2 used to flip tabs instead of pages). Fixed height so pages
- * never squeeze.
+ * Percentage panel pages: a real swipe carousel (headline, breakdown,
+ * sips) with snap + tappable dots. This works because the outer tab
+ * pager disables its own swipe while Home is showing (see MainActivity)
+ * — two horizontal pagers can't share one gesture, so Home yields.
+ * Fixed height so pages never squeeze.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun ColumnScope.StatsPages(
     state: HomeViewModel.UiState.Success
 ) {
-    var page by remember { mutableStateOf(0) }
-    Box(
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(
+        initialPage = 0,
+        pageCount = { 3 }
+    )
+    val scope = rememberCoroutineScope()
+    androidx.compose.foundation.pager.HorizontalPager(
+        state = pagerState,
         modifier = Modifier
             .fillMaxWidth()
-            .height(168.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        androidx.compose.animation.AnimatedContent(
-            targetState = page,
-            transitionSpec = {
-                (androidx.compose.animation.fadeIn(
-                    animationSpec = tween(180)
-                ) togetherWith androidx.compose.animation.fadeOut(
-                    animationSpec = tween(180)
-                ))
-            },
-            label = "statsPage"
-        ) { p ->
-            when (p) {
-                0 -> {
-                    // Headline is pace-vs-expected (lag, not the day): 9am shows
-                    // where you stand against the morning's share, not 23% of the
-                    // whole day. Day goal rides along small underneath.
-                    val pace = if (state.expectedMl <= 0) state.percentage
-                    else ((state.totalEffectiveMl * 100f) / state.expectedMl).roundToInt()
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "${pace}%",
-                            fontSize = 40.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "${state.totalEffectiveMl} / ${state.expectedMl} ml by now",
-                            fontSize = 15.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = statsQuip(state.percentage, state.status),
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+            .height(168.dp)
+    ) { p ->
+        when (p) {
+            0 -> {
+                // Headline is pace-vs-expected (lag, not the day): 9am shows
+                // where you stand against the morning's share, not 23% of the
+                // whole day. Day goal rides along small underneath.
+                val pace = if (state.expectedMl <= 0) state.percentage
+                else ((state.totalEffectiveMl * 100f) / state.expectedMl).roundToInt()
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "${pace}%",
+                        fontSize = 40.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "${state.totalEffectiveMl} / ${state.expectedMl} ml by now",
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = statsQuip(state.percentage, state.status),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                1 -> {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        StatLine(
-                            label = "Drunk",
-                            value = "${state.totalEffectiveMl} ml"
-                        )
-                        StatLine(label = "Goal", value = "${state.goalMl} ml")
-                        StatLine(label = "By now", value = "${state.expectedMl} ml")
-                        StatLine(
-                            label = "Left",
-                            value = if (state.remainingMl > 0) "${state.remainingMl} ml" else "—"
-                        )
-                        StatLine(
-                            label = "Logs",
-                            value = "${state.entries.size} today"
-                        )
-                    }
+            }
+            1 -> {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    StatLine(
+                        label = "Drunk",
+                        value = "${state.totalEffectiveMl} ml"
+                    )
+                    StatLine(label = "Goal", value = "${state.goalMl} ml")
+                    StatLine(label = "By now", value = "${state.expectedMl} ml")
+                    StatLine(
+                        label = "Left",
+                        value = if (state.remainingMl > 0) "${state.remainingMl} ml" else "—"
+                    )
+                    StatLine(
+                        label = "Logs",
+                        value = "${state.entries.size} today"
+                    )
                 }
-                else -> {
-                    SipsPage(entries = state.entries)
-                }
+            }
+            else -> {
+                SipsPage(entries = state.entries)
             }
         }
     }
-    SwipeDots(count = 3, current = page, onSelect = { page = it })
+    SwipeDots(count = 3, current = pagerState.currentPage) {
+        scope.launch { pagerState.animateScrollToPage(it) }
+    }
 }
 
 @Composable
@@ -692,22 +575,14 @@ private fun AllClearCard() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(SlantedCardShape())
+            .clip(RoundedCornerShape(16.dp))
             .background(
-                homePanelContainer(),
-                SlantedCardShape()
+                glassCardContainer(),
+                RoundedCornerShape(16.dp)
             )
             .border(
-                1.dp,
-                Brush.verticalGradient(
-                    listOf(
-                        Color.White.copy(alpha = 0.16f),
-                        MaterialTheme.colorScheme.outline.copy(
-                            alpha = Glass.BORDER_ALPHA
-                        )
-                    )
-                ),
-                SlantedCardShape()
+                glassCardBorder(),
+                RoundedCornerShape(16.dp)
             )
             .padding(horizontal = 20.dp, vertical = 18.dp)
     ) {

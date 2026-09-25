@@ -129,12 +129,14 @@ The split is **by user** (`GroupShuffleSplit`): no user appears in both
 train and test, otherwise the model just memorizes personal habits and
 test scores lie.
 
-## Android integration (v0.2)
+## Android integration (v0.2, as shipped)
 
-1. Copy `model/hydration_goal.tflite` + `model/scaler.json` into `app/src/main/assets/`.
-2. Load with the TensorFlow Lite Task Library / Interpreter API.
-3. Apply the saved scaler (`(x − mean) / scale`) before inference.
-4. Blend with the rule engine: `final = 0.5 × rule + 0.5 × model`, then clamp to [1000, 5000] ml.
+1. `model/sequence_tcn.tflite` is copied into `app/src/main/assets/`.
+2. `OnDeviceForecast` loads it, feeds the previous 7 complete daily
+   totals (fixed /4000 scale, no scaler file), shows the result as the
+   Settings advisor line. Null-safe: any failure means silence.
+3. The aggregate MLP (`hydration_goal.tflite` + `scaler.json`) stays
+   unshipped — kept as a measured baseline, not a downgrade aboard.
 
 ## Talking about this (interviews)
 

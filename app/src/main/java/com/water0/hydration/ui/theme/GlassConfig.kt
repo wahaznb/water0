@@ -8,28 +8,25 @@ import androidx.compose.ui.unit.dp
  * Applied glass configuration. Values are read once at cold start from
  * [GlassPrefs] so Haze blur never re-composes mid-frame.
  *
- * Defaults per spec: blur 23dp, tint alpha 0.31, bevel 0.05, dock 28dp.
+ * Defaults per spec: blur 6dp, tint alpha 0.27, dock 42dp (max 45dp).
+ * No bevel — the lens edge is a fixed hairline, not a tunable.
  */
 @Immutable
 data class GlassConfig(
     val blurRadius: Dp = Defaults.BLUR,
     val tintAlpha: Float = Defaults.TINT_ALPHA,
-    val bevelAlpha: Float = Defaults.BEVEL_ALPHA,
     val dockCorner: Dp = Defaults.DOCK_CORNER
 ) {
     object Defaults {
-        val BLUR: Dp = 23.dp
-        const val TINT_ALPHA = 0.31f
-        const val BEVEL_ALPHA = 0.05f
-        val DOCK_CORNER: Dp = 28.dp
+        val BLUR: Dp = 6.dp
+        const val TINT_ALPHA = 0.27f
+        val DOCK_CORNER: Dp = 42.dp
     }
 
     object Ranges {
         val BLUR_RANGE = 0.dp..40.dp
         const val TINT_MIN = 0f
         const val TINT_MAX = 0.60f
-        const val BEVEL_MIN = 0f
-        const val BEVEL_MAX = 0.20f
-        val DOCK_RANGE = 8.dp..64.dp
+        val DOCK_RANGE = 8.dp..45.dp
     }
 }

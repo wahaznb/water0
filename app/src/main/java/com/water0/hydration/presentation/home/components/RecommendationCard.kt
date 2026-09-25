@@ -54,7 +54,7 @@ fun RecommendationCard(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = com.water0.hydration.presentation.home.SlantedCardShape(),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = glassCardContainer()
         ),

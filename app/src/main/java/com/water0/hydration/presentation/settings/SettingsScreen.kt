@@ -384,10 +384,16 @@ private fun GoalSection(profile: UserProfile, viewModel: SettingsViewModel) {
     }
 }
 
+/** True when notifications can actually appear (pre-33 always can). */
+private fun checkNotifPermission(context: android.content.Context): Boolean =
+    android.os.Build.VERSION.SDK_INT < 33 ||
+        androidx.core.content.ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.POST_NOTIFICATIONS
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
 @Composable
 private fun RemindersSection(profile: UserProfile, viewModel: SettingsViewModel) {
-    val context = LocalContext.current
-    // Opt-in permission: asked only when the user flips reminders ON, never
+    val context = LocalContext.current    // Opt-in permission: asked only when the user flips reminders ON, never
     // at install. If denied, the toggle still saves — the worker just skips
     // showing until the system permission is granted.
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -400,6 +406,22 @@ private fun RemindersSection(profile: UserProfile, viewModel: SettingsViewModel)
                 .getNotificationScheduler(context).poke()
         }
     }
+    // Permission can die outside the app (system settings, auto-revoke):
+    // re-check on every return so the warning below never lies stale.
+    var notifGranted by remember {
+        mutableStateOf(checkNotifPermission(context))
+    }
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                notifGranted = checkNotifPermission(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val scope = rememberCoroutineScope()
     SectionCard(title = "Reminders") {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -437,6 +459,66 @@ private fun RemindersSection(profile: UserProfile, viewModel: SettingsViewModel)
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        } else if (!notifGranted) {
+            // The seeded-ON trap, made visible: toggle on, permission off
+            // means the worker runs silent forever. Say so + offer the fix.
+            Text(
+                text = "Blocked: notifications are denied, so nothing can " +
+                    "appear — not even the status line.",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.error
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        permissionLauncher.launch(
+                            android.Manifest.permission.POST_NOTIFICATIONS
+                        )
+                    }
+                ) {
+                    Text("Ask again")
+                }
+                TextButton(
+                    onClick = {
+                        val intent = android.content.Intent(
+                            android.provider.Settings
+                                .ACTION_APP_NOTIFICATION_SETTINGS
+                        ).putExtra(
+                            android.provider.Settings.EXTRA_APP_PACKAGE,
+                            context.packageName
+                        )
+                        context.startActivity(intent)
+                    }
+                ) {
+                    Text("Open system settings")
+                }
+            }
+        }
+        // Fire-now diagnostics: same code the chain runs. If this shows,
+        // display works and the chain/schedule is the suspect; if not,
+        // read the toast reason.
+        if (profile.remindersEnabled) {
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        val shown =
+                            com.water0.hydration.presentation.notification
+                                .showStatusNotifications(context)
+                        android.widget.Toast.makeText(
+                            context,
+                            if (shown) "Sent — check your shade."
+                            else "Nothing posted (quiet hours? permission?)",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            ) {
+                Text("Send test notification")
+            }
         }
         Text(
             text = "Every ${profile.reminderIntervalMinutes} min",
@@ -650,16 +732,6 @@ private fun GlassLabSection(
             valueRange = 0f..0.60f
         )
         Text(
-            text = "Bevel: ${(config.bevelAlpha * 100).roundToInt()}%",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Slider(
-            value = config.bevelAlpha,
-            onValueChange = { onChange(config.copy(bevelAlpha = it)) },
-            valueRange = 0f..0.20f
-        )
-        Text(
             text = "Dock roundness: ${config.dockCorner.value.toInt()}dp",
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurface
@@ -667,10 +739,10 @@ private fun GlassLabSection(
         Slider(
             value = config.dockCorner.value,
             onValueChange = { onChange(config.copy(dockCorner = it.dp)) },
-            valueRange = 8f..64f
+            valueRange = 8f..45f
         )
         TextButton(onClick = { onChange(com.water0.hydration.ui.theme.GlassConfig()) }) {
-            Text("Reset defaults (23 / 31% / 5% / 28dp)")
+            Text("Reset defaults (6 / 27% / 42dp)")
         }
     }
 }

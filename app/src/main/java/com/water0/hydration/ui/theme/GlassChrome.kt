@@ -16,13 +16,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Liquid-glass toast: translucent tint + hairline border.
+ * Liquid-glass toast: translucent tint + hairline border with a fixed
+ * top highlight (no tunable bevel anymore).
  */
 @Composable
 fun GlassSnackbar(
     message: String,
-    modifier: Modifier = Modifier,
-    config: GlassConfig = GlassConfig()
+    modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier
@@ -35,7 +35,7 @@ fun GlassSnackbar(
                 1.dp,
                 Brush.verticalGradient(
                     listOf(
-                        Color.White.copy(alpha = config.bevelAlpha + 0.08f),
+                        Color.White.copy(alpha = 0.08f),
                         MaterialTheme.colorScheme.outline.copy(alpha = Glass.BORDER_ALPHA)
                     )
                 ),

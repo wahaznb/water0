@@ -13,17 +13,15 @@ import androidx.compose.ui.unit.dp
 class GlassPrefs(private val prefs: SharedPreferences) {
 
     fun applied(): GlassConfig = GlassConfig(
-        blurRadius = prefs.getInt(KEY_BLUR_DP, 23).dp,
+        blurRadius = prefs.getInt(KEY_BLUR_DP, 6).dp,
         tintAlpha = prefs.getFloat(KEY_TINT, GlassConfig.Defaults.TINT_ALPHA),
-        bevelAlpha = prefs.getFloat(KEY_BEVEL, GlassConfig.Defaults.BEVEL_ALPHA),
-        dockCorner = prefs.getInt(KEY_DOCK_DP, 28).dp
+        dockCorner = prefs.getInt(KEY_DOCK_DP, 42).dp.coerceAtMost(45.dp)
     )
 
     fun saveApplied(config: GlassConfig) {
         prefs.edit()
             .putInt(KEY_BLUR_DP, config.blurRadius.value.toInt())
             .putFloat(KEY_TINT, config.tintAlpha)
-            .putFloat(KEY_BEVEL, config.bevelAlpha)
             .putInt(KEY_DOCK_DP, config.dockCorner.value.toInt())
             .apply()
     }
@@ -37,14 +35,25 @@ class GlassPrefs(private val prefs: SharedPreferences) {
     companion object {
         private const val KEY_BLUR_DP = "glass_blur_dp"
         private const val KEY_TINT = "glass_tint"
-        private const val KEY_BEVEL = "glass_bevel"
         private const val KEY_DOCK_DP = "glass_dock_dp"
+        // Bumped when the defaults change (v0.3: 6dp / 27% / 42dp, bevel
+        // removed): existing installs re-seed once so the phone actually
+        // shows the new look instead of the stored old values.
+        private const val KEY_VERSION = "glass_defaults_version"
+        private const val CURRENT_VERSION = 1
 
         fun from(context: Context): GlassPrefs {
             val prefs = context.getSharedPreferences("water0_prefs", Context.MODE_PRIVATE)
             val store = GlassPrefs(prefs)
-            if (!prefs.contains(KEY_BLUR_DP)) {
+            if (!prefs.contains(KEY_BLUR_DP) ||
+                prefs.getInt(KEY_VERSION, 0) < CURRENT_VERSION
+            ) {
                 store.saveApplied(GlassConfig())
+                prefs.edit().putInt(KEY_VERSION, CURRENT_VERSION).apply()
+            }
+            // Clamp a stored dock value from the old 64dp era into range.
+            if (prefs.getInt(KEY_DOCK_DP, 42) > 45) {
+                prefs.edit().putInt(KEY_DOCK_DP, 45).apply()
             }
             return store
         }

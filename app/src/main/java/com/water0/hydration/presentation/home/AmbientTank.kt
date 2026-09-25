@@ -83,16 +83,15 @@ fun AmbientTank(
     val pulseScale = 1f - 0.06f * pulseWave
 
     val state = uiState as? HomeViewModel.UiState.Success ?: return
-    // Anchored tank: one home on the left, no travel between tabs.
-    // Other tabs get the same tank faded dim — crossfade only, no
-    // 4-way glide. Travel was the "doesn't fit together" feeling plus
-    // 4 simultaneous Dp animations per switch (jank source).
+    // Anchored tumbler: left ~35% of the screen, vertically centered.
+    // Wide frosted cards float over it everywhere (see HomeScreen), so
+    // the tank holds its ground instead of traveling — crossfade only.
     val slowGlide = tween<Float>(durationMillis = 500)
     val poseAlpha: Float = if (home) 1f else 0.22f
     val tankW = 320.dp
     val tankH = 644.dp
-    val tankX = -135.dp
-    val tankY = 64.dp
+    val tankX = (-180).dp
+    val tankY = 0.dp
     val tankAlpha by animateFloatAsState(
         targetValue = poseAlpha,
         animationSpec = slowGlide,

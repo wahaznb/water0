@@ -197,6 +197,19 @@ class MainActivity : ComponentActivity() {
                 // sampled content for the lens to refract it). Its measured
                 // height reserves the content inset; the toast is lifted
                 // above it for the same reason.
+                // Every successful log/delete refreshes the persistent shade
+                // line within seconds (poke = 10s primer work). Skips the
+                // initial 0 so launch doesn't double-schedule.
+                LaunchedEffect(Unit) {
+                    var first = true
+                    viewModel.dataChanged.collect {
+                        if (first) {
+                            first = false
+                            return@collect
+                        }
+                        AppContainer.getNotificationScheduler(this@MainActivity).poke()
+                    }
+                }
                 val snackbarHostState = remember { SnackbarHostState() }
                 var barHeightDp by remember { mutableStateOf(0.dp) }
                 // Floating lenses everywhere (top bar + bottom dock): content
@@ -271,6 +284,11 @@ class MainActivity : ComponentActivity() {
                     ) {
                         HorizontalPager(
                             state = pagerState,
+                            // Home yields horizontal swipes to the stats card
+                            // carousel (see StatsPages): two nested pagers
+                            // can't share one gesture, and the outer always
+                            // wins. Dock still navigates everywhere.
+                            userScrollEnabled = pagerState.currentPage != 0,
                             modifier = Modifier.fillMaxSize()
                         ) { page ->
                             // Page glide: fade + slight parallax while dragging.

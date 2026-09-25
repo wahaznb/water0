@@ -70,6 +70,8 @@ All notable changes to Water0 are documented here. Format follows
 - Tank headlines pace-vs-expected (1100 / 1800 ml by now), day goal
   demoted to the breakdown; range pill fixed shape, zero tap animation,
   hold-and-swipe across segments
+- Notification diagnostics: in-app test button runs the exact chain
+  code, plus a blocked-permission warning that re-checks on resume
 - Onboarding asks instead of assuming (weight, optional age, sex, sleep
   hours, reminders opt-in); age stored (DB v3, editable, exported);
   persistent notification fires within seconds of opting in

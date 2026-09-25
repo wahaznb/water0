@@ -15,8 +15,8 @@ class LiquidGlassMappingTest {
     @Test
     fun `defaults map to a strong-but-sane lens`() {
         val params = GlassConfig().toLiquidParams(Color.White)
-        // 23dp / 24dp saturates just under full blur.
-        assertEquals(23f / 24f, params.blur, 0.001f)
+        // 6dp / 24dp — light blur by default.
+        assertEquals(6f / 24f, params.blur, 0.001f)
         assertEquals(GlassConfig.Defaults.TINT_ALPHA, params.tint.alpha, 0.001f)
         assertTrue(params.scale in 0f..1f)
         assertTrue(params.darkness in 0f..1f)

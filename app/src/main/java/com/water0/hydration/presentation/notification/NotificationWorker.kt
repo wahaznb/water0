@@ -64,11 +64,7 @@ class NotificationWorker(
         if (inputData.getBoolean(KEY_SHOW, true) &&
             !inQuietHours(profile.quietHoursStart, profile.quietHoursEnd)
         ) {
-            val entries = repository.getTodayEntries().first()
-            showOngoing(
-                context, engine, profile, total, goal,
-                entries
-            )
+            showStatusNotifications(context)
         } else {
             // Quiet hours or a silent tick: never let stale notifications
             // sit overnight.
@@ -84,96 +80,6 @@ class NotificationWorker(
     private fun inQuietHours(start: Int, end: Int): Boolean {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         return if (start <= end) hour in start until end else hour >= start || hour < end
-    }
-
-    /**
-     * Two notifications per fire: the quiet persistent status line
-     * (current vs prorated by-now target, updated in place, never buzzes
-     * twice) plus — only when there is something to say — a normal
-     * buzzing reminder carrying the same recency nudge the app shows, so
-     * both always agree. On pace / met / over: persistent only, no buzz.
-     * Refreshes each chain tick (≥15min) and shortly after launch.
-     */
-    private suspend fun showOngoing(
-        context: Context,
-        engine: com.water0.hydration.domain.engine.RecommendationEngine,
-        profile: com.water0.hydration.data.local.entity.UserProfile,
-        totalMl: Int,
-        goalMl: Int,
-        todayEntries: List<com.water0.hydration.data.local.entity.HydrationEntry>
-    ) {
-        if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-        val nowMs = System.currentTimeMillis()
-        val hour = Calendar.getInstance().apply { timeInMillis = nowMs }.get(Calendar.HOUR_OF_DAY)
-        val lastDrinkMs = todayEntries.firstOrNull()?.timestamp
-        val expected = (goalMl * engine.dayFraction(hour, profile.wakeUpHour, profile.sleepHour))
-            .roundToInt()
-        val over = totalMl > com.water0.hydration.domain.engine.RecommendationEngine.safeMaxMl(goalMl)
-        val met = totalMl >= goalMl
-        val title = when {
-            over -> "Over the safe limit"
-            met -> "Goal met · $totalMl ml"
-            else -> "$totalMl / $expected ml by now"
-        }
-        val text = when {
-            over -> "Stop here for today."
-            met -> "Goal $goalMl ml · sip only if thirsty."
-            else -> {
-                val gapH = if (lastDrinkMs == null) {
-                    (hour - profile.wakeUpHour + 1).coerceAtLeast(1).toFloat()
-                } else {
-                    ((nowMs - lastDrinkMs) / 3600000f).coerceAtLeast(0f)
-                }
-                if (totalMl >= expected) "Goal $goalMl ml · nicely on pace."
-                else "Goal $goalMl ml · try ~${engine.suggestSipMl(gapH)} ml?"
-            }
-        }
-        val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            context, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val manager = NotificationManagerCompat.from(context)
-        manager.notify(
-            NOTIFICATION_ID,
-            NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setContentTitle(title)
-                .setContentText(text)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setContentIntent(pendingIntent)
-                .setOngoing(true)
-                .setAutoCancel(false)
-                .setOnlyAlertOnce(true)
-                .build()
-        )
-        // Normal buzzing reminder on top — but only with a real nudge.
-        // Same recency math as the Home tab, so tapping through shows the
-        // exact card this buzz talked about.
-        if (!over && !met) {
-            engine.recencySuggestion(
-                totalMl, goalMl, lastDrinkMs, nowMs,
-                profile.wakeUpHour, profile.sleepHour
-            )?.let { nudge ->
-                manager.notify(
-                    REMINDER_ID,
-                    NotificationCompat.Builder(context, CHANNEL_ID)
-                        .setSmallIcon(android.R.drawable.ic_dialog_info)
-                        .setContentTitle("Around ${nudge.suggestedAmountMl} ml?")
-                        .setContentText(nudge.message)
-                        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                        .setContentIntent(pendingIntent)
-                        .setAutoCancel(true)
-                        .build()
-                )
-            }
-        }
     }
 
     companion object {
