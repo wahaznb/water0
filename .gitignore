@@ -19,6 +19,10 @@ Thumbs.db
 # Design sources (IconKitchen export, not needed for build)
 IconKitchen-Output.zip
 
+# Curated release packages (sideload APKs, checksums, notes):
+# distributed via GitHub Releases, never tracked in git.
+release/
+
 # Android
 *.apk
 *.ap_
