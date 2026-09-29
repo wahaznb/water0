@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +35,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -90,17 +93,12 @@ fun HomeScreen(
         // spans full width in shared glass, so the tank glows through the
         // frost instead of fighting a split column for space. One edge
         // language (16dp rounds) everywhere — no slant, no divider.
-        // Order: recommendations up top, status + stats below.
+        // Order: hero stats first, recommendations below.
         androidx.compose.foundation.layout.Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            RecommendationsSection(
-                recommendations = state.recommendations,
-                onAction = { amount -> onRecLog(amount) }
-            )
-            StatusIndicator(status = state.status)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -117,16 +115,44 @@ fun HomeScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                GreetingBox()
+                HeroHeader(status = state.status)
                 StatsPages(state = state)
+                // Day progress under the carousel: the same story as the
+                // shade line — how much of the day is actually drunk.
+                androidx.compose.material3.LinearProgressIndicator(
+                    progress = {
+                        (state.totalEffectiveMl.toFloat() / state.goalMl.coerceAtLeast(1))
+                            .coerceIn(0f, 1f)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                )
             }
+            com.water0.hydration.presentation.home.components.PaceCurveCard(
+                entries = state.entries,
+                goalMl = state.goalMl,
+                wakeHour = state.wakeHour,
+                sleepHour = state.sleepHour
+            )
+            RecommendationsSection(
+                recommendations = state.recommendations,
+                onAction = { amount -> onRecLog(amount) }
+            )
         }
     }
 }
 
-/** Greeting + date in their own frosted box above the percentage. */
+/**
+ * Hero header: greeting + date on the left, compact status chip on the
+ * right. Replaces the old stacked greeting box + full-width status pill
+ * — one row, same information.
+ */
 @Composable
-private fun ColumnScope.GreetingBox() {
+private fun HeroHeader(status: RecommendationEngine.HydrationStatus.Status) {
     val cal = java.util.Calendar.getInstance()
     val greeting = when (cal.get(java.util.Calendar.HOUR_OF_DAY)) {
         in 5..11 -> "Good morning"
@@ -136,33 +162,48 @@ private fun ColumnScope.GreetingBox() {
     }
     val date = java.text.SimpleDateFormat("EEEE, MMM d", java.util.Locale.getDefault())
         .format(cal.time)
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
-                RoundedCornerShape(14.dp)
-            )
-            .border(
-                1.dp,
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.30f),
-                RoundedCornerShape(14.dp)
-            )
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center
+    val (text, target) = when (status) {
+        RecommendationEngine.HydrationStatus.Status.BEHIND -> "Behind" to Color(0xFFEF5350)
+        RecommendationEngine.HydrationStatus.Status.ON_TRACK -> "On track" to Color(0xFF43A047)
+        RecommendationEngine.HydrationStatus.Status.AHEAD -> "Ahead" to Color(0xFF1E88E5)
+        RecommendationEngine.HydrationStatus.Status.OVER -> "Over limit" to Color(0xFFFF5252)
+    }
+    val color by animateColorAsState(
+        targetValue = target,
+        animationSpec = tween(durationMillis = 600),
+        label = "heroStatusTint"
+    )
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        androidx.compose.foundation.layout.Column {
             Text(
                 text = greeting,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = date,
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(color.copy(alpha = 0.14f), RoundedCornerShape(20.dp))
+                .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = text,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = color
             )
         }
     }
@@ -271,51 +312,13 @@ fun hydrationTintFor(uiState: HomeViewModel.UiState): Color {
     }
 }
 
-@Composable
-fun StatusIndicator(status: RecommendationEngine.HydrationStatus.Status) {
-    val (text, target) = when (status) {
-        RecommendationEngine.HydrationStatus.Status.BEHIND -> "Behind goal" to Color(0xFFEF5350)
-        RecommendationEngine.HydrationStatus.Status.ON_TRACK -> "On track" to Color(0xFF43A047)
-        RecommendationEngine.HydrationStatus.Status.AHEAD -> "Ahead of goal" to Color(0xFF1E88E5)
-        RecommendationEngine.HydrationStatus.Status.OVER -> "Over the safe limit" to Color(0xFFFF5252)
-    }
-    // Tint glides instead of snapping when hydration state flips.
-    val color by animateColorAsState(
-        targetValue = target,
-        animationSpec = tween(durationMillis = 600),
-        label = "statusTint"
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(36.dp)
-            .background(color.copy(alpha = 0.14f), RoundedCornerShape(12.dp))
-            .border(
-                1.dp,
-                color.copy(alpha = 0.35f),
-                RoundedCornerShape(12.dp)
-            )
-            .padding(horizontal = 16.dp)
-    ) {
-        Text(
-            text = text,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = color,
-            modifier = Modifier
-                .fillMaxSize()
-                .wrapContentSize(Alignment.Center)
-        )
-    }
-}
-
 /**
- * Percentage panel pages: a real swipe carousel (headline, breakdown,
- * sips) with snap + tappable dots. This works because the outer tab
- * pager disables its own swipe while Home is showing (see MainActivity)
- * — two horizontal pagers can't share one gesture, so Home yields.
- * Fixed height so pages never squeeze.
+ * Percentage panel pages: swipe carousel (headline, breakdown, sips)
+ * with snap + tappable dots. The swipe is hand-driven: the inner pager
+ * has userScrollEnabled=false and a horizontal-drag detector feeds it,
+ * so the gesture is owned right on the card and no ancestor — outer
+ * tab pager included — can steal it (that theft was the original
+ * "swipe flips tabs" bug). Fixed height so pages never squeeze.
  */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -327,11 +330,49 @@ private fun ColumnScope.StatsPages(
         pageCount = { 3 }
     )
     val scope = rememberCoroutineScope()
+    // Live drag offset for finger-following feedback; eases back on
+    // release while the page animates to its settle target.
+    val dragX = remember {
+        androidx.compose.animation.core.Animatable(0f)
+    }
     androidx.compose.foundation.pager.HorizontalPager(
         state = pagerState,
+        userScrollEnabled = false,
         modifier = Modifier
             .fillMaxWidth()
             .height(168.dp)
+            .pointerInput(pagerState) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        val target = when {
+                            dragX.value < -60f && pagerState.currentPage < 2 ->
+                                pagerState.currentPage + 1
+                            dragX.value > 60f && pagerState.currentPage > 0 ->
+                                pagerState.currentPage - 1
+                            else -> pagerState.currentPage
+                        }
+                        scope.launch {
+                            launch { pagerState.animateScrollToPage(target) }
+                            dragX.animateTo(
+                                0f,
+                                animationSpec = tween(durationMillis = 180)
+                            )
+                        }
+                    },
+                    onDragCancel = {
+                        scope.launch {
+                            dragX.animateTo(
+                                0f,
+                                animationSpec = tween(durationMillis = 180)
+                            )
+                        }
+                    },
+                    onHorizontalDrag = { _, dragAmount ->
+                        scope.launch { dragX.snapTo(dragX.value + dragAmount) }
+                    }
+                )
+            }
+            .graphicsLayer { translationX = dragX.value }
     ) { p ->
         when (p) {
             0 -> {

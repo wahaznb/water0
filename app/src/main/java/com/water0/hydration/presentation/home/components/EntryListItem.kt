@@ -115,10 +115,6 @@ fun EntryListItem(
     val timeString = timeFormat.format(entry.timestamp)
 
     val effectiveMl = entry.effectiveHydrationMl
-    val effectiveText = if (effectiveMl != entry.amountMl) {
-        " ($effectiveMl ml effective)"
-    } else ""
-
     // Marked-for-delete rows flash red, then vanish.
     val container by androidx.compose.animation.animateColorAsState(
         targetValue = if (marked) MaterialTheme.colorScheme.error.copy(alpha = 0.55f)
@@ -165,16 +161,23 @@ fun EntryListItem(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = "${entry.type.name}  •  ${entry.amountMl}ml$effectiveText",
+                    text = entry.type.name.lowercase().replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = timeString,
+                    text = "$timeString · $effectiveMl ml effective",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+
+            Text(
+                text = "${entry.amountMl}ml",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                color = drinkColor
+            )
 
             IconButton(
                 onClick = { onDelete(entry.id) },

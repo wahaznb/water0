@@ -85,6 +85,10 @@ class NotificationWorker(
     companion object {
         const val UNIQUE_WORK = "hydration_reminder_chain"
         const val KEY_SHOW = "show_notification"
+        // Silent persistence (status line) vs audible nudge (reminder):
+        // separate channels so the system — and the user in Settings —
+        // treats them as the two different jobs they are.
+        const val STATUS_CHANNEL_ID = "hydration_status"
         const val CHANNEL_ID = "hydration_reminders"
         const val NOTIFICATION_ID = 1001
         const val REMINDER_ID = 1002

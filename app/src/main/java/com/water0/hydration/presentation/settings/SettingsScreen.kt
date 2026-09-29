@@ -127,6 +127,7 @@ fun SettingsScreen(
                     AppearanceSection(darkTheme = darkTheme, onToggleTheme = onToggleTheme)
                     GlassLabSection(config = glassConfig, onChange = onGlassConfigChange)
                     DataSection(viewModel = viewModel)
+                    PermissionsSection()
                     AboutSection()
                     androidx.compose.foundation.layout.Spacer(
                         modifier = Modifier.height(bottomGutter)
@@ -643,6 +644,35 @@ private fun FitnessSection() {
             OutlinedButton(onClick = { launcher.launch(source.readPermissions()) }) {
                 Text("Connect Health Connect")
             }
+        } else if (sleepLine == null) {
+            // Unavailable or denied: one tap re-checks (fresh installs and
+            // custom ROMs where the provider appears after updates).
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = { refresh() }) {
+                    Text("Check again")
+                }
+                TextButton(onClick = {
+                    try {
+                        context.startActivity(
+                            Intent(
+                                "androidx.health.ACTION_HEALTH_CONNECT_SETTINGS"
+                            ).setPackage("com.google.android.apps.healthdata")
+                        )
+                    } catch (_: Exception) {
+                        try {
+                            context.startActivity(
+                                Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS")
+                            )
+                        } catch (_: Exception) {
+                        }
+                    }
+                }) {
+                    Text("Open Health Connect")
+                }
+            }
         }
     }
 }
@@ -804,6 +834,51 @@ private fun DataSection(viewModel: SettingsViewModel) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Composable
+private fun PermissionsSection() {
+    // Plain-language ledger of everything the app can touch and why.
+    // No INTERNET permission exists in the manifest — there is nothing
+    // to disclose there because the app cannot phone home at all.
+    SectionCard(title = "Permissions & why") {
+        PermissionRow(
+            name = "Notifications (Android 13+)",
+            why = "Persistent status line + drink nudges. Asked only when you enable reminders."
+        )
+        PermissionRow(
+            name = "Run at startup",
+            why = "Re-schedules reminders after a reboot. No data involved."
+        )
+        PermissionRow(
+            name = "Health Connect — sleep & exercise (optional)",
+            why = "Workouts shape recommendations, last night's sleep shows in Fitness. Read on this phone only, never uploaded."
+        )
+        PermissionRow(
+            name = "Network",
+            why = "Not requested. The app is fully offline — check the manifest."
+        )
+    }
+}
+
+@Composable
+private fun PermissionRow(name: String, why: String) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = name,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = why,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

@@ -284,11 +284,6 @@ class MainActivity : ComponentActivity() {
                     ) {
                         HorizontalPager(
                             state = pagerState,
-                            // Home yields horizontal swipes to the stats card
-                            // carousel (see StatsPages): two nested pagers
-                            // can't share one gesture, and the outer always
-                            // wins. Dock still navigates everywhere.
-                            userScrollEnabled = pagerState.currentPage != 0,
                             modifier = Modifier.fillMaxSize()
                         ) { page ->
                             // Page glide: fade + slight parallax while dragging.

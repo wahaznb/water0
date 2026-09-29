@@ -38,6 +38,18 @@ class WaterLogReceiver : BroadcastReceiver() {
                         amountMl, HydrationEntry.DrinkType.WATER
                     )
                 }
+                // Refresh the shade synchronously: the updated numbers ARE
+                // the tap feedback (a 10s worker round-trip feels broken).
+                // Poke stays as backup in case this post fails. The toast
+                // is belt-and-braces: instant, works even if the shade
+                // update gets swallowed.
+                android.widget.Toast.makeText(
+                    context, "Logged $amountMl ml", android.widget.Toast.LENGTH_SHORT
+                ).show()
+                try {
+                    showStatusNotifications(context)
+                } catch (_: Exception) {
+                }
                 AppContainer.getNotificationScheduler(context).poke()
             } catch (_: Exception) {
                 // Shade action: never crash the receiver, never notify.

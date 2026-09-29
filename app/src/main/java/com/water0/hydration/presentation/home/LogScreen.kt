@@ -221,6 +221,52 @@ fun LogScreen(
             onCustomClick = { showCustomAmount = true }
         )
 
+        // Recent servings as one-tap shortcuts: your actual habits, not
+        // just fixed presets. Distinct type+amount pairs, latest first.
+        if (state.entries.isNotEmpty()) {
+            val recents = remember(state.entries) {
+                state.entries.distinctBy { it.type to it.amountMl }.take(5)
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Recent",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    recents.forEach { recent ->
+                        FilterChip(
+                            selected = false,
+                            onClick = {
+                                viewModel.logWater(recent.amountMl, recent.type)
+                                notify(
+                                    "Added ${recent.amountMl} ml " +
+                                        recent.type.name.lowercase()
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = "${recent.type.name.lowercase()
+                                        .replaceFirstChar { it.uppercase() }} " +
+                                        "${recent.amountMl}ml",
+                                    fontSize = 13.sp
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
         if (showCustomAmount) {
             AddWaterDialog(
                 initialAmount = customInitial,

@@ -5,6 +5,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,6 +44,7 @@ import kotlin.math.roundToInt
  * start at common values but stay on screen, adjustable. Everything
  * remains editable later in Settings → Profile / Active hours.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun OnboardingScreen(
     onFinish: (UserProfile) -> Unit,
@@ -54,6 +57,10 @@ fun OnboardingScreen(
     var ageText by remember { mutableStateOf("") }
     var ageError by remember { mutableStateOf<String?>(null) }
     var sex by remember { mutableStateOf<UserProfile.Sex?>(null) }
+    var activity by remember {
+        mutableStateOf(UserProfile.ActivityLevel.MODERATE)
+    }
+    var climate by remember { mutableStateOf(UserProfile.Climate.TEMPERATE) }
     var wake by remember { mutableStateOf(7f) }
     var sleep by remember { mutableStateOf(23f) }
     var remindersOn by remember { mutableStateOf(true) }
@@ -76,8 +83,8 @@ fun OnboardingScreen(
         onFinish(
             UserProfile(
                 weightKg = kg,
-                activityLevel = UserProfile.ActivityLevel.MODERATE,
-                climate = UserProfile.Climate.TEMPERATE,
+                activityLevel = activity,
+                climate = climate,
                 wakeUpHour = wake.roundToInt(),
                 sleepHour = sleep.roundToInt(),
                 dailyGoalMl = 2000,
@@ -114,11 +121,18 @@ fun OnboardingScreen(
             )
             Text(
                 text = "Three quick things so your goal is yours — " +
-                    "change any of them later in Settings.",
+                    "change any of them later in Settings. " +
+                    "Takes a minute · No account needed.",
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
+            Text(
+                text = "1 · Body (powers the goal math)",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
                     selected = useMetric,
@@ -202,6 +216,63 @@ fun OnboardingScreen(
             }
 
             Text(
+                text = "Activity (multiplies the goal — movers need more)",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                UserProfile.ActivityLevel.entries.forEach { option ->
+                    val label = when (option) {
+                        UserProfile.ActivityLevel.SEDENTARY -> "Sedentary"
+                        UserProfile.ActivityLevel.LIGHT -> "Light"
+                        UserProfile.ActivityLevel.MODERATE -> "Moderate"
+                        UserProfile.ActivityLevel.ACTIVE -> "Active"
+                        UserProfile.ActivityLevel.VERY_ACTIVE -> "Very active"
+                    }
+                    FilterChip(
+                        selected = activity == option,
+                        onClick = { activity = option },
+                        label = { Text(label) }
+                    )
+                }
+            }
+
+            Text(
+                text = "Climate (adds a daily extra on top)",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                UserProfile.Climate.entries.forEach { option ->
+                    val label = when (option) {
+                        UserProfile.Climate.COLD -> "Cold"
+                        UserProfile.Climate.TEMPERATE -> "Temperate"
+                        UserProfile.Climate.HOT -> "Hot"
+                        UserProfile.Climate.VERY_HOT -> "Very hot"
+                    }
+                    FilterChip(
+                        selected = climate == option,
+                        onClick = { climate = option },
+                        label = { Text(label) }
+                    )
+                }
+            }
+
+            Text(
+                text = "2 · Schedule (powers the by-now pace)",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
                 text = "Wake up: ${"%02d".format(wake.roundToInt())}:00",
                 fontSize = 16.sp,
                 color = MaterialTheme.colorScheme.onSurface
@@ -224,6 +295,12 @@ fun OnboardingScreen(
                 steps = 22
             )
 
+            Text(
+                text = "3 · Reminders (status line + nudges)",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

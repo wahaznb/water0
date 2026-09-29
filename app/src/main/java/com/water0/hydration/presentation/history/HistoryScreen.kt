@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,11 +15,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -42,6 +45,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -128,6 +132,12 @@ fun HistoryScreen(
                             bottom = bottomGutter + 16.dp
                         )
                     ) {
+                        // Week at a glance: last 7 days as bars with a goal
+                        // line, same glass card language. The tumbler stays
+                        // the hero; this is the trend behind it.
+                        item(key = "week_graph") {
+                            WeekGraph(days = state.days.takeLast(7).reversed())
+                        }
                         items(state.days, key = { it.dayStartMillis }) { day ->
                             DayCard(
                                 day = day,
@@ -143,6 +153,123 @@ fun HistoryScreen(
                                 }
                             )
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeekGraph(days: List<GetHistoryUseCase.DaySummary>) {
+    if (days.isEmpty()) return
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val maxMl = maxOf(
+        days.maxOf { it.goalMl },
+        days.maxOf { it.totalEffectiveMl },
+        1
+    ).toFloat()
+    val initials = days.map { day ->
+        val cal = java.util.Calendar.getInstance().apply {
+            timeInMillis = day.dayStartMillis
+        }
+        when (cal.get(java.util.Calendar.DAY_OF_WEEK)) {
+            java.util.Calendar.SUNDAY -> "S"
+            java.util.Calendar.MONDAY -> "M"
+            java.util.Calendar.TUESDAY -> "T"
+            java.util.Calendar.WEDNESDAY -> "W"
+            java.util.Calendar.THURSDAY -> "T"
+            java.util.Calendar.FRIDAY -> "F"
+            else -> "S"
+        }
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = glassCardContainer()),
+        border = glassCardBorder(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Last 7 days",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = onSurface
+            )
+            androidx.compose.foundation.Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+            ) {
+                val w = size.width
+                val h = size.height
+                val n = days.size
+                val slot = w / n
+                val barW = (slot * 0.52f).coerceAtLeast(8.dp.toPx())
+                val goalY = h * (1f - days.first().goalMl / maxMl)
+                // Goal line across the week.
+                drawLine(
+                    color = onVariant.copy(alpha = 0.5f),
+                    start = androidx.compose.ui.geometry.Offset(0f, goalY),
+                    end = androidx.compose.ui.geometry.Offset(w, goalY),
+                    strokeWidth = 1.dp.toPx(),
+                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+                        floatArrayOf(6.dp.toPx(), 4.dp.toPx())
+                    )
+                )
+                days.forEachIndexed { i, day ->
+                    val frac = (day.totalEffectiveMl / maxMl).coerceIn(0f, 1f)
+                    val barH = (h * frac).coerceAtLeast(if (day.totalEffectiveMl > 0) 4.dp.toPx() else 0f)
+                    val cx = slot * i + slot / 2f
+                    val barColor = when {
+                        day.percentage >= 100 -> Color(0xFF1E88E5)
+                        day.percentage >= 70 -> Color(0xFF43A047)
+                        day.totalEffectiveMl == 0 -> onVariant.copy(alpha = 0.25f)
+                        else -> Color(0xFFEF5350)
+                    }
+                    drawRoundRect(
+                        color = barColor.copy(alpha = 0.85f),
+                        topLeft = androidx.compose.ui.geometry.Offset(cx - barW / 2f, h - barH),
+                        size = androidx.compose.ui.geometry.Size(barW, barH),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(
+                            barW / 2f, barW / 2f
+                        )
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Goal-met dot over each day initial: the week at a glance
+                // reads as streaks, not just bars.
+                days.forEachIndexed { i, day ->
+                    val met = day.percentage >= 100
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(
+                                    if (met) Color(0xFF1E88E5)
+                                    else onVariant.copy(alpha = 0.30f)
+                                )
+                        )
+                        Text(
+                            text = initials[i],
+                            fontSize = 11.sp,
+                            fontWeight = if (i == initials.size - 1) FontWeight.Bold else FontWeight.Normal,
+                            color = if (i == initials.size - 1) onSurface else onVariant
+                        )
                     }
                 }
             }

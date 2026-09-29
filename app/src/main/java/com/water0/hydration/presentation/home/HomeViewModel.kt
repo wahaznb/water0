@@ -42,7 +42,10 @@ class HomeViewModel(
             val recommendations: List<RecommendationEngine.Recommendation>,
             // Pacing truth: what should be drunk by this hour. The tank
             // headlines lag-vs-expected; the day goal rides along small.
-            val expectedMl: Int
+            val expectedMl: Int,
+            // Wake→sleep window the pace curve draws against.
+            val wakeHour: Int,
+            val sleepHour: Int
         ) : UiState
 
         object Loading : UiState
@@ -100,7 +103,9 @@ class HomeViewModel(
                     remainingMl = result.remainingMl,
                     status = result.status,
                     recommendations = result.recommendations,
-                    expectedMl = result.expectedMl
+                    expectedMl = result.expectedMl,
+                    wakeHour = result.wakeHour,
+                    sleepHour = result.sleepHour
                 )
             }
         }

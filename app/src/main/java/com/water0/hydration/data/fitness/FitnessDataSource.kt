@@ -24,7 +24,11 @@ data class SleepWindow(val bedTimeMs: Long, val wakeTimeMs: Long)
 class FitnessDataSource(private val context: Context) {
 
     fun isAvailable(): Boolean = try {
-        HealthConnectClient.Companion.sdkStatus(context) ==
+        // 1.1.x API: explicit provider package (defaults to the Play
+        // provider); this is the path that sees platform-bundled Health
+        // Connect on Android 14+ and custom ROMs, where the old alpha11
+        // sdkStatus() check reported "not there" and hid the feature.
+        HealthConnectClient.getSdkStatus(context) ==
             HealthConnectClient.SDK_AVAILABLE
     } catch (_: Exception) {
         false

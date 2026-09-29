@@ -21,7 +21,7 @@ mockk = "1.13.12"
 espresso = "3.5.1"
 coroutines = "1.7.3"
 tensorflowLite = "2.15.0"
-healthConnect = "1.0.0-alpha11"
+healthConnect = "1.1.0-alpha06"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }

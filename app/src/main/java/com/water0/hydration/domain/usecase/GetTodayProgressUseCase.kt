@@ -24,7 +24,10 @@ class GetTodayProgressUseCase(
         val recommendations: List<RecommendationEngine.Recommendation>,
         // Pacing truth: what should be drunk by this hour. The tank
         // headlines lag-vs-expected, not the whole day.
-        val expectedMl: Int
+        val expectedMl: Int,
+        // Wake→sleep window the pace curve draws against.
+        val wakeHour: Int,
+        val sleepHour: Int
     )
 
     operator fun invoke(): Flow<ProgressResult> {
@@ -74,7 +77,9 @@ class GetTodayProgressUseCase(
                 remainingMl = status.remainingMl,
                 status = status.status,
                 recommendations = recommendations,
-                expectedMl = expectedMl
+                expectedMl = expectedMl,
+                wakeHour = profile.wakeUpHour,
+                sleepHour = profile.sleepHour
             )
         }
     }

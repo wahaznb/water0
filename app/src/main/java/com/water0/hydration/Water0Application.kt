@@ -26,14 +26,27 @@ class Water0Application : Application() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val channel = NotificationChannel(
-            NotificationWorker.CHANNEL_ID,
-            "Hydration reminders",
-            NotificationManager.IMPORTANCE_DEFAULT
-        ).apply {
-            description = "Gentle nudges to drink water during the day."
-        }
-        getSystemService(NotificationManager::class.java)
-            ?.createNotificationChannel(channel)
+        val manager = getSystemService(NotificationManager::class.java)
+            ?: return
+        // Two jobs, two channels: the status line is silent persistence,
+        // the reminder is the one allowed to buzz.
+        manager.createNotificationChannel(
+            NotificationChannel(
+                NotificationWorker.STATUS_CHANNEL_ID,
+                "Hydration status",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Persistent line: how far along today's goal you are."
+            }
+        )
+        manager.createNotificationChannel(
+            NotificationChannel(
+                NotificationWorker.CHANNEL_ID,
+                "Hydration reminders",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Gentle nudges to drink water during the day."
+            }
+        )
     }
 }

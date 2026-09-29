@@ -95,7 +95,7 @@ suspend fun showStatusNotifications(context: Context): Boolean {
         },
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
-    val statusBuilder = NotificationCompat.Builder(context, NotificationWorker.CHANNEL_ID)
+    val statusBuilder = NotificationCompat.Builder(context, NotificationWorker.STATUS_CHANNEL_ID)
         .setSmallIcon(com.water0.hydration.R.mipmap.ic_launcher)
         .setColor(waterBlue)
         .setContentTitle(title)
@@ -108,6 +108,31 @@ suspend fun showStatusNotifications(context: Context): Boolean {
         .setAutoCancel(false)
         .setOnlyAlertOnce(true)
     if (largeIcon != null) statusBuilder.setLargeIcon(largeIcon)
+    // Branded shade row: big % + progress under system decorations.
+    // (Title/text above stay as the accessibility + fallback content.)
+    try {
+        val remote = android.widget.RemoteViews(
+            context.packageName, com.water0.hydration.R.layout.notification_status
+        )
+        remote.setTextViewText(com.water0.hydration.R.id.notif_title, title)
+        remote.setTextViewText(com.water0.hydration.R.id.notif_text, text)
+        remote.setTextViewText(
+            com.water0.hydration.R.id.notif_percent,
+            "${(totalMl * 100 / goalMl.coerceAtLeast(1)).coerceIn(0, 999)}%"
+        )
+        remote.setProgressBar(
+            com.water0.hydration.R.id.notif_progress, 100,
+            (totalMl * 100 / goalMl.coerceAtLeast(1)).coerceIn(0, 100), false
+        )
+        if (largeIcon != null) {
+            remote.setImageViewBitmap(com.water0.hydration.R.id.notif_icon, largeIcon)
+        }
+        statusBuilder
+            .setCustomContentView(remote)
+            .setStyle(androidx.core.app.NotificationCompat.DecoratedCustomViewStyle())
+    } catch (_: Exception) {
+        // Custom views are best-effort: stock template above still ships.
+    }
     if (!over && !met) statusBuilder.addAction(
         com.water0.hydration.R.mipmap.ic_launcher, "+250 ml", quickLog
     )
