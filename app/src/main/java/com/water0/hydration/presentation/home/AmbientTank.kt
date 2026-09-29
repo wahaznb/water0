@@ -2,6 +2,7 @@ package com.water0.hydration.presentation.home
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -36,6 +37,8 @@ import kotlinx.coroutines.delay
 fun AmbientTank(
     viewModel: HomeViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     selectedRoute: String,
+    // Glass Lab kill-switch: calm mode renders nothing at all.
+    visible: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -83,15 +86,39 @@ fun AmbientTank(
     val pulseScale = 1f - 0.06f * pulseWave
 
     val state = uiState as? HomeViewModel.UiState.Success ?: return
-    // Anchored tumbler: left ~35% of the screen, vertically centered.
-    // Wide frosted cards float over it everywhere (see HomeScreen), so
-    // the tank holds its ground instead of traveling — crossfade only.
+    if (!visible) return
+    // Home nests the tumbler left-inside the hero card (see HomeScreen:
+    // info keeps right, tank water left) — position + scale only, still
+    // the background layer. Other tabs get the anchored ghost back.
+    // The home↔other pulse dip masks the alignment snap mid-flight.
     val slowGlide = tween<Float>(durationMillis = 500)
-    val poseAlpha: Float = if (home) 1f else 0.22f
-    val tankW = 320.dp
-    val tankH = 644.dp
-    val tankX = (-180).dp
-    val tankY = 0.dp
+    val slowGlideDp = tween<androidx.compose.ui.unit.Dp>(durationMillis = 500)
+    val poseAlign = if (home) Alignment.TopStart else Alignment.CenterStart
+    val poseW = if (home) 130.dp else 300.dp
+    val poseH = if (home) 225.dp else 604.dp
+    val poseX = if (home) 30.dp else (-185).dp
+    val poseY = if (home) 200.dp else 0.dp
+    val poseAlpha: Float = if (home) 1f else 0.20f
+    val tankW by animateDpAsState(
+        targetValue = poseW,
+        animationSpec = slowGlideDp,
+        label = "tankW"
+    )
+    val tankH by animateDpAsState(
+        targetValue = poseH,
+        animationSpec = slowGlideDp,
+        label = "tankH"
+    )
+    val tankX by animateDpAsState(
+        targetValue = poseX,
+        animationSpec = slowGlideDp,
+        label = "tankX"
+    )
+    val tankY by animateDpAsState(
+        targetValue = poseY,
+        animationSpec = slowGlideDp,
+        label = "tankY"
+    )
     val tankAlpha by animateFloatAsState(
         targetValue = poseAlpha,
         animationSpec = slowGlide,
@@ -100,7 +127,7 @@ fun AmbientTank(
 
     Box(
         modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.CenterStart
+        contentAlignment = poseAlign
     ) {
         // Transition covers the glide: a small dip while it travels.
         Box(

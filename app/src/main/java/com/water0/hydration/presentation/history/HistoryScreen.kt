@@ -186,7 +186,7 @@ private fun WeekGraph(days: List<GetHistoryUseCase.DaySummary>) {
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(com.water0.hydration.ui.theme.Radii.md),
         colors = CardDefaults.cardColors(containerColor = glassCardContainer()),
         border = glassCardBorder(),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -295,7 +295,7 @@ private fun DayCard(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(com.water0.hydration.ui.theme.Radii.md),
         colors = CardDefaults.cardColors(
             containerColor = glassCardContainer()
         ),

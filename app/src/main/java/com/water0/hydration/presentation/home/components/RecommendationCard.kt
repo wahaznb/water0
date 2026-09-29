@@ -54,7 +54,7 @@ fun RecommendationCard(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(com.water0.hydration.ui.theme.Radii.md),
         colors = CardDefaults.cardColors(
             containerColor = glassCardContainer()
         ),

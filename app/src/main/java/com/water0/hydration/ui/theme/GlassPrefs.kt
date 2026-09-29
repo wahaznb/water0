@@ -15,7 +15,9 @@ class GlassPrefs(private val prefs: SharedPreferences) {
     fun applied(): GlassConfig = GlassConfig(
         blurRadius = prefs.getInt(KEY_BLUR_DP, 6).dp,
         tintAlpha = prefs.getFloat(KEY_TINT, GlassConfig.Defaults.TINT_ALPHA),
-        dockCorner = prefs.getInt(KEY_DOCK_DP, 42).dp.coerceAtMost(45.dp)
+        dockCorner = prefs.getInt(KEY_DOCK_DP, 42).dp.coerceAtMost(45.dp),
+        backgroundOn = prefs.getBoolean(KEY_BG_ON, true),
+        tankOn = prefs.getBoolean(KEY_TANK_ON, true)
     )
 
     fun saveApplied(config: GlassConfig) {
@@ -23,6 +25,8 @@ class GlassPrefs(private val prefs: SharedPreferences) {
             .putInt(KEY_BLUR_DP, config.blurRadius.value.toInt())
             .putFloat(KEY_TINT, config.tintAlpha)
             .putInt(KEY_DOCK_DP, config.dockCorner.value.toInt())
+            .putBoolean(KEY_BG_ON, config.backgroundOn)
+            .putBoolean(KEY_TANK_ON, config.tankOn)
             .apply()
     }
 
@@ -36,6 +40,8 @@ class GlassPrefs(private val prefs: SharedPreferences) {
         private const val KEY_BLUR_DP = "glass_blur_dp"
         private const val KEY_TINT = "glass_tint"
         private const val KEY_DOCK_DP = "glass_dock_dp"
+        private const val KEY_BG_ON = "glass_bg_on"
+        private const val KEY_TANK_ON = "glass_tank_on"
         // Bumped when the defaults change (v0.3: 6dp / 27% / 42dp, bevel
         // removed): existing installs re-seed once so the phone actually
         // shows the new look instead of the stored old values.

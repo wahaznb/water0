@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.water0.hydration.domain.engine.RecommendationEngine
+import com.water0.hydration.ui.theme.Radii
+import com.water0.hydration.ui.theme.glassCard
 import com.water0.hydration.ui.theme.glassCardBorder
 import com.water0.hydration.ui.theme.glassCardContainer
 import com.water0.hydration.presentation.home.components.RecommendationCard
@@ -104,11 +106,7 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(
-                        glassCardContainer(),
-                        RoundedCornerShape(16.dp)
-                    )
+                    .glassCard()
                     // Top sheen: faint radial wash so the card reads as
                     // glass catching light, not flat frost.
                     .background(
@@ -120,18 +118,31 @@ fun HomeScreen(
                             center = androidx.compose.ui.geometry.Offset.Zero,
                             radius = 800f
                         ),
-                        RoundedCornerShape(16.dp)
-                    )
-                    .border(
-                        glassCardBorder(),
-                        RoundedCornerShape(16.dp)
+                        RoundedCornerShape(Radii.md)
                     )
                     .padding(14.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 HeroHeader(status = state.status)
-                StatsPages(state = state)
+                // Tank nests left-inside this card (see AmbientTank Home
+                // pose): info keeps to the right two-thirds so numbers
+                // never sit on water.
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    androidx.compose.foundation.layout.Spacer(
+                        modifier = Modifier.weight(0.35f)
+                    )
+                    Column(
+                        modifier = Modifier.weight(0.65f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        StatsPages(state = state)
+                    }
+                }
                 // Day progress under the carousel: the same story as the
                 // shade line — how much of the day is actually drunk.
                 androidx.compose.material3.LinearProgressIndicator(
@@ -684,15 +695,7 @@ private fun AllClearCard() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                glassCardContainer(),
-                RoundedCornerShape(16.dp)
-            )
-            .border(
-                glassCardBorder(),
-                RoundedCornerShape(16.dp)
-            )
+            .glassCard()
             .padding(horizontal = 20.dp, vertical = 18.dp)
     ) {
         androidx.compose.foundation.layout.Row(

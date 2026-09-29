@@ -142,7 +142,7 @@ fun SettingsScreen(
 private fun SectionCard(title: String, content: @Composable () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(com.water0.hydration.ui.theme.Radii.md),
         colors = CardDefaults.cardColors(
             containerColor = glassCardContainer()
         ),
@@ -774,6 +774,38 @@ private fun GlassLabSection(
         TextButton(onClick = { onChange(com.water0.hydration.ui.theme.GlassConfig()) }) {
             Text("Reset defaults (6 / 27% / 42dp)")
         }
+        // Show switches: calm mode kills motion for weak GPUs and low
+        // battery without touching the tuned look (one tap restores).
+        ShowRow(
+            label = "Living background",
+            checked = config.backgroundOn,
+            onChange = { onChange(config.copy(backgroundOn = it)) }
+        )
+        ShowRow(
+            label = "Ambient tank",
+            checked = config.tankOn,
+            onChange = { onChange(config.copy(tankOn = it)) }
+        )
+    }
+}
+
+@Composable
+private fun ShowRow(
+    label: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit
+) {
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Switch(checked = checked, onCheckedChange = onChange)
     }
 }
 

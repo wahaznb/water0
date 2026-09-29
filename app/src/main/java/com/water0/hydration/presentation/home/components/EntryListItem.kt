@@ -127,7 +127,7 @@ fun EntryListItem(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(com.water0.hydration.ui.theme.Radii.md),
         colors = CardDefaults.cardColors(
             containerColor = container
         ),

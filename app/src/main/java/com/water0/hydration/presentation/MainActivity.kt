@@ -8,6 +8,7 @@ import androidx.activity.viewModels
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -250,18 +251,28 @@ class MainActivity : ComponentActivity() {
                 // Full-bleed living background behind EVERYTHING (including
                 // the lens bar zone) so the lens always samples real pixels.
                 Box(modifier = Modifier.fillMaxSize()) {
-                    AuroraBackground(
-                        modifier = Modifier.fillMaxSize(),
-                        hydrationTint = rootTint,
-                        energy = rootEnergy
-                    )
+                    if (glassConfig.backgroundOn) {
+                        AuroraBackground(
+                            modifier = Modifier.fillMaxSize(),
+                            hydrationTint = rootTint,
+                            energy = rootEnergy
+                        )
+                    } else {
+                        // Calm mode: flat theme background, zero motion cost.
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.background)
+                        )
+                    }
                     // Ambient mega-tank behind the pages: hero on Home, dim
                     // backdrop elsewhere. NOT inside the pager (it would
                     // swipe away) and NOT in the lens layer (it is meant to
                     // BE refracted, not to refract).
                     AmbientTank(
                         viewModel = viewModel,
-                        selectedRoute = selected
+                        selectedRoute = selected,
+                        visible = glassConfig.tankOn
                     )
                 Scaffold(
                     snackbarHost = {

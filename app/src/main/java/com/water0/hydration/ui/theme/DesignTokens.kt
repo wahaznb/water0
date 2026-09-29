@@ -4,9 +4,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 /**
  * Design tokens: the single source for spacing, radii, and icon sizes.
@@ -54,4 +58,19 @@ fun SectionHeader(
         style = MaterialTheme.typography.titleLarge,
         modifier = modifier.padding(horizontal = Spacing.lg)
     )
+}
+
+/**
+ * The one card look: 16dp rounds + shared frost + shared hairline.
+ * Every card in every tab uses this — same properties in terms of
+ * looks, one place to retune. (Sheen/highlights layer on top where
+ * a hero needs extra light, never instead of this.)
+ */
+@Composable
+fun Modifier.glassCard(): Modifier {
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(Radii.md)
+    return this
+        .clip(shape)
+        .background(glassCardContainer(), shape)
+        .border(glassCardBorder(), shape)
 }

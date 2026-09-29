@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.sp
 fun AddWaterDialog(
     onDismiss: () -> Unit,
     onConfirm: (Int) -> Unit,
-    presets: List<Int> = listOf(100, 250, 500, 750),
+    presets: List<Int> = listOf(100, 250, 500),
     // Prefilled by a tapped recommendation (its midpoint) — still fully
     // editable before confirming.
     initialAmount: Int = 250
@@ -53,29 +53,20 @@ fun AddWaterDialog(
         title = { Text("Add water") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Balanced 2×2 preset grid: four fixed chips in one Row
-                // overflow on narrow screens (750ml wrapped vertically).
-                // Two rows of two always fit, whatever the width.
-                presets.chunked(2).forEach { row ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        row.forEach { preset ->
-                            FilterChip(
-                                selected = amount == preset,
-                                onClick = { setAmount(preset) },
-                                label = { Text("${preset}ml", fontSize = 13.sp) },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        // Odd row keeps its single chip half-width so the
-                        // grid rhythm holds for any preset count.
-                        if (row.size == 1) {
-                            androidx.compose.foundation.layout.Spacer(
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
+                // Three presets always fit one row; 750ml lives behind
+                // the slider, the exact field, and quick-add — it wrapped
+                // vertically here, so it moved out.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    presets.forEach { preset ->
+                        FilterChip(
+                            selected = amount == preset,
+                            onClick = { setAmount(preset) },
+                            label = { Text("${preset}ml", fontSize = 13.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
                 Row(
