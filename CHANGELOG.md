@@ -3,6 +3,40 @@
 All notable changes to Water0 are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.3-beta] - 2026-09-29
+
+### Added
+- Today's pace card on Home: expected wake→sleep line, actual intake
+  steps, now-marker, dashed goal line, one-line verdict
+- 7-day bar graph with goal-met dots on top of Logs
+- Recent shortcut chips on Update (your own type+amount pairs, one tap)
+- Persistent shade quick-log: +250 ml action with instant toast,
+  behind-headline ("500 ml behind"), progress bar, brand styling
+- Settings "Permissions & why" ledger; Fitness "Check again" retry +
+  "Open Health Connect" deep-link for custom ROMs
+- Onboarding asks activity + climate (was silently defaulted), numbered
+  why-sections, "No account needed" line
+
+### Changed
+- Home is one frosted column over a left-anchored tank (~35%,
+  vertically centered, crossfade only — no more per-tab travel)
+- Stats card is a hand-driven swipe carousel (owns its gesture, tab
+  swipe works everywhere); greeting + status merged into a hero header
+  with day progress bar
+- Notifications split into silent status + buzzing reminder channels
+- Glass Lab defaults 6 / 27% / 42dp (max 45); bevel removed entirely
+- Health Connect client 1.0.0-alpha11 → 1.1.0-alpha06 (new detection
+  path for Android 14+ platform module / custom ROMs)
+- Entry rows: type / time·effective meta / bold amount hierarchy
+- READMEs rewritten to shipped behavior; `release/` untracked (ships
+  via GitHub Releases, never in git)
+
+### Fixed
+- Stats swipe no longer flips tabs; third page no longer squeezed
+- Shade no longer stale after logging (re-posts within seconds)
+- Full-page swipe blur removed (stutter source); background draws cut
+  (24 twinkles, 80 grain)
+
 ## [0.2] - 2026-09-21
 
 ### Added

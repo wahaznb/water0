@@ -34,6 +34,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -105,6 +107,19 @@ fun HomeScreen(
                     .clip(RoundedCornerShape(16.dp))
                     .background(
                         glassCardContainer(),
+                        RoundedCornerShape(16.dp)
+                    )
+                    // Top sheen: faint radial wash so the card reads as
+                    // glass catching light, not flat frost.
+                    .background(
+                        Brush.radialGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                                Color.Transparent
+                            ),
+                            center = androidx.compose.ui.geometry.Offset.Zero,
+                            radius = 800f
+                        ),
                         RoundedCornerShape(16.dp)
                     )
                     .border(
@@ -335,7 +350,59 @@ private fun ColumnScope.StatsPages(
     val dragX = remember {
         androidx.compose.animation.core.Animatable(0f)
     }
-    androidx.compose.foundation.pager.HorizontalPager(
+    // Glass orb: a small fitted glow fitted behind the numbers. It drifts
+    // against the swipe (parallax from the live drag + the pager's own
+    // offset), so every page — percentage, breakdown, sips — gets its
+    // background adjusted as you move.
+    val primary = MaterialTheme.colorScheme.primary
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(168.dp),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        androidx.compose.foundation.Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    translationX = dragX.value * 0.25f -
+                        pagerState.currentPageOffsetFraction * 120.dp.toPx()
+                }
+        ) {
+            val orbR = 64.dp.toPx()
+            val orbC = Offset(size.width * 0.5f, size.height * 0.30f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(
+                        primary.copy(alpha = 0.22f),
+                        primary.copy(alpha = 0.05f),
+                        Color.Transparent
+                    ),
+                    center = orbC,
+                    radius = orbR
+                ),
+                radius = orbR,
+                center = orbC
+            )
+            // Faint rim so it reads as a lens, not a blob.
+            drawCircle(
+                color = Color.White.copy(alpha = 0.12f),
+                radius = orbR,
+                center = orbC,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = 1.dp.toPx()
+                )
+            )
+            drawCircle(
+                color = Color.White.copy(alpha = 0.20f),
+                radius = 3.dp.toPx(),
+                center = Offset(
+                    orbC.x - orbR * 0.35f,
+                    orbC.y - orbR * 0.35f
+                )
+            )
+        }
+        androidx.compose.foundation.pager.HorizontalPager(
         state = pagerState,
         userScrollEnabled = false,
         modifier = Modifier
@@ -430,7 +497,8 @@ private fun ColumnScope.StatsPages(
                 SipsPage(entries = state.entries)
             }
         }
-    }
+        } // pager content
+    } // Box: orb behind, pager above
     SwipeDots(count = 3, current = pagerState.currentPage) {
         scope.launch { pagerState.animateScrollToPage(it) }
     }

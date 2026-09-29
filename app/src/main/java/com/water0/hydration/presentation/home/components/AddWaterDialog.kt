@@ -53,16 +53,29 @@ fun AddWaterDialog(
         title = { Text("Add water") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    presets.forEach { preset ->
-                        FilterChip(
-                            selected = amount == preset,
-                            onClick = { setAmount(preset) },
-                            label = { Text("${preset}ml", fontSize = 13.sp) }
-                        )
+                // Balanced 2×2 preset grid: four fixed chips in one Row
+                // overflow on narrow screens (750ml wrapped vertically).
+                // Two rows of two always fit, whatever the width.
+                presets.chunked(2).forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        row.forEach { preset ->
+                            FilterChip(
+                                selected = amount == preset,
+                                onClick = { setAmount(preset) },
+                                label = { Text("${preset}ml", fontSize = 13.sp) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        // Odd row keeps its single chip half-width so the
+                        // grid rhythm holds for any preset count.
+                        if (row.size == 1) {
+                            androidx.compose.foundation.layout.Spacer(
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
                 }
                 Row(
