@@ -31,6 +31,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.Slider
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -781,11 +782,28 @@ private fun GlassLabSection(
             checked = config.backgroundOn,
             onChange = { onChange(config.copy(backgroundOn = it)) }
         )
-        ShowRow(
-            label = "Ambient tank",
-            checked = config.tankOn,
-            onChange = { onChange(config.copy(tankOn = it)) }
+        // Cards look: frost (milky fill) vs liquid glass (clearer fill,
+        // brighter rim — background reads through). Same shape, same
+        // hairline; only the fill and light change.
+        Text(
+            text = "Cards: frost / glass",
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface
         )
+        androidx.compose.foundation.layout.Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = !config.cardGlass,
+                onClick = { onChange(config.copy(cardGlass = false)) },
+                label = { Text("Frost", fontSize = 13.sp) }
+            )
+            FilterChip(
+                selected = config.cardGlass,
+                onClick = { onChange(config.copy(cardGlass = true)) },
+                label = { Text("Glass", fontSize = 13.sp) }
+            )
+        }
     }
 }
 

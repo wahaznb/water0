@@ -118,10 +118,21 @@ object Glass {
     const val CHIP_ALPHA = 0.55f
 }
 
+/**
+ * Card look switch (Glass Lab chips, live): false = frost (milky fill),
+ * true = liquid glass (clearer fill, brighter rim). Provided once in
+ * MainActivity from the saved config; previews default to frost.
+ */
+val LocalCardGlass = androidx.compose.runtime.compositionLocalOf { false }
+
 @Composable
 fun glassCardContainer(): Color {
-    // Dark: unchanged frosted surface. Light: light grey with a small
-    // black tint so cards sit visibly on the white field.
+    // Dark: frosted surface, or a clearer version in glass mode. Light:
+    // light grey with a small black tint so cards sit visibly on white.
+    if (LocalCardGlass.current) {
+        return if (isDarkScheme()) MaterialTheme.colorScheme.surface.copy(alpha = 0.22f)
+        else Color(0xFFECECEC).copy(alpha = 0.35f)
+    }
     return if (isDarkScheme()) MaterialTheme.colorScheme.surface.copy(alpha = Glass.CARD_ALPHA)
     else Color(0xFFECECEC).copy(alpha = 0.60f)
 }
@@ -135,17 +146,20 @@ fun isDarkScheme(): Boolean {
 
 // Beveled rim: bright top edge fading into the hairline outline, the
 // cheap version of a lens edge. Shared by every card in the app.
+// Glass mode brightens the top light so the edge reads as a lens.
 @Composable
-fun glassCardBorder(): BorderStroke =
-    BorderStroke(
+fun glassCardBorder(): BorderStroke {
+    val topLight = if (LocalCardGlass.current) 0.30f else 0.16f
+    return BorderStroke(
         1.dp,
         Brush.verticalGradient(
             listOf(
-                Color.White.copy(alpha = 0.16f),
+                Color.White.copy(alpha = topLight),
                 MaterialTheme.colorScheme.outline.copy(alpha = Glass.BORDER_ALPHA)
             )
         )
     )
+}
 
 // One background bubble's dice roll: spawn x, size, own lifespan, and its
 // own motion signature — rise curve, sway rhythm, peak brightness. No two

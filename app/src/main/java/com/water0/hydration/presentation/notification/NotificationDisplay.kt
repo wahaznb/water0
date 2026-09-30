@@ -101,6 +101,8 @@ suspend fun showStatusNotifications(context: Context): Boolean {
         .setContentTitle(title)
         .setContentText(text)
         .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+        // The ONE progress bar: the system template's, natively styled.
+        // (A second bar inside the custom view rendered double bars.)
         .setProgress(goalMl, totalMl.coerceAtMost(goalMl), false)
         .setPriority(NotificationCompat.PRIORITY_LOW)
         .setContentIntent(pendingIntent)
@@ -108,7 +110,8 @@ suspend fun showStatusNotifications(context: Context): Boolean {
         .setAutoCancel(false)
         .setOnlyAlertOnce(true)
     if (largeIcon != null) statusBuilder.setLargeIcon(largeIcon)
-    // Branded shade row: big % + progress under system decorations.
+    // Custom row: title + big % + detail. Icon, header, progress, and
+    // buttons stay system-owned (duplicating them rendered doubles).
     // (Title/text above stay as the accessibility + fallback content.)
     try {
         val remote = android.widget.RemoteViews(
@@ -120,13 +123,6 @@ suspend fun showStatusNotifications(context: Context): Boolean {
             com.water0.hydration.R.id.notif_percent,
             "${(totalMl * 100 / goalMl.coerceAtLeast(1)).coerceIn(0, 999)}%"
         )
-        remote.setProgressBar(
-            com.water0.hydration.R.id.notif_progress, 100,
-            (totalMl * 100 / goalMl.coerceAtLeast(1)).coerceIn(0, 100), false
-        )
-        if (largeIcon != null) {
-            remote.setImageViewBitmap(com.water0.hydration.R.id.notif_icon, largeIcon)
-        }
         statusBuilder
             .setCustomContentView(remote)
             .setStyle(androidx.core.app.NotificationCompat.DecoratedCustomViewStyle())

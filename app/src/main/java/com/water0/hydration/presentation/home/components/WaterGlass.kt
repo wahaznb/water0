@@ -97,17 +97,9 @@ fun WaterGlass(
     /** False when the numbers live beside the tank instead of on it. */
     showCaption: Boolean = true
 ) {
-    // Wave phase drifts forever; only the TOP band follows it — lower
-    // interfaces stay flat like real settled layers.
-    val wave = rememberInfiniteTransition(label = "wave")
-    val phase by wave.animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1700, easing = LinearEasing)
-        ),
-        label = "phase"
-    )
+    // Still water: the surface sits flat. A pour kick adds a transient
+    // crest through sloshBoostDp instead of perpetual motion.
+    val phase = 0f
     val percentage = (level * 100).roundToInt()
     val bar = MaterialTheme.colorScheme.primary
     val shape = TumblerShape()
@@ -155,7 +147,7 @@ fun WaterGlass(
             // interfaces below stay flat like settled liquids.
             val twoPi = (2 * PI).toFloat()
             val waveLength = size.width / 1.1f
-            val amplitude = (7 + sloshBoostDp).dp.toPx()
+            val amplitude = sloshBoostDp.dp.toPx()
             var bandBottom = size.height
             bands.forEachIndexed { index, band ->
                 val bandHeight = waterHeight * band.fraction
@@ -233,9 +225,9 @@ fun WaterGlass(
                 Offset(size.width - wallWidth, size.height),
                 wallWidth
             )
-            // Rising bubbles — frequent by design (7x density). More while
-            // pouring, sloshing, or over the goal.
-            val bubbleCount = 84 + (if (pouring) 24 else 0) + (if (overfull) 30 else 0) +
+            // A few suspended bubbles for depth — static, like propane in
+            // a still glass. More while pouring or over the goal.
+            val bubbleCount = 14 + (if (pouring) 24 else 0) + (if (overfull) 30 else 0) +
                 sloshBoostDp.toInt() * 3
             for (i in 0 until bubbleCount) {
                 val seed = ((i * 37) % 100) / 100f

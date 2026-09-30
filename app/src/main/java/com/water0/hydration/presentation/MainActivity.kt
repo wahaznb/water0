@@ -45,7 +45,6 @@ import com.water0.hydration.di.AppContainer
 import com.water0.hydration.presentation.history.HistoryScreen
 import com.water0.hydration.presentation.history.HistoryViewModel
 import com.water0.hydration.presentation.history.HistoryViewModelFactory
-import com.water0.hydration.presentation.home.AmbientTank
 import com.water0.hydration.presentation.home.HomeScreen
 import com.water0.hydration.presentation.home.HomeViewModel
 import com.water0.hydration.presentation.home.LogScreen
@@ -108,7 +107,11 @@ class MainActivity : ComponentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
         seedDefaults()
+        // Chain + instant shade: KEEP never resets a live chain, and the
+        // poke re-posts the persistent line seconds after every launch
+        // (killed app, update, reboot race) instead of next tick.
         AppContainer.getNotificationScheduler(this).ensureScheduled()
+        AppContainer.getNotificationScheduler(this).poke()
         // Theme choice persists in plain SharedPreferences: a single
         // boolean flag is exactly what prefs are for (no DB migration).
         // Default is dark, Omarchy-style.
@@ -245,6 +248,10 @@ class MainActivity : ComponentActivity() {
                 )
                 val rootEnergy = ((homeUiState as? HomeViewModel.UiState.Success)
                     ?.percentage?.div(100f) ?: 0.35f).coerceIn(0f, 1f)
+                // Card look for the whole shell (Glass Lab chips, live).
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.water0.hydration.ui.theme.LocalCardGlass provides glassConfig.cardGlass
+                ) {
                 LiquidGlassContainer(
                     modifier = Modifier.fillMaxSize(),
                     content = {
@@ -265,15 +272,8 @@ class MainActivity : ComponentActivity() {
                                 .background(MaterialTheme.colorScheme.background)
                         )
                     }
-                    // Ambient mega-tank behind the pages: hero on Home, dim
-                    // backdrop elsewhere. NOT inside the pager (it would
-                    // swipe away) and NOT in the lens layer (it is meant to
-                    // BE refracted, not to refract).
-                    AmbientTank(
-                        viewModel = viewModel,
-                        selectedRoute = selected,
-                        visible = glassConfig.tankOn
-                    )
+                    // No ambient tank: the tumbler lives only inside its
+                    // Home card (still water, no travel, nothing stale).
                 Scaffold(
                     snackbarHost = {
                         SnackbarHost(
@@ -403,6 +403,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 )
+                } // card-look provider
                 } // else onboarded == true: the pager shell above
             }
         }

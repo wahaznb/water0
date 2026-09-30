@@ -11,7 +11,9 @@ import androidx.compose.ui.unit.dp
  * Defaults per spec: blur 6dp, tint alpha 0.27, dock 42dp (max 45dp).
  * No bevel — the lens edge is a fixed hairline, not a tunable.
  * The two show switches default on; they gate the living background
- * and the ambient tank (calm mode for weak GPUs / low battery).
+ * and nothing else visual-critical. Cards render in one of two looks
+ * (Glass Lab chips, live): FROST = milky translucent fill, GLASS =
+ * clearer fill with a brighter rim so the background reads through.
  */
 @Immutable
 data class GlassConfig(
@@ -19,8 +21,9 @@ data class GlassConfig(
     val tintAlpha: Float = Defaults.TINT_ALPHA,
     val dockCorner: Dp = Defaults.DOCK_CORNER,
     val backgroundOn: Boolean = true,
-    val tankOn: Boolean = true
+    val cardGlass: Boolean = false
 ) {
+    // No TankMode anymore: the tumbler lives only inside its Home card.
     object Defaults {
         val BLUR: Dp = 6.dp
         const val TINT_ALPHA = 0.27f

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
@@ -34,7 +35,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -92,12 +92,9 @@ fun HomeScreen(
             modifier = Modifier.height(topGutter)
         )
 
-        // Wide frosted cards over the ambient tank: the tumbler holds the
-        // left ~35% behind everything (see AmbientTank) and every card
-        // spans full width in shared glass, so the tank glows through the
-        // frost instead of fighting a split column for space. One edge
-        // language (16dp rounds) everywhere — no slant, no divider.
-        // Order: hero stats first, recommendations below.
+        // Two cards side by side: tumbler card left, numbers right.
+        // One edge language (16dp rounds) everywhere — no slant,
+        // no divider. Order: hero stats first, recommendations below.
         androidx.compose.foundation.layout.Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -125,18 +122,40 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 HeroHeader(status = state.status)
-                // Tank nests left-inside this card (see AmbientTank Home
-                // pose): info keeps to the right two-thirds so numbers
-                // never sit on water.
+                // Tank and numbers as two cards side by side: the tumbler
+                // lives ONLY here (still water, no travel, no background
+                // twin), info keeps its own card.
                 androidx.compose.foundation.layout.Row(
                     modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    androidx.compose.foundation.layout.Spacer(
-                        modifier = Modifier.weight(0.35f)
-                    )
                     Column(
-                        modifier = Modifier.weight(0.65f),
+                        modifier = Modifier
+                            .weight(0.36f)
+                            .glassCard()
+                            .padding(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        com.water0.hydration.presentation.home.components.WaterStage(
+                            totalMl = state.totalEffectiveMl,
+                            goalMl = state.goalMl,
+                            layers = com.water0.hydration.presentation.home.components.layersFor(
+                                state.entries
+                            ),
+                            tiltDegrees = 0f,
+                            sloshBoostDp = 0f,
+                            pouring = false,
+                            glassWidth = 96.dp,
+                            glassHeight = 168.dp,
+                            showCaption = false
+                        )
+                    }
+                    Column(
+                        modifier = Modifier
+                            .weight(0.64f)
+                            .glassCard()
+                            .padding(14.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -361,59 +380,7 @@ private fun ColumnScope.StatsPages(
     val dragX = remember {
         androidx.compose.animation.core.Animatable(0f)
     }
-    // Glass orb: a small fitted glow fitted behind the numbers. It drifts
-    // against the swipe (parallax from the live drag + the pager's own
-    // offset), so every page — percentage, breakdown, sips — gets its
-    // background adjusted as you move.
-    val primary = MaterialTheme.colorScheme.primary
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(168.dp),
-        contentAlignment = Alignment.TopCenter
-    ) {
-        androidx.compose.foundation.Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    translationX = dragX.value * 0.25f -
-                        pagerState.currentPageOffsetFraction * 120.dp.toPx()
-                }
-        ) {
-            val orbR = 64.dp.toPx()
-            val orbC = Offset(size.width * 0.5f, size.height * 0.30f)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    listOf(
-                        primary.copy(alpha = 0.22f),
-                        primary.copy(alpha = 0.05f),
-                        Color.Transparent
-                    ),
-                    center = orbC,
-                    radius = orbR
-                ),
-                radius = orbR,
-                center = orbC
-            )
-            // Faint rim so it reads as a lens, not a blob.
-            drawCircle(
-                color = Color.White.copy(alpha = 0.12f),
-                radius = orbR,
-                center = orbC,
-                style = androidx.compose.ui.graphics.drawscope.Stroke(
-                    width = 1.dp.toPx()
-                )
-            )
-            drawCircle(
-                color = Color.White.copy(alpha = 0.20f),
-                radius = 3.dp.toPx(),
-                center = Offset(
-                    orbC.x - orbR * 0.35f,
-                    orbC.y - orbR * 0.35f
-                )
-            )
-        }
-        androidx.compose.foundation.pager.HorizontalPager(
+    androidx.compose.foundation.pager.HorizontalPager(
         state = pagerState,
         userScrollEnabled = false,
         modifier = Modifier
@@ -508,8 +475,7 @@ private fun ColumnScope.StatsPages(
                 SipsPage(entries = state.entries)
             }
         }
-        } // pager content
-    } // Box: orb behind, pager above
+    }
     SwipeDots(count = 3, current = pagerState.currentPage) {
         scope.launch { pagerState.animateScrollToPage(it) }
     }
