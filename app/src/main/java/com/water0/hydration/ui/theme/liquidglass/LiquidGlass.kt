@@ -330,7 +330,7 @@ private fun GlassContainerWithShader(
 
                 val elements = glassScope.elements
 
-                val maxElements = 10
+                val maxElements = 48
                 val positions = FloatArray(maxElements * 2)
                 val sizes = FloatArray(maxElements * 2)
                 val scales = FloatArray(maxElements)
@@ -410,16 +410,16 @@ private val GLASS_DISPLACEMENT_SHADER = """
     uniform float2 resolution;
     uniform shader contents;
     uniform int elementsCount;
-    uniform float2 glassPositions[10];
-    uniform float2 glassSizes[10];
-    uniform float glassScales[10];
-    uniform float cornerRadii[10];
-    uniform float elevations[10];
-    uniform float centerDistortions[10];
-    uniform float glassTints[40]; // 10 elements * 4 components (r,g,b,a)
-    uniform float glassDarkness[10];
-    uniform float glassWarpEdges[10];
-    uniform float glassBlurs[10];
+    uniform float2 glassPositions[48];
+    uniform float2 glassSizes[48];
+    uniform float glassScales[48];
+    uniform float cornerRadii[48];
+    uniform float elevations[48];
+    uniform float centerDistortions[48];
+    uniform float glassTints[192]; // 48 elements * 4 components (r,g,b,a)
+    uniform float glassDarkness[48];
+    uniform float glassWarpEdges[48];
+    uniform float glassBlurs[48];
 
     float sdfRoundedRect(float2 p, float2 halfSize, float radius) {
         float2 d = abs(p) - halfSize + radius;
@@ -530,7 +530,7 @@ private val GLASS_DISPLACEMENT_SHADER = """
         float blurRadius = 0.0;
         float2 surfaceNormal = float2(0.0);
 
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 48; i++) {
             if (i >= elementsCount) break;
             float2 center = glassPositions[i] + glassSizes[i] * 0.5;
             float2 localCoord = fragCoord - center;

@@ -46,10 +46,11 @@ class GlassPrefs(private val prefs: SharedPreferences) {
         private const val KEY_CARD_GLASS = "glass_card_glass"
         private const val KEY_GLASS_CLARITY = "glass_clarity"
         // Bumped when the defaults change (v0.3: 6dp / 27% / 42dp, bevel
-        // removed): existing installs re-seed once so the phone actually
-        // shows the new look instead of the stored old values.
+        // removed; glass cards always on): existing installs re-seed
+        // once so the phone actually shows the new look instead of the
+        // stored old values.
         private const val KEY_VERSION = "glass_defaults_version"
-        private const val CURRENT_VERSION = 1
+        private const val CURRENT_VERSION = 2
 
         fun from(context: Context): GlassPrefs {
             val prefs = context.getSharedPreferences("water0_prefs", Context.MODE_PRIVATE)

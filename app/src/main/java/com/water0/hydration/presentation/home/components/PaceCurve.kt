@@ -1,6 +1,8 @@
 package com.water0.hydration.presentation.home.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,15 +12,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import com.water0.hydration.ui.theme.glassCard
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.water0.hydration.data.local.entity.HydrationEntry
@@ -39,7 +45,6 @@ fun PaceCurveCard(
     sleepHour: Int,
     modifier: Modifier = Modifier
 ) {
-    val primary = MaterialTheme.colorScheme.primary
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onVariant = MaterialTheme.colorScheme.onSurfaceVariant
     // Cumulative steps, oldest first, clamped into the wake window.
@@ -73,27 +78,59 @@ fun PaceCurveCard(
         else -> "${expectedNow - drunkNow} ml under the line — steady sips close it."
     }
 
+    com.water0.hydration.ui.theme.LensCard(
+        modifier = modifier.fillMaxWidth(),
+        blurOverride = 0.5f
+    ) {
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .glassCard()
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         SectionHeader(text = "Today's pace")
+        // Scrubbable: tap or drag across the plot to inspect any hour —
+        // cursor + readout follow the finger.
+        var touchFrac by remember { mutableStateOf<Float?>(null) }
+        var plotWPx by remember { mutableFloatStateOf(1f) }
+        fun expectedAt(hour: Float) =
+            (goalMl * ((hour - wakeHour + 1) / span).coerceIn(0f, 1f)).roundToInt()
+        fun drunkAt(hour: Float) =
+            steps.lastOrNull { it.first <= hour }?.second ?: 0
+        val dark = com.water0.hydration.ui.theme.isDarkScheme()
+        val red = Color(0xFFEF5350)
+        val green = Color(0xFF43A047)
+        // Reference black: the goal line up top. Neutral in both modes.
+        val refLine = Color.Black.copy(alpha = if (dark) 0.65f else 0.45f)
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(150.dp)
+                .onSizeChanged { plotWPx = it.width.toFloat() }
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { touchFrac = (it.x / plotWPx).coerceIn(0f, 1f) }
+                    )
+                }
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { touchFrac = (it.x / plotWPx).coerceIn(0f, 1f) },
+                        onDragEnd = { },
+                        onDragCancel = { },
+                        onHorizontalDrag = { change, _ ->
+                            touchFrac = (change.position.x / plotWPx).coerceIn(0f, 1f)
+                        }
+                    )
+                }
         ) {
             val w = size.width
             val h = size.height
             fun x(hour: Float) = ((hour - wakeHour) / span).coerceIn(0f, 1f) * w
             fun y(ml: Float) = h * (1f - (ml / maxMl).coerceIn(0f, 1f))
-            val goalColor = Color(0xFF43A047)
-            // Goal dashed line, green: the line to beat.
+            // Goal reference, black dashed.
             drawLine(
-                color = goalColor.copy(alpha = 0.65f),
+                color = refLine,
                 start = Offset(0f, y(goalMl.toFloat())),
                 end = Offset(w, y(goalMl.toFloat())),
                 strokeWidth = 1.5.dp.toPx(),
@@ -101,67 +138,76 @@ fun PaceCurveCard(
                     floatArrayOf(6.dp.toPx(), 4.dp.toPx())
                 )
             )
-            // Expected: straight wake→sleep line.
+            // Expected: straight wake→sleep line, faint.
             drawLine(
                 color = onVariant.copy(alpha = 0.65f),
                 start = Offset(x(wakeHour.toFloat()), y(0f)),
                 end = Offset(x(sleepHour.toFloat()), y(goalMl.toFloat())),
                 strokeWidth = 1.5.dp.toPx()
             )
-            // Actual: rising steps + soft fill under them. Red everywhere
-            // the day is behind the line — the color IS the verdict.
+            // Actual, colored per segment: green where that hour's total
+            // covers its target, red everywhere it doesn't.
             var prevX = x(wakeHour.toFloat())
             var prevY = y(0f)
-            val behindNow = awake && drunkNow < expectedNow
-            val stepColor = if (behindNow) Color(0xFFEF5350) else primary
-            val stepFill = if (behindNow) Color(0xFFEF5350) else primary
-            val fill = androidx.compose.ui.graphics.Path().apply {
-                moveTo(x(wakeHour.toFloat()), h)
-                lineTo(x(wakeHour.toFloat()), y(0f))
-            }
             for ((hour, total) in steps) {
                 val cx = x(hour)
                 val cy = y(total.toFloat())
-                drawLine(stepColor, Offset(prevX, prevY), Offset(cx, prevY), 2.5.dp.toPx())
-                drawLine(stepColor, Offset(cx, prevY), Offset(cx, cy), 2.5.dp.toPx())
-                drawCircle(stepColor, 3.5.dp.toPx(), Offset(cx, cy))
+                val seg = if (total >= expectedAt(hour)) green else red
+                drawLine(seg, Offset(prevX, prevY), Offset(cx, prevY), 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                drawLine(seg, Offset(cx, prevY), Offset(cx, cy), 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                drawCircle(seg, 3.5.dp.toPx(), Offset(cx, cy))
                 drawCircle(Color.White.copy(alpha = 0.85f), 1.5.dp.toPx(), Offset(cx, cy))
-                fill.lineTo(cx, prevY)
-                fill.lineTo(cx, cy)
                 prevX = cx
                 prevY = cy
             }
-            // Extend flat to now so the line never dangles mid-air.
+            // Extend flat to now, colored by the current standing.
             if (steps.isNotEmpty()) {
-                drawLine(stepColor, Offset(prevX, prevY), Offset(x(nowHour), prevY), 2.5.dp.toPx())
-                fill.lineTo(x(nowHour), prevY)
+                val nowSeg = if (drunkNow >= expectedNow) green else red
+                drawLine(nowSeg, Offset(prevX, prevY), Offset(x(nowHour), prevY), 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
             }
-            fill.lineTo(x(if (steps.isEmpty()) wakeHour.toFloat() else nowHour), h)
-            fill.close()
-            drawPath(
-                path = fill,
-                brush = Brush.verticalGradient(
-                    listOf(
-                        stepFill.copy(alpha = 0.22f),
-                        stepFill.copy(alpha = 0.02f)
-                    )
-                )
-            )
-            // Now marker.
+            // Now marker: green while under the diagonal (in the safe
+            // zone), red once past it — the vertical reads the standing.
+            val nowBehind = drunkNow < expectedNow
+            val nowColor = if (nowBehind) green else red
             val nx = x(nowHour)
             drawLine(
-                color = onSurface.copy(alpha = 0.45f),
+                color = nowColor.copy(alpha = 0.85f),
                 start = Offset(nx, 0f),
                 end = Offset(nx, h),
-                strokeWidth = 1.dp.toPx(),
+                strokeWidth = 2.dp.toPx(),
                 pathEffect = PathEffect.dashPathEffect(
                     floatArrayOf(4.dp.toPx(), 4.dp.toPx())
                 )
             )
-            drawCircle(onSurface.copy(alpha = 0.8f), 2.5.dp.toPx(), Offset(nx, 0f))
+            drawCircle(nowColor, 3.5.dp.toPx(), Offset(nx, 0f))
+            // Scrub cursor: vertical line + dot on the actual curve.
+            // Same standing rule: green under the diagonal, red past it.
+            touchFrac?.let { frac ->
+                val hour = wakeHour + frac * span
+                val drunk = drunkAt(hour)
+                val cx = frac * w
+                val cy = y(drunk.toFloat())
+                val cur = if (drunk < expectedAt(hour)) green else red
+                drawLine(
+                    color = cur.copy(alpha = 0.8f),
+                    start = Offset(cx, 0f),
+                    end = Offset(cx, h),
+                    strokeWidth = 1.5.dp.toPx()
+                )
+                drawCircle(Color.White, 6.dp.toPx(), Offset(cx, cy))
+                drawCircle(cur, 4.dp.toPx(), Offset(cx, cy))
+            }
+        }
+        // Readout follows the finger; caption returns when untouched.
+        // (touchFrac persists after release so the reading lingers.)
+        val readout = touchFrac?.let { frac ->
+            val hour = wakeHour + frac * span
+            val hh = hour.toInt().coerceIn(0, 23)
+            val mm = ((hour - hh) * 60).toInt().coerceIn(0, 59)
+            "%02d:%02d · %d drunk / %d expected".format(hh, mm, drunkAt(hour), expectedAt(hour))
         }
         Text(
-            text = caption,
+            text = readout ?: caption,
             fontSize = 13.sp,
             color = onVariant
         )
@@ -181,5 +227,6 @@ fun PaceCurveCard(
                 color = onVariant
             )
         }
+    }
     }
 }

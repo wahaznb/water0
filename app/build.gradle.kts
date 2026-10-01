@@ -17,6 +17,16 @@ android {
         versionName = "0.3-beta"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+        // Build number = commit count: unique per commit, so the About
+        // screen identifies exactly which build is on a phone.
+        val buildNumber = try {
+            providers.exec {
+                commandLine("git", "rev-list", "--count", "HEAD")
+            }.standardOutput.asText.get().trim().toInt()
+        } catch (_: Exception) {
+            0
+        }
+        buildConfigField("int", "BUILD_NUMBER", "$buildNumber")
     }
     
     buildTypes {

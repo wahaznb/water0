@@ -55,6 +55,8 @@ import com.water0.hydration.presentation.navigation.PlateRangeBar
 import com.water0.hydration.presentation.navigation.Routes
 import com.water0.hydration.presentation.settings.SettingsScreen
 import com.water0.hydration.ui.theme.GlassPrefs
+import com.water0.hydration.ui.theme.LocalLensConfig
+import com.water0.hydration.ui.theme.LocalLensScope
 import com.water0.hydration.ui.theme.GlassSnackbar
 import com.water0.hydration.ui.theme.AuroraBackground
 import com.water0.hydration.ui.theme.Water0
@@ -276,8 +278,9 @@ class MainActivity : ComponentActivity() {
                                 .background(MaterialTheme.colorScheme.background)
                         )
                     }
-                    // No ambient tank: the tumbler lives only inside its
-                    // Home card (still water, no travel, nothing stale).
+                    // Screens live in content again: plates, dock,
+                    // buttons and graphs refract them (the visible
+                    // glass); cards stay frost.
                 Scaffold(
                     snackbarHost = {
                         SnackbarHost(
@@ -299,6 +302,11 @@ class MainActivity : ComponentActivity() {
                     ) {
                         HorizontalPager(
                             state = pagerState,
+                            // Home owns horizontal swipes (the stats card
+                            // carousel needs them); two nested pagers can't
+                            // share one gesture and the outer always wins.
+                            // Dock still navigates everywhere.
+                            userScrollEnabled = pagerState.currentPage != 0,
                             modifier = Modifier.fillMaxSize()
                         ) { page ->
                             // Page glide: fade + slight parallax while dragging.
@@ -361,6 +369,19 @@ class MainActivity : ComponentActivity() {
                 }
                 },
                     glassContent = scope@{
+                        // Screens live in the lens layer: every card
+                        // registers as a refracting element over the
+                        // background-only content. Text stays crisp;
+                        // only sampled pixels bend.
+                        val glass = this@scope
+                        androidx.compose.runtime.CompositionLocalProvider(
+                            LocalLensScope provides glass,
+                            LocalLensConfig provides glassConfig,
+                            // Lenses track layout rects, not overscroll
+                            // stretch: kill the stretch so glass never
+                            // detaches from content at list ends.
+                            androidx.compose.foundation.LocalOverscrollConfiguration provides null
+                        ) {
                         // Floating top lens on EVERY tab (Home wears
                         // "Water0"). Pager-driven so titles never disagree
                         // with what's displayed. Logs carries its range
@@ -406,6 +427,7 @@ class MainActivity : ComponentActivity() {
                             onHeight = { barHeightDp = it }
                         )
                     }
+                } // lens locals provider
                 )
                 } // card-look provider
                 } // else onboarded == true: the pager shell above

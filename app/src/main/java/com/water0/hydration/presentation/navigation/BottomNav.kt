@@ -123,18 +123,16 @@ fun GlassBoxScope.GlassBottomBar(
         (((xPx - rowPadPx) / contentWidthPx()) * TABS.size).toInt()
             .coerceIn(0, TABS.size - 1)
 
-    // Dock light: soft steady glow on the selected tab, bright pool
-    // wherever the finger touches. No blob, no morphing — light only.
-    val params = remember(config) { config.toLiquidParams(Color(0xFFEE2689)) }
-    val dragging = fingerX != null
-    // Touch point in row coords; null = untouched. Taps flash it briefly,
-    // scrubbing carries it under the finger.
+    // Touch glow, second attempt: same-hue gradient stops only (the
+    // transparent-black fade rendered as mud through the lens twice).
+    // If dots show again it is NOT this layer — it is deleted next.
     var touchX by remember { mutableStateOf<Float?>(null) }
     val lightAlpha by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (touchX != null || dragging) 1f else 0f,
+        targetValue = if (touchX != null) 1f else 0f,
         animationSpec = androidx.compose.animation.core.tween(durationMillis = 220),
         label = "touchLight"
     )
+    val params = remember(config) { config.toLiquidParams(Color(0xFFEE2689)) }
 
     // Full-width floating dock: spans the screen with slim side margins,
     // content flows beneath it. Height is hoisted for the toast lift.
@@ -158,10 +156,9 @@ fun GlassBoxScope.GlassBottomBar(
             Box(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Light layer, drawn first so icons sit on top of it:
-                // resting glow on the selected tab + bright pool tracking
-                // the finger while touching/scrubbing. End stops fade the
-                // SAME hue (never Transparent black — that renders as mud).
+                // Touch glow, hue-fixed: white holds white to the edge,
+                // primary holds primary — verified gradient class after
+                // the black-dot incident.
                 val glowWhite = Color.White.copy(alpha = 0.10f)
                 val touchWhite = Color.White
                 val touchPrimary = MaterialTheme.colorScheme.primary
@@ -208,8 +205,6 @@ fun GlassBoxScope.GlassBottomBar(
                         .fillMaxWidth()
                         .onSizeChanged { rowWidthPx = it.width.toFloat() }
                         .pointerInput(Unit) {
-                            // Tap flash: light pools where the finger lands,
-                            // fading on release. Scrubbing takes over below.
                             detectTapGestures(
                                 onPress = { offset ->
                                     touchX = offset.x

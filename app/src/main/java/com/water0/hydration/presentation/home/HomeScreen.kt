@@ -5,7 +5,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,8 +36,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -339,69 +336,14 @@ private fun ColumnScope.StatsPages(
         pageCount = { 3 }
     )
     val scope = rememberCoroutineScope()
-    // Live drag offset for finger-following feedback; eases back on
-    // release while the page animates to its settle target.
-    val dragX = remember {
-        androidx.compose.animation.core.Animatable(0f)
-    }
-    // Fling counts as a vote too: fast flicks turn the page even when
-    // the finger hasn't crossed the distance threshold.
-    val flingTracker = remember {
-        androidx.compose.ui.input.pointer.util.VelocityTracker()
-    }
+    // Native pager scrolling (framework fling + snap): the outer tab
+    // pager yields while Home shows (see MainActivity), so no ancestor
+    // can steal the gesture.
     androidx.compose.foundation.pager.HorizontalPager(
         state = pagerState,
-        userScrollEnabled = false,
         modifier = Modifier
             .fillMaxWidth()
-            .height(168.dp)
-            .pointerInput(pagerState) {
-                detectHorizontalDragGestures(
-                    onDragStart = {
-                        flingTracker.resetTracking()
-                    },
-                    onDragEnd = {
-                        val velocity = try {
-                            flingTracker.calculateVelocity().x
-                        } catch (_: Exception) {
-                            0f
-                        }
-                        val target = when {
-                            dragX.value < -60f && pagerState.currentPage < 2 ->
-                                pagerState.currentPage + 1
-                            dragX.value > 60f && pagerState.currentPage > 0 ->
-                                pagerState.currentPage - 1
-                            velocity < -600f && pagerState.currentPage < 2 ->
-                                pagerState.currentPage + 1
-                            velocity > 600f && pagerState.currentPage > 0 ->
-                                pagerState.currentPage - 1
-                            else -> pagerState.currentPage
-                        }
-                        scope.launch {
-                            launch { pagerState.animateScrollToPage(target) }
-                            dragX.animateTo(
-                                0f,
-                                animationSpec = tween(durationMillis = 180)
-                            )
-                        }
-                    },
-                    onDragCancel = {
-                        scope.launch {
-                            dragX.animateTo(
-                                0f,
-                                animationSpec = tween(durationMillis = 180)
-                            )
-                        }
-                    },
-                    onHorizontalDrag = { change, dragAmount ->
-                        flingTracker.addPosition(
-                            change.uptimeMillis, change.position
-                        )
-                        scope.launch { dragX.snapTo(dragX.value + dragAmount) }
-                    }
-                )
-            }
-            .graphicsLayer { translationX = dragX.value }
+            .height(196.dp)
     ) { p ->
         when (p) {
             0 -> {
@@ -430,42 +372,62 @@ private fun ColumnScope.StatsPages(
                     }
                     val ringFrac = (pace / 100f).coerceIn(0f, 1f)
                     val ringTrack = MaterialTheme.colorScheme.onSurface.copy(
-                        alpha = 0.12f
+                        alpha = 0.14f
                     )
+                    // OpenVitals style: thick track, bottom gap, rounded
+                    // caps, label over value over subcaption inside.
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(148.dp)
+                        modifier = Modifier.size(172.dp)
                     ) {
                         androidx.compose.foundation.Canvas(
                             modifier = Modifier.fillMaxSize()
                         ) {
+                            val stroke = 13.dp.toPx()
+                            val gapSweep = 300f
+                            val start = 90f + (360f - gapSweep) / 2f
                             drawArc(
                                 color = ringTrack,
-                                startAngle = 0f,
-                                sweepAngle = 360f,
+                                startAngle = start,
+                                sweepAngle = gapSweep,
                                 useCenter = false,
                                 style = androidx.compose.ui.graphics.drawscope.Stroke(
-                                    width = 9.dp.toPx(),
+                                    width = stroke,
                                     cap = androidx.compose.ui.graphics.StrokeCap.Round
                                 )
                             )
                             drawArc(
                                 color = ringColor,
-                                startAngle = -90f,
-                                sweepAngle = 360f * ringFrac,
+                                startAngle = start,
+                                sweepAngle = gapSweep * ringFrac,
                                 useCenter = false,
                                 style = androidx.compose.ui.graphics.drawscope.Stroke(
-                                    width = 9.dp.toPx(),
+                                    width = stroke,
                                     cap = androidx.compose.ui.graphics.StrokeCap.Round
                                 )
                             )
                         }
-                        Text(
-                            text = "${pace}%",
-                            fontSize = 40.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = "Today",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "${pace}%",
+                                fontSize = 40.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${state.totalEffectiveMl} of ${state.goalMl} ml",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                     Text(
                         text = "${state.totalEffectiveMl} / ${state.expectedMl} ml by now",

@@ -184,6 +184,10 @@ private fun WeekGraph(days: List<GetHistoryUseCase.DaySummary>) {
             else -> "S"
         }
     }
+    com.water0.hydration.ui.theme.LensCard(
+        modifier = Modifier.fillMaxWidth(),
+        blurOverride = 0.5f
+    ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(com.water0.hydration.ui.theme.Radii.md),
@@ -275,7 +279,8 @@ private fun WeekGraph(days: List<GetHistoryUseCase.DaySummary>) {
             }
         }
     }
-}
+    } // WeekGraph LensCard
+} // WeekGraph fun
 
 @Composable
 private fun DayCard(

@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.unit.dp
 
 // Design language: Omarchy-style — dark-first, near-black blue-tinted
@@ -79,11 +80,11 @@ object GlassColors {
 
     // Omarchy ships light-mode pairings too; keep a bright water theme
     // so the app respects the system setting instead of forcing dark.
-    // Soft pink-white field instead of stark white — easier on the
-    // eyes, nods at the dock pink.
+    // Soft sky-blue field; cards sit on it as white-tinted glass,
+    // bubbles and glows run white.
     val light = lightColorScheme(
-        background = Color(0xFFFBF2F4),
-        surface = Color(0xFFF6E9EC),
+        background = Color(0xFFD9E7F7),
+        surface = Color(0xFFFFFFFF),
         surfaceVariant = Color(0xFFDCE9FA),
         onBackground = Color(0xFF000000),
         onSurface = Color(0xFF000000),
@@ -142,8 +143,8 @@ fun glassCardContainer(): Color {
         return if (isDarkScheme()) Color.White.copy(alpha = a)
         else Color.White.copy(alpha = a + 0.25f)
     }
-    return if (isDarkScheme()) Color.White.copy(alpha = 0.07f)
-    else Color(0xFFF6E9EC).copy(alpha = 0.60f)
+    return if (isDarkScheme()) MaterialTheme.colorScheme.surface.copy(alpha = Glass.CARD_ALPHA)
+    else Color.White.copy(alpha = 0.55f)
 }
 
 /** True when the app theme is dark — one source for every theme branch. */
@@ -205,12 +206,14 @@ private data class GlowOrb(
     val birthUptimeMs: Long
 )
 
-// One jellyfish life: random spawn, random heading, fixed lifespan.
-// Respawned by the reaper — never the same swim twice.
+// One jellyfish life: random spawn, random heading, random tilt and
+// size, fixed lifespan. Respawned by the reaper — never the same
+// swim twice.
 private data class JellySpawn(
     val xFrac: Float,
     val yFrac: Float,
     val angleRad: Float,
+    val tiltDeg: Float,
     val travelFrac: Float,
     val sizeDp: Float,
     val birthUptimeMs: Long
@@ -319,23 +322,34 @@ fun AuroraBackground(
         }
     }
     // Reaper: once a second, respawn anything past its lifespan — glow
-    // orbs at fresh random spots, bubbles at a fresh random x, the
-    // jellyfish wherever it pleases. Unseeded rolls every time, so no
-    // field ever repeats. The state writes recompose; per-frame motion
-    // comes from the wall clock in draw, so nothing here costs a frame.
+    // orbs at fresh random spots, bubbles at a fresh random x, each
+    // jellyfish wherever it pleases, tilted however it likes. Unseeded
+    // rolls every time, so no field ever repeats. The state writes
+    // recompose; per-frame motion comes from the wall clock in draw, so
+    // nothing here costs a frame.
+    fun newJelly(rng: kotlin.random.Random, now: Long, stagger: Boolean): JellySpawn {
+        val life = 26_000L
+        return JellySpawn(
+            xFrac = rng.nextFloat(),
+            yFrac = 0.15f + rng.nextFloat() * 0.5f,
+            angleRad = rng.nextFloat() * 6.28f,
+            tiltDeg = (rng.nextFloat() * 2f - 1f) * 35f,
+            travelFrac = 0.12f + rng.nextFloat() * 0.10f,
+            // Wide spread, never bigger: minis to showpieces.
+            sizeDp = 22f + rng.nextFloat() * 64f,
+            birthUptimeMs = if (stagger) now - rng.nextLong(life) else now
+        )
+    }
     val jellyLifeMs = 26_000L
-    val jelly = remember(bgSeed) {
+    // A small bloom, not one animal: three concurrent jellies at mixed
+    // sizes, each on its own life.
+    val jellies = remember(bgSeed) {
         val rng = kotlin.random.Random(bgSeed)
         val now = android.os.SystemClock.uptimeMillis()
-        androidx.compose.runtime.mutableStateOf(
-            JellySpawn(
-                xFrac = rng.nextFloat(),
-                yFrac = 0.15f + rng.nextFloat() * 0.5f,
-                angleRad = rng.nextFloat() * 6.28f,
-                travelFrac = 0.12f + rng.nextFloat() * 0.10f,
-                sizeDp = 44f + rng.nextFloat() * 20f,
-                birthUptimeMs = now - rng.nextLong(jellyLifeMs)
-            )
+        androidx.compose.runtime.mutableStateListOf(
+            newJelly(rng, now, stagger = true),
+            newJelly(rng, now, stagger = true),
+            newJelly(rng, now, stagger = true)
         )
     }
     androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -343,15 +357,10 @@ fun AuroraBackground(
             kotlinx.coroutines.delay(1000L)
             val now = android.os.SystemClock.uptimeMillis()
             val rng = kotlin.random.Random.Default
-            if (now - jelly.value.birthUptimeMs >= jellyLifeMs) {
-                jelly.value = JellySpawn(
-                    xFrac = rng.nextFloat(),
-                    yFrac = 0.15f + rng.nextFloat() * 0.5f,
-                    angleRad = rng.nextFloat() * 6.28f,
-                    travelFrac = 0.12f + rng.nextFloat() * 0.10f,
-                    sizeDp = 44f + rng.nextFloat() * 20f,
-                    birthUptimeMs = now
-                )
+            for (i in jellies.indices) {
+                if (now - jellies[i].birthUptimeMs >= jellyLifeMs) {
+                    jellies[i] = newJelly(rng, now, stagger = false)
+                }
             }
             for (i in orbs.indices) {
                 if (now - orbs[i].birthUptimeMs >= OrbLifeMs) {
@@ -442,10 +451,10 @@ fun AuroraBackground(
                 b.swayDp.dp.toPx()
             val y = h * 1.05f - Math.pow(progress.toDouble(), b.risePow.toDouble()).toFloat() * h * 1.1f
             drawCircle(
-                // Dark: bright blue risers on black. Light: dark blue dots
-                // on white. Each bubble peaks at its own brightness.
+                // Dark: bright blue risers on black. Light: white drops
+                // on the blue field.
                 color = if (dark) primary.copy(alpha = (0.065f + energy * 0.065f) * fade * b.alphaPeak)
-                else primary.copy(alpha = (0.14f + energy * 0.12f) * fade * b.alphaPeak),
+                else Color.White.copy(alpha = (0.35f + energy * 0.25f) * fade * b.alphaPeak),
                 b.sizeDp.dp.toPx() * 0.5f,
                 androidx.compose.ui.geometry.Offset(x, y)
             )
@@ -458,10 +467,10 @@ fun AuroraBackground(
             val y = (((i * 67) % 100) / 100f) * h
             val twinkle = 0.5f + 0.5f * kotlin.math.sin(rise * 6.28f + seed * 6.28f).toFloat()
             drawCircle(
-                // Dark: cool white pinpoints. Light: blue pinpoints (white
-                // is invisible on a luminous field).
+                // Dark: cool white pinpoints. Light: white pinpoints on
+                // the blue field.
                 color = if (dark) Color.White.copy(alpha = (0.020f + energy * 0.040f) * twinkle)
-                else primary.copy(alpha = (0.12f + energy * 0.12f) * twinkle),
+                else Color.White.copy(alpha = (0.30f + energy * 0.25f) * twinkle),
                 (1f + (i % 2)).dp.toPx() * 0.5f,
                 androidx.compose.ui.geometry.Offset(x, y)
             )
@@ -477,12 +486,12 @@ fun AuroraBackground(
             if (progress >= 1f) continue // dead, awaiting respawn
             val envelope = kotlin.math.sin(progress * kotlin.math.PI).toFloat()
             val core = envelope * envelope
-            // Dark halo stays dim on black; light halo is deep TV Girl navy
-            // #1B2268 so the glows read dark on white.
+            // Dark halo stays dim on navy; light halo is white glow on
+            // the blue field.
             val intensity = core * if (dark) (0.08f + energy * 0.06f)
-            else (0.12f + energy * 0.10f)
+            else (0.16f + energy * 0.12f)
             val haloColor = if (dark) secondary.copy(alpha = intensity)
-            else Color(0xFF1B2268).copy(alpha = intensity)
+            else Color.White.copy(alpha = intensity)
             if (intensity <= 0.004f) continue
             // Drift along the rolled heading plus a small breathing wobble,
             // so it visibly travels while alive.
@@ -505,9 +514,8 @@ fun AuroraBackground(
                 radius = radius,
                 center = center
             )
-            // Warm starlight in dark (reads through the lenses); deeper
-            // amber in light (pale yellow is invisible on luminous).
-            val starlight = if (dark) Color(0xFFFFF1BE) else Color(0xFFB26A00)
+            // Warm starlight in dark, plain white glow in light.
+            val starlight = if (dark) Color(0xFFFFF1BE) else Color.White
             // Star core: tight bright glow + hot pinpoint + 4-point
             // sparkle, all breathing on the same envelope as its halo.
             drawCircle(
@@ -541,8 +549,7 @@ fun AuroraBackground(
         if (hydrationTint != Color.Transparent) {
             drawRect(color = hydrationTint, size = size)
         }
-        run {
-            val j = jelly.value
+        for (j in jellies) {
             val now = android.os.SystemClock.uptimeMillis()
             val progress = ((now - j.birthUptimeMs).toFloat() / jellyLifeMs)
                 .coerceIn(0f, 1f)
@@ -555,70 +562,207 @@ fun AuroraBackground(
                     .coerceIn(0f, h)
                 val pulse = 1f + 0.07f * kotlin.math.sin(tSway * 1.1f).toFloat()
                 val r = j.sizeDp.dp.toPx() * pulse
-                val jelly = primary.copy(alpha = (0.16f + energy * 0.08f) * fade)
-            // Dome.
-            val dome = androidx.compose.ui.graphics.Path().apply {
-                moveTo(jx - r, jy)
-                quadraticBezierTo(jx - r, jy - r * 1.15f, jx, jy - r * 1.15f)
-                quadraticBezierTo(jx + r, jy - r * 1.15f, jx + r, jy)
-                close()
-            }
-            drawPath(
-                path = dome,
-                brush = Brush.verticalGradient(
-                    listOf(
-                        jelly,
-                        jelly.copy(alpha = jelly.alpha * 0.25f)
-                    ),
-                    startY = jy - r * 1.15f,
-                    endY = jy
-                )
-            )
-            // Dome rim light on top.
-            drawArc(
-                color = Color.White.copy(alpha = 0.14f),
-                startAngle = 200f,
-                sweepAngle = 140f,
-                useCenter = false,
-                topLeft = androidx.compose.ui.geometry.Offset(jx - r, jy - r * 1.15f),
-                size = androidx.compose.ui.geometry.Size(r * 2f, r * 2f),
-                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.25.dp.toPx())
-            )
-            // Inner glow.
-            drawCircle(
-                color = secondary.copy(alpha = (0.10f + energy * 0.06f) * fade),
-                radius = r * 0.45f,
-                center = androidx.compose.ui.geometry.Offset(jx, jy - r * 0.55f)
-            )
-            // Tentacles: staggered sway, longer in the middle.
-            for (i in 0 until 6) {
-                val fx = (i - 2.5f) / 2.5f // -1..1 across the rim
-                val sx = jx + fx * r * 0.8f
-                val len = (76 + (1f - kotlin.math.abs(fx)) * 52f).dp.toPx()
-                val sway = kotlin.math.sin(tSway * 1.3f + i * 1.1f).toFloat() * 10.dp.toPx()
-                val sway2 = kotlin.math.sin(tSway * 1.3f + i * 1.1f + 0.9f).toFloat() * 14.dp.toPx()
-                val tent = androidx.compose.ui.graphics.Path().apply {
-                    moveTo(sx, jy)
-                    quadraticBezierTo(
-                        sx + sway, jy + len * 0.5f,
-                        sx + sway2, jy + len
+                // Pink bloom; paler pink-white on the light field, cyan crown.
+                val ink = if (dark) Color(0xFFFF8FB3) else Color(0xFFFF5C8A)
+                val ink2 = if (dark) Color(0xFF7DF9FF) else Color.White
+                withTransform(
+                    {
+                        translate(jx, jy)
+                        rotate(j.tiltDeg)
+                        translate(-jx, -jy)
+                    }
+                ) {
+                    // Halo backdrop: the glow the animal swims in.
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            listOf(
+                                ink.copy(alpha = 0.20f * fade),
+                                ink.copy(alpha = 0f)
+                            ),
+                            center = androidx.compose.ui.geometry.Offset(jx, jy - r * 0.4f),
+                            radius = r * 2.4f
+                        ),
+                        radius = r * 2.4f,
+                        center = androidx.compose.ui.geometry.Offset(jx, jy - r * 0.4f)
                     )
+                    // Marginal tentacles (behind the dome): long trailers.
+                    for (i in 0 until 8) {
+                        val fx = (i - 3.5f) / 3.5f
+                        val sx = jx + fx * r * 0.85f
+                        val len = (110f + (1f - kotlin.math.abs(fx)) * 60f).dp.toPx()
+                        val sway = kotlin.math.sin(tSway * 1.3f + i * 0.9f).toFloat() * 10.dp.toPx()
+                        val sway2 = kotlin.math.sin(tSway * 1.3f + i * 0.9f + 0.9f).toFloat() * 15.dp.toPx()
+                        val tent = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(sx, jy)
+                            quadraticBezierTo(
+                                sx + sway, jy + len * 0.5f,
+                                sx + sway2, jy + len
+                            )
+                        }
+                        drawPath(
+                            path = tent,
+                            color = ink.copy(alpha = (0.13f + energy * 0.05f) * (1f - 0.25f * kotlin.math.abs(fx)) * fade),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                width = (1.5f + (1f - kotlin.math.abs(fx))).dp.toPx(),
+                                cap = androidx.compose.ui.graphics.StrokeCap.Round
+                            )
+                        )
+                        drawCircle(
+                            color = ink.copy(alpha = 0.16f * fade),
+                            radius = 2.dp.toPx(),
+                            center = androidx.compose.ui.geometry.Offset(sx + sway2, jy + len)
+                        )
+                    }
+                    // Oral arms: three thick folded ribbons at the mouth.
+                    for (k in -1..1) {
+                        val bx = jx + k * r * 0.22f
+                        val armLen = r * (1.35f + 0.15f * kotlin.math.abs(k.toFloat()))
+                        val aSway = kotlin.math.sin(tSway * 1.6f + k * 2.1f).toFloat() * 8.dp.toPx()
+                        val arm = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(bx, jy + r * 0.05f)
+                            quadraticBezierTo(
+                                bx + aSway, jy + armLen * 0.5f,
+                                bx - aSway * 0.6f, jy + armLen
+                            )
+                        }
+                        drawPath(
+                            path = arm,
+                            color = ink.copy(alpha = 0.30f * fade),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                width = 3.5.dp.toPx(),
+                                cap = androidx.compose.ui.graphics.StrokeCap.Round
+                            )
+                        )
+                    }
+                    // Bell: organic lobes up top, scalloped ruffle hem below.
+                    val dome = androidx.compose.ui.graphics.Path().apply {
+                        val lobes = 5
+                        val steps = 28
+                        for (k in 0..steps) {
+                            val t = k.toFloat() / steps
+                            val ang = kotlin.math.PI.toFloat() * (1f - t)
+                            val rad = r * (1f + 0.045f * kotlin.math.sin(t * lobes * 6.28f + tSway * 0.3f).toFloat())
+                            val px = jx + kotlin.math.cos(ang).toFloat() * rad
+                            val py = (jy - r * 0.06f) - kotlin.math.sin(ang).toFloat() * rad * 1.12f
+                            if (k == 0) moveTo(px, py) else lineTo(px, py)
+                        }
+                        val scallops = 7
+                        val step = (2f * r) / scallops
+                        for (k in 0 until scallops) {
+                            val x0 = jx + r - k * step
+                            quadraticBezierTo(
+                                x0 - step / 2f, jy + r * 0.18f,
+                                x0 - step, jy
+                            )
+                        }
+                        close()
+                    }
+                    drawPath(
+                        path = dome,
+                        brush = Brush.verticalGradient(
+                            listOf(
+                                ink.copy(alpha = (0.30f + energy * 0.10f) * fade),
+                                ink.copy(alpha = (0.06f + energy * 0.03f) * fade)
+                            ),
+                            startY = jy - r * 1.18f,
+                            endY = jy + r * 0.2f
+                        )
+                    )
+                    // Mottling: soft dark clouds inside the bell for depth.
+                    val blot = Color.Black.copy(alpha = 0.16f * fade)
+                    drawCircle(blot, r * 0.28f, androidx.compose.ui.geometry.Offset(jx - r * 0.30f, jy - r * 0.52f))
+                    drawCircle(blot, r * 0.22f, androidx.compose.ui.geometry.Offset(jx + r * 0.34f, jy - r * 0.38f))
+                    // Radial canals fanning from the crown, moon-jelly style.
+                    for (c in 0 until 7) {
+                        val ct = c / 6f
+                        val cang = kotlin.math.PI.toFloat() * (0.12f + 0.76f * ct)
+                        val cx0 = jx + kotlin.math.cos(cang).toFloat() * r * 0.18f
+                        val cy0 = (jy - r * 0.06f) - kotlin.math.sin(cang).toFloat() * r * 0.20f
+                        val cx1 = jx + kotlin.math.cos(cang).toFloat() * r * 0.90f
+                        val cy1 = (jy - r * 0.06f) - kotlin.math.sin(cang).toFloat() * r * 1.00f
+                        val canal = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(cx0, cy0)
+                            quadraticBezierTo(
+                                (cx0 + cx1) / 2f, (cy0 + cy1) / 2f - 4.dp.toPx(),
+                                cx1, cy1
+                            )
+                        }
+                        drawPath(
+                            path = canal,
+                            color = ink.copy(alpha = 0.28f * fade),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                width = 1.5.dp.toPx(),
+                                cap = androidx.compose.ui.graphics.StrokeCap.Round
+                            )
+                        )
+                    }
+                    // Clover mark: the glowing signature at the dome crown.
+                    val cloverC = androidx.compose.ui.geometry.Offset(jx, jy - r * 0.58f)
+                    val petalD = r * 0.15f
+                    val petalR = r * 0.085f
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            listOf(
+                                ink2.copy(alpha = 0.55f * fade),
+                                ink2.copy(alpha = 0f)
+                            ),
+                            center = cloverC,
+                            radius = r * 0.42f
+                        ),
+                        radius = r * 0.42f,
+                        center = cloverC
+                    )
+                    val petal = ink2.copy(alpha = 0.85f * fade)
+                    drawOval(petal, androidx.compose.ui.geometry.Offset(cloverC.x - petalR * 0.8f, cloverC.y - petalD - petalR * 1.3f),
+                        androidx.compose.ui.geometry.Size(petalR * 1.6f, petalR * 2.6f))
+                    drawOval(petal, androidx.compose.ui.geometry.Offset(cloverC.x - petalR * 0.8f, cloverC.y + petalD - petalR * 1.3f),
+                        androidx.compose.ui.geometry.Size(petalR * 1.6f, petalR * 2.6f))
+                    drawOval(petal, androidx.compose.ui.geometry.Offset(cloverC.x - petalD - petalR * 1.3f, cloverC.y - petalR * 0.8f),
+                        androidx.compose.ui.geometry.Size(petalR * 2.6f, petalR * 1.6f))
+                    drawOval(petal, androidx.compose.ui.geometry.Offset(cloverC.x + petalD - petalR * 1.3f, cloverC.y - petalR * 0.8f),
+                        androidx.compose.ui.geometry.Size(petalR * 2.6f, petalR * 1.6f))
+                    drawCircle(Color.White.copy(alpha = 0.9f * fade), r * 0.045f, cloverC)
+                    // Cel rim: bright outline over the whole bell.
+                    drawPath(
+                        path = dome,
+                        color = ink.copy(alpha = 0.55f * fade),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                    )
+                    // Anime speculars: two curved streaks + shine blob, upper left.
+                    val spec = Color.White.copy(alpha = 0.55f * fade)
+                    val specPath = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(jx - r * 0.78f, jy - r * 0.42f)
+                        quadraticBezierTo(jx - r * 0.72f, jy - r * 0.85f, jx - r * 0.38f, jy - r * 1.0f)
+                    }
+                    drawPath(specPath, spec, style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round))
+                    val specPath2 = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(jx - r * 0.60f, jy - r * 0.38f)
+                        quadraticBezierTo(jx - r * 0.55f, jy - r * 0.62f, jx - r * 0.34f, jy - r * 0.72f)
+                    }
+                    drawPath(specPath2, Color.White.copy(alpha = 0.35f * fade),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round))
+                    drawOval(
+                        Color.White.copy(alpha = 0.50f * fade),
+                        androidx.compose.ui.geometry.Offset(jx - r * 0.52f, jy - r * 0.78f),
+                        androidx.compose.ui.geometry.Size(r * 0.20f, r * 0.11f)
+                    )
+                    // Sparkles: tiny plus-stars winking around the bell.
+                    for (s in 0 until 5) {
+                        val ang = tSway * 0.4f + s * 1.256f
+                        val spx = jx + kotlin.math.cos(ang).toFloat() * r * 1.7f
+                        val spy = (jy - r * 0.5f) + kotlin.math.sin(ang).toFloat() * r * 1.4f
+                        val tw = 0.5f + 0.5f * kotlin.math.sin(tSway * 2f + s * 1.7f).toFloat()
+                        val sLen = 4.5.dp.toPx() * (0.6f + 0.4f * tw)
+                        val sCol = Color.White.copy(alpha = 0.45f * tw * fade)
+                        drawLine(sCol, androidx.compose.ui.geometry.Offset(spx - sLen, spy), androidx.compose.ui.geometry.Offset(spx + sLen, spy),
+                            strokeWidth = 1.dp.toPx())
+                        drawLine(sCol, androidx.compose.ui.geometry.Offset(spx, spy - sLen), androidx.compose.ui.geometry.Offset(spx, spy + sLen),
+                            strokeWidth = 1.dp.toPx())
+                    }
                 }
-                drawPath(
-                    path = tent,
-                    color = primary.copy(alpha = (0.13f + energy * 0.05f) * (1f - 0.25f * kotlin.math.abs(fx)) * fade),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(
-                        width = (1.5f + (1f - kotlin.math.abs(fx))).dp.toPx(),
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round
-                    )
-                )
-                drawCircle(
-                    color = primary.copy(alpha = 0.16f * fade),
-                    radius = 2.dp.toPx(),
-                    center = androidx.compose.ui.geometry.Offset(sx + sway2, jy + len)
-                )
             }
-            } // jelly life (skip drawing while awaiting respawn)
         }
         // Film grain last: whisper-thin, so it never veils the black.
         // Static-feel speckle, capped at 80 — 300 per-frame circles

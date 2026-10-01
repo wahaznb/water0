@@ -782,42 +782,6 @@ private fun GlassLabSection(
             checked = config.backgroundOn,
             onChange = { onChange(config.copy(backgroundOn = it)) }
         )
-        // Cards look: frost (milky fill) vs liquid glass (clearer fill,
-        // brighter rim — background reads through). Same shape, same
-        // hairline; only the fill and light change.
-        Text(
-            text = "Cards: frost / glass",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        androidx.compose.foundation.layout.Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            FilterChip(
-                selected = !config.cardGlass,
-                onClick = { onChange(config.copy(cardGlass = false)) },
-                label = { Text("Frost", fontSize = 13.sp) }
-            )
-            FilterChip(
-                selected = config.cardGlass,
-                onClick = { onChange(config.copy(cardGlass = true)) },
-                label = { Text("Glass", fontSize = 13.sp) }
-            )
-        }
-        // Clarity only exists in glass mode: how see-through the cards
-        // go, iPhone-icon style. Disabled in frost (nothing to clarify).
-        Text(
-            text = "Glass clarity: ${(config.glassClarity * 100).roundToInt()}%",
-            fontSize = 14.sp,
-            color = if (config.cardGlass) MaterialTheme.colorScheme.onSurface
-            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-        )
-        Slider(
-            value = config.glassClarity,
-            onValueChange = { onChange(config.copy(glassClarity = it)) },
-            valueRange = 0f..1f,
-            enabled = config.cardGlass
-        )
     }
 }
 
@@ -952,7 +916,8 @@ private fun AboutSection() {
     SectionCard(title = "About") {
         Text(
             text = "Water0 ${com.water0.hydration.BuildConfig.VERSION_NAME} " +
-                "(${com.water0.hydration.BuildConfig.VERSION_CODE})",
+                "(${com.water0.hydration.BuildConfig.VERSION_CODE}) · " +
+                "build ${com.water0.hydration.BuildConfig.BUILD_NUMBER}",
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
