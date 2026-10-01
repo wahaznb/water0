@@ -804,6 +804,20 @@ private fun GlassLabSection(
                 label = { Text("Glass", fontSize = 13.sp) }
             )
         }
+        // Clarity only exists in glass mode: how see-through the cards
+        // go, iPhone-icon style. Disabled in frost (nothing to clarify).
+        Text(
+            text = "Glass clarity: ${(config.glassClarity * 100).roundToInt()}%",
+            fontSize = 14.sp,
+            color = if (config.cardGlass) MaterialTheme.colorScheme.onSurface
+            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        )
+        Slider(
+            value = config.glassClarity,
+            onValueChange = { onChange(config.copy(glassClarity = it)) },
+            valueRange = 0f..1f,
+            enabled = config.cardGlass
+        )
     }
 }
 

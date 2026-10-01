@@ -21,7 +21,9 @@ data class GlassConfig(
     val tintAlpha: Float = Defaults.TINT_ALPHA,
     val dockCorner: Dp = Defaults.DOCK_CORNER,
     val backgroundOn: Boolean = true,
-    val cardGlass: Boolean = false
+    val cardGlass: Boolean = false,
+    // 0 = milky … 1 = near-clear. Only read in glass mode.
+    val glassClarity: Float = 0.5f
 ) {
     // No TankMode anymore: the tumbler lives only inside its Home card.
     object Defaults {

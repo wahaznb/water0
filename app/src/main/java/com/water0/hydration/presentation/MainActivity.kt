@@ -250,7 +250,11 @@ class MainActivity : ComponentActivity() {
                     ?.percentage?.div(100f) ?: 0.35f).coerceIn(0f, 1f)
                 // Card look for the whole shell (Glass Lab chips, live).
                 androidx.compose.runtime.CompositionLocalProvider(
-                    com.water0.hydration.ui.theme.LocalCardGlass provides glassConfig.cardGlass
+                    com.water0.hydration.ui.theme.LocalCardStyle provides
+                        com.water0.hydration.ui.theme.CardStyle(
+                            glass = glassConfig.cardGlass,
+                            clarity = glassConfig.glassClarity
+                        )
                 ) {
                 LiquidGlassContainer(
                     modifier = Modifier.fillMaxSize(),

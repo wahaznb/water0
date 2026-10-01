@@ -38,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -46,7 +45,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.water0.hydration.ui.theme.GlassConfig
@@ -54,7 +52,6 @@ import com.water0.hydration.ui.theme.isDarkScheme
 import com.water0.hydration.ui.theme.liquidglass.GlassBoxScope
 import com.water0.hydration.ui.theme.liquidglass.LiquidGlassBox
 import com.water0.hydration.ui.theme.liquidglass.toLiquidParams
-import kotlin.math.roundToInt
 
 object Routes {
     const val HOME = "home"
@@ -94,8 +91,8 @@ private val TABS = listOf(
 
 // Floating neutral liquid-glass tab bar — full-width dock, no tap
 // animation. Real backdrop lens on API 33+ (ported Mortd3kay technique),
-// gradient fallback below. Hold-and-scrub with haptics; one morphing blob
-// glides with the finger and settles on the active tab.
+// gradient fallback below. Hold-and-scrub with haptics; light pools
+// where the finger touches, icons just tint.
 @Composable
 fun GlassBoxScope.GlassBottomBar(
     selected: String,
@@ -126,47 +123,18 @@ fun GlassBoxScope.GlassBottomBar(
         (((xPx - rowPadPx) / contentWidthPx()) * TABS.size).toInt()
             .coerceIn(0, TABS.size - 1)
 
-    // TV Girl pink dock: hot pink #EE2689 from the Who Really Cares
-    // palette, at the Glass Lab tint strength.
+    // Dock light: soft steady glow on the selected tab, bright pool
+    // wherever the finger touches. No blob, no morphing — light only.
     val params = remember(config) { config.toLiquidParams(Color(0xFFEE2689)) }
-    // ONE floating blob (56dp) that glides with the finger and settles on
-    // the selected tab — never pops. While held it tracks fingerX through
-    // a liquid spring (trails slightly); at rest it springs to the tab
-    // center. Y stays layout-centered (CenterStart), so only X is math.
     val dragging = fingerX != null
-    val bubbleR = 28.dp
-    val bubbleCenterDp: Dp = with(density) {
-        val wPx = rowWidthPx ?: 324.dp.toPx()
-        val rawPx = fingerX ?: tabCenterPx(selectedIndex)
-        (rawPx.coerceIn(bubbleR.toPx(), wPx - bubbleR.toPx())).toDp()
-    }
-    val bubbleX by animateDpAsState(
-        targetValue = bubbleCenterDp - bubbleR,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = 120f
-        ),
-        label = "bubble"
+    // Touch point in row coords; null = untouched. Taps flash it briefly,
+    // scrubbing carries it under the finger.
+    var touchX by remember { mutableStateOf<Float?>(null) }
+    val lightAlpha by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (touchX != null || dragging) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 220),
+        label = "touchLight"
     )
-    // Jelly blob: a calm circle at rest, a squishing dot while the finger
-    // moves. Each corner gets its own radius on its own phase, so the four
-    // never agree — always an asymmetric blob, never a rounded rectangle.
-    // Squash and stretch run opposite phases (volume-preserving jelly).
-    val fxForShape = fingerX ?: 0f
-    fun wob(divDp: Float, phase: Float): Float =
-        kotlin.math.sin(fxForShape / with(density) { divDp.dp.toPx() } + phase).toFloat()
-    fun blobCorner(divDp: Float, phase: Float): Int {
-        if (!dragging) return 50
-        return (50 + 18 * wob(divDp, phase)).roundToInt().coerceIn(28, 72)
-    }
-    val cTL = blobCorner(37f, 0f)
-    val cTR = blobCorner(29f, 1.3f)
-    val cBR = blobCorner(43f, 2.1f)
-    val cBL = blobCorner(31f, 4.0f)
-    val blobShape = RoundedCornerShape(cTL, cTR, cBR, cBL)
-    val squish = if (!dragging) 0f else wob(53f, 0f)
-    val blobScaleX = 1f + 0.10f * squish
-    val blobScaleY = 1f - 0.10f * squish
 
     // Full-width floating dock: spans the screen with slim side margins,
     // content flows beneath it. Height is hoisted for the toast lift.
@@ -190,39 +158,68 @@ fun GlassBoxScope.GlassBottomBar(
             Box(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Floating blob, drawn first so icons sit on top of it.
-                // X glides with the finger; Y is layout-centered; shape
-                // wobbles while scrubbing, circle at rest.
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .offset(x = bubbleX)
-                        .graphicsLayer {
-                            scaleX = blobScaleX
-                            scaleY = blobScaleY
-                        }
-                        .size(bubbleR * 2)
-                        .clip(blobShape)
-                        .background(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-                            blobShape
-                        )
-                        .border(
-                            1.dp,
-                            Brush.linearGradient(
-                                listOf(
-                                    Color.White.copy(alpha = 0.55f),
-                                    Color.White.copy(alpha = 0.12f),
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
-                                )
+                // Light layer, drawn first so icons sit on top of it:
+                // resting glow on the selected tab + bright pool tracking
+                // the finger while touching/scrubbing.
+                val glowWhite = Color.White.copy(alpha = 0.10f)
+                val touchWhite = Color.White
+                val touchPrimary = MaterialTheme.colorScheme.primary
+                androidx.compose.foundation.Canvas(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val cy = size.height / 2f
+                    val glowR = 46.dp.toPx()
+                    val sx = tabCenterPx(selectedIndex)
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            listOf(
+                                glowWhite,
+                                Color.Transparent
                             ),
-                            blobShape
+                            center = androidx.compose.ui.geometry.Offset(sx, cy),
+                            radius = glowR
+                        ),
+                        radius = glowR,
+                        center = androidx.compose.ui.geometry.Offset(sx, cy)
+                    )
+                    val lx = (touchX ?: fingerX)?.coerceIn(0f, size.width)
+                    if (lx != null && lightAlpha > 0.01f) {
+                        val touchR = 56.dp.toPx()
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                listOf(
+                                    touchWhite.copy(alpha = 0.42f * lightAlpha),
+                                    touchPrimary.copy(
+                                        alpha = 0.20f * lightAlpha
+                                    ),
+                                    Color.Transparent
+                                ),
+                                center = androidx.compose.ui.geometry.Offset(lx, cy),
+                                radius = touchR
+                            ),
+                            radius = touchR,
+                            center = androidx.compose.ui.geometry.Offset(lx, cy)
                         )
-                )
+                    }
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .onSizeChanged { rowWidthPx = it.width.toFloat() }
+                        .pointerInput(Unit) {
+                            // Tap flash: light pools where the finger lands,
+                            // fading on release. Scrubbing takes over below.
+                            detectTapGestures(
+                                onPress = { offset ->
+                                    touchX = offset.x
+                                    try {
+                                        awaitRelease()
+                                    } finally {
+                                        touchX = null
+                                    }
+                                }
+                            )
+                        }
                         .pointerInput(Unit) {
                             detectDragGesturesAfterLongPress(
                                 onDragStart = { offset ->
@@ -289,7 +286,7 @@ private fun GlassTab(
     // Full-width dock: each tab takes an equal share (weight comes from
     // the Row scope caller). Icon-only: the label lives in
     // contentDescription for talkback. No tap animation — no magnify, no
-    // ripple; the floating blob is the only motion. Tabs just tint.
+    // ripple; touch light is the only motion. Tabs just tint.
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier.clickable(

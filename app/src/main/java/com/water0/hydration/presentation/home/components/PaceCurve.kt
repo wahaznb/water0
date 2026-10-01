@@ -14,18 +14,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.water0.hydration.ui.theme.glassCard
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.water0.hydration.data.local.entity.HydrationEntry
 import com.water0.hydration.ui.theme.SectionHeader
-import com.water0.hydration.ui.theme.glassCardBorder
-import com.water0.hydration.ui.theme.glassCardContainer
 import kotlin.math.roundToInt
 
 /**
@@ -87,18 +84,19 @@ fun PaceCurveCard(
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(110.dp)
+                .height(150.dp)
         ) {
             val w = size.width
             val h = size.height
             fun x(hour: Float) = ((hour - wakeHour) / span).coerceIn(0f, 1f) * w
             fun y(ml: Float) = h * (1f - (ml / maxMl).coerceIn(0f, 1f))
-            // Goal dashed line.
+            val goalColor = Color(0xFF43A047)
+            // Goal dashed line, green: the line to beat.
             drawLine(
-                color = onVariant.copy(alpha = 0.5f),
+                color = goalColor.copy(alpha = 0.65f),
                 start = Offset(0f, y(goalMl.toFloat())),
                 end = Offset(w, y(goalMl.toFloat())),
-                strokeWidth = 1.dp.toPx(),
+                strokeWidth = 1.5.dp.toPx(),
                 pathEffect = PathEffect.dashPathEffect(
                     floatArrayOf(6.dp.toPx(), 4.dp.toPx())
                 )
@@ -110,23 +108,42 @@ fun PaceCurveCard(
                 end = Offset(x(sleepHour.toFloat()), y(goalMl.toFloat())),
                 strokeWidth = 1.5.dp.toPx()
             )
-            // Actual: rising steps.
+            // Actual: rising steps + soft fill under them.
             var prevX = x(wakeHour.toFloat())
             var prevY = y(0f)
             val stepColor = primary
+            val fill = androidx.compose.ui.graphics.Path().apply {
+                moveTo(x(wakeHour.toFloat()), h)
+                lineTo(x(wakeHour.toFloat()), y(0f))
+            }
             for ((hour, total) in steps) {
                 val cx = x(hour)
                 val cy = y(total.toFloat())
-                drawLine(stepColor, Offset(prevX, prevY), Offset(cx, prevY), 2.dp.toPx())
-                drawLine(stepColor, Offset(cx, prevY), Offset(cx, cy), 2.dp.toPx())
-                drawCircle(stepColor, 3.dp.toPx(), Offset(cx, cy))
+                drawLine(stepColor, Offset(prevX, prevY), Offset(cx, prevY), 2.5.dp.toPx())
+                drawLine(stepColor, Offset(cx, prevY), Offset(cx, cy), 2.5.dp.toPx())
+                drawCircle(stepColor, 3.5.dp.toPx(), Offset(cx, cy))
+                drawCircle(Color.White.copy(alpha = 0.85f), 1.5.dp.toPx(), Offset(cx, cy))
+                fill.lineTo(cx, prevY)
+                fill.lineTo(cx, cy)
                 prevX = cx
                 prevY = cy
             }
             // Extend flat to now so the line never dangles mid-air.
             if (steps.isNotEmpty()) {
-                drawLine(stepColor, Offset(prevX, prevY), Offset(x(nowHour), prevY), 2.dp.toPx())
+                drawLine(stepColor, Offset(prevX, prevY), Offset(x(nowHour), prevY), 2.5.dp.toPx())
+                fill.lineTo(x(nowHour), prevY)
             }
+            fill.lineTo(x(if (steps.isEmpty()) wakeHour.toFloat() else nowHour), h)
+            fill.close()
+            drawPath(
+                path = fill,
+                brush = Brush.verticalGradient(
+                    listOf(
+                        primary.copy(alpha = 0.22f),
+                        primary.copy(alpha = 0.02f)
+                    )
+                )
+            )
             // Now marker.
             val nx = x(nowHour)
             drawLine(

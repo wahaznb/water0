@@ -119,19 +119,24 @@ object Glass {
 }
 
 /**
- * Card look switch (Glass Lab chips, live): false = frost (milky fill),
- * true = liquid glass (clearer fill, brighter rim). Provided once in
- * MainActivity from the saved config; previews default to frost.
+ * Card look (Glass Lab, live): frost vs liquid glass + how clear the
+ * glass goes. Provided once in MainActivity from the saved config;
+ * previews default to frost.
  */
-val LocalCardGlass = androidx.compose.runtime.compositionLocalOf { false }
+data class CardStyle(val glass: Boolean = false, val clarity: Float = 0.5f)
+
+val LocalCardStyle = androidx.compose.runtime.compositionLocalOf { CardStyle() }
 
 @Composable
 fun glassCardContainer(): Color {
-    // Dark: frosted surface, or a clearer version in glass mode. Light:
-    // light grey with a small black tint so cards sit visibly on white.
-    if (LocalCardGlass.current) {
-        return if (isDarkScheme()) MaterialTheme.colorScheme.surface.copy(alpha = 0.22f)
-        else Color(0xFFECECEC).copy(alpha = 0.35f)
+    val style = LocalCardStyle.current
+    // Glass mode: clearer fill so the background reads through like an
+    // iPhone liquid-glass icon — clarity slides the fill from milky to
+    // near-clear. Frost keeps the fixed readable fills.
+    if (style.glass) {
+        val a = 0.35f - style.clarity.coerceIn(0f, 1f) * 0.25f
+        return if (isDarkScheme()) MaterialTheme.colorScheme.surface.copy(alpha = a)
+        else Color(0xFFECECEC).copy(alpha = a + 0.20f)
     }
     return if (isDarkScheme()) MaterialTheme.colorScheme.surface.copy(alpha = Glass.CARD_ALPHA)
     else Color(0xFFECECEC).copy(alpha = 0.60f)
@@ -149,7 +154,12 @@ fun isDarkScheme(): Boolean {
 // Glass mode brightens the top light so the edge reads as a lens.
 @Composable
 fun glassCardBorder(): BorderStroke {
-    val topLight = if (LocalCardGlass.current) 0.30f else 0.16f
+    val style = LocalCardStyle.current
+    val topLight = if (style.glass) {
+        0.16f + style.clarity.coerceIn(0f, 1f) * 0.25f
+    } else {
+        0.16f
+    }
     return BorderStroke(
         1.dp,
         Brush.verticalGradient(
@@ -486,6 +496,82 @@ fun AuroraBackground(
         }
         if (hydrationTint != Color.Transparent) {
             drawRect(color = hydrationTint, size = size)
+        }
+        // Jellyfish: one slow drifter for the deep-water read. Dome
+        // breathes, six tentacles sway on staggered phases, the whole
+        // animal hovers around the right-center so cards never cover it
+        // fully. Rides the shared clocks — no new animation, no new cost
+        // beyond ~10 draw ops. Calm mode (backgroundOn=false) skips the
+        // whole canvas, jelly included.
+        run {
+            val t = rise * 6.28f
+            val jx = w * (0.62f + 0.06f * kotlin.math.sin(t * 0.5f).toFloat())
+            val jy = h * (0.34f + 0.03f * kotlin.math.sin(t * 0.35f + 1f).toFloat())
+            val pulse = 1f + 0.07f * kotlin.math.sin(t).toFloat()
+            val r = 52.dp.toPx() * pulse
+            val jelly = primary.copy(alpha = (0.16f + energy * 0.08f))
+            // Dome.
+            val dome = androidx.compose.ui.graphics.Path().apply {
+                moveTo(jx - r, jy)
+                quadraticBezierTo(jx - r, jy - r * 1.15f, jx, jy - r * 1.15f)
+                quadraticBezierTo(jx + r, jy - r * 1.15f, jx + r, jy)
+                close()
+            }
+            drawPath(
+                path = dome,
+                brush = Brush.verticalGradient(
+                    listOf(
+                        jelly,
+                        jelly.copy(alpha = jelly.alpha * 0.25f)
+                    ),
+                    startY = jy - r * 1.15f,
+                    endY = jy
+                )
+            )
+            // Dome rim light on top.
+            drawArc(
+                color = Color.White.copy(alpha = 0.14f),
+                startAngle = 200f,
+                sweepAngle = 140f,
+                useCenter = false,
+                topLeft = androidx.compose.ui.geometry.Offset(jx - r, jy - r * 1.15f),
+                size = androidx.compose.ui.geometry.Size(r * 2f, r * 2f),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.25.dp.toPx())
+            )
+            // Inner glow.
+            drawCircle(
+                color = secondary.copy(alpha = 0.10f + energy * 0.06f),
+                radius = r * 0.45f,
+                center = androidx.compose.ui.geometry.Offset(jx, jy - r * 0.55f)
+            )
+            // Tentacles: staggered sway, longer in the middle.
+            for (i in 0 until 6) {
+                val fx = (i - 2.5f) / 2.5f // -1..1 across the rim
+                val sx = jx + fx * r * 0.8f
+                val len = (76 + (1f - kotlin.math.abs(fx)) * 52f).dp.toPx()
+                val sway = kotlin.math.sin(t * 1.3f + i * 1.1f).toFloat() * 10.dp.toPx()
+                val sway2 = kotlin.math.sin(t * 1.3f + i * 1.1f + 0.9f).toFloat() * 14.dp.toPx()
+                val tent = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(sx, jy)
+                    quadraticBezierTo(
+                        sx + sway, jy + len * 0.5f,
+                        sx + sway2, jy + len
+                    )
+                }
+                drawPath(
+                    path = tent,
+                    color = primary.copy(alpha = (0.13f + energy * 0.05f) * (1f - 0.25f * kotlin.math.abs(fx))),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = (1.5f + (1f - kotlin.math.abs(fx))).dp.toPx(),
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                )
+                drawCircle(
+                    color = primary.copy(alpha = 0.16f),
+                    radius = 2.dp.toPx(),
+                    center = androidx.compose.ui.geometry.Offset(sx + sway2, jy + len)
+                )
+            }
         }
         // Film grain last: whisper-thin, so it never veils the black.
         // Static-feel speckle, capped at 80 — 300 per-frame circles

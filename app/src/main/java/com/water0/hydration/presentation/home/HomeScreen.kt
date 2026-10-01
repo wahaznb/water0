@@ -100,89 +100,80 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .glassCard()
-                    // Top sheen: faint radial wash so the card reads as
-                    // glass catching light, not flat frost.
-                    .background(
-                        Brush.radialGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                                Color.Transparent
-                            ),
-                            center = androidx.compose.ui.geometry.Offset.Zero,
-                            radius = 800f
-                        ),
-                        RoundedCornerShape(Radii.md)
-                    )
-                    .padding(14.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                HeroHeader(status = state.status)
-                // Tank and numbers as two cards side by side: the tumbler
-                // lives ONLY here (still water, no travel, no background
-                // twin), info keeps its own card.
-                androidx.compose.foundation.layout.Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .weight(0.36f)
-                            .glassCard()
-                            .padding(10.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        com.water0.hydration.presentation.home.components.WaterStage(
-                            totalMl = state.totalEffectiveMl,
-                            goalMl = state.goalMl,
-                            layers = com.water0.hydration.presentation.home.components.layersFor(
-                                state.entries
-                            ),
-                            tiltDegrees = 0f,
-                            sloshBoostDp = 0f,
-                            pouring = false,
-                            glassWidth = 96.dp,
-                            glassHeight = 168.dp,
-                            showCaption = false
-                        )
-                    }
-                    Column(
-                        modifier = Modifier
-                            .weight(0.64f)
-                            .glassCard()
-                            .padding(14.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        StatsPages(state = state)
-                    }
-                }
-                // Day progress under the carousel: the same story as the
-                // shade line — how much of the day is actually drunk.
-                androidx.compose.material3.LinearProgressIndicator(
-                    progress = {
-                        (state.totalEffectiveMl.toFloat() / state.goalMl.coerceAtLeast(1))
-                            .coerceIn(0f, 1f)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp)),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                )
-            }
+            // Greeting stands alone; the pace graph is the main focus
+            // right below it; tank and numbers are two separate cards
+            // after that. Nothing nests, nothing spans.
+            HeroHeader(status = state.status)
             com.water0.hydration.presentation.home.components.PaceCurveCard(
                 entries = state.entries,
                 goalMl = state.goalMl,
                 wakeHour = state.wakeHour,
                 sleepHour = state.sleepHour
             )
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(0.36f)
+                        .glassCard()
+                        .padding(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    com.water0.hydration.presentation.home.components.WaterStage(
+                        totalMl = state.totalEffectiveMl,
+                        goalMl = state.goalMl,
+                        layers = com.water0.hydration.presentation.home.components.layersFor(
+                            state.entries
+                        ),
+                        tiltDegrees = 0f,
+                        sloshBoostDp = 0f,
+                        pouring = false,
+                        glassWidth = 96.dp,
+                        glassHeight = 168.dp,
+                        showCaption = false
+                    )
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(0.64f)
+                        .glassCard()
+                        // Top sheen lives here now: the numbers card
+                        // catches the light.
+                        .background(
+                            Brush.radialGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                                    Color.Transparent
+                                ),
+                                center = androidx.compose.ui.geometry.Offset.Zero,
+                                radius = 800f
+                            ),
+                            RoundedCornerShape(Radii.md)
+                        )
+                        .padding(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    StatsPages(state = state)
+                    // Day progress under the carousel: the same story as
+                    // the shade line — how much of the day is drunk.
+                    androidx.compose.material3.LinearProgressIndicator(
+                        progress = {
+                            (state.totalEffectiveMl.toFloat() / state.goalMl.coerceAtLeast(1))
+                                .coerceIn(0f, 1f)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp)),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                    )
+                }
+            }
             RecommendationsSection(
                 recommendations = state.recommendations,
                 onAction = { amount -> onRecLog(amount) }

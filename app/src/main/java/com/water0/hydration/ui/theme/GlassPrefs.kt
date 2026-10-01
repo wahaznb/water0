@@ -17,7 +17,8 @@ class GlassPrefs(private val prefs: SharedPreferences) {
         tintAlpha = prefs.getFloat(KEY_TINT, GlassConfig.Defaults.TINT_ALPHA),
         dockCorner = prefs.getInt(KEY_DOCK_DP, 42).dp.coerceAtMost(45.dp),
         backgroundOn = prefs.getBoolean(KEY_BG_ON, true),
-        cardGlass = prefs.getBoolean(KEY_CARD_GLASS, false)
+        cardGlass = prefs.getBoolean(KEY_CARD_GLASS, false),
+        glassClarity = prefs.getFloat(KEY_GLASS_CLARITY, 0.5f)
     )
 
     fun saveApplied(config: GlassConfig) {
@@ -27,6 +28,7 @@ class GlassPrefs(private val prefs: SharedPreferences) {
             .putInt(KEY_DOCK_DP, config.dockCorner.value.toInt())
             .putBoolean(KEY_BG_ON, config.backgroundOn)
             .putBoolean(KEY_CARD_GLASS, config.cardGlass)
+            .putFloat(KEY_GLASS_CLARITY, config.glassClarity)
             .apply()
     }
 
@@ -42,6 +44,7 @@ class GlassPrefs(private val prefs: SharedPreferences) {
         private const val KEY_DOCK_DP = "glass_dock_dp"
         private const val KEY_BG_ON = "glass_bg_on"
         private const val KEY_CARD_GLASS = "glass_card_glass"
+        private const val KEY_GLASS_CLARITY = "glass_clarity"
         // Bumped when the defaults change (v0.3: 6dp / 27% / 42dp, bevel
         // removed): existing installs re-seed once so the phone actually
         // shows the new look instead of the stored old values.
