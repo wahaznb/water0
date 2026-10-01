@@ -118,7 +118,6 @@ suspend fun showStatusNotifications(context: Context): Boolean {
             context.packageName, com.water0.hydration.R.layout.notification_status
         )
         remote.setTextViewText(com.water0.hydration.R.id.notif_title, title)
-        remote.setTextViewText(com.water0.hydration.R.id.notif_text, text)
         remote.setTextViewText(
             com.water0.hydration.R.id.notif_percent,
             "${(totalMl * 100 / goalMl.coerceAtLeast(1)).coerceIn(0, 999)}%"

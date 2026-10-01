@@ -101,8 +101,8 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Greeting stands alone; the pace graph is the main focus
-            // right below it; tank and numbers are two separate cards
-            // after that. Nothing nests, nothing spans.
+            // right below it; the numbers card follows full width.
+            // No tumbler anywhere — a status ring circles the %.
             HeroHeader(status = state.status)
             com.water0.hydration.presentation.home.components.PaceCurveCard(
                 entries = state.entries,
@@ -110,54 +110,28 @@ fun HomeScreen(
                 wakeHour = state.wakeHour,
                 sleepHour = state.sleepHour
             )
-            androidx.compose.foundation.layout.Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(
-                    modifier = Modifier
-                        .weight(0.36f)
-                        .glassCard()
-                        .padding(10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    com.water0.hydration.presentation.home.components.WaterStage(
-                        totalMl = state.totalEffectiveMl,
-                        goalMl = state.goalMl,
-                        layers = com.water0.hydration.presentation.home.components.layersFor(
-                            state.entries
-                        ),
-                        tiltDegrees = 0f,
-                        sloshBoostDp = 0f,
-                        pouring = false,
-                        glassWidth = 96.dp,
-                        glassHeight = 168.dp,
-                        showCaption = false
-                    )
-                }
-                Column(
-                    modifier = Modifier
-                        .weight(0.64f)
-                        .glassCard()
-                        // Top sheen lives here now: the numbers card
-                        // catches the light.
-                        .background(
-                            Brush.radialGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                                    Color.Transparent
-                                ),
-                                center = androidx.compose.ui.geometry.Offset.Zero,
-                                radius = 800f
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .glassCard()
+                    // Top sheen lives here now: the numbers card
+                    // catches the light.
+                    .background(
+                        Brush.radialGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0f)
                             ),
-                            RoundedCornerShape(Radii.md)
-                        )
-                        .padding(14.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    StatsPages(state = state)
+                            center = androidx.compose.ui.geometry.Offset.Zero,
+                            radius = 800f
+                        ),
+                        RoundedCornerShape(Radii.md)
+                    )
+                    .padding(14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                StatsPages(state = state)
                     // Day progress under the carousel: the same story as
                     // the shade line — how much of the day is drunk.
                     androidx.compose.material3.LinearProgressIndicator(
@@ -173,7 +147,6 @@ fun HomeScreen(
                         trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
                     )
                 }
-            }
             RecommendationsSection(
                 recommendations = state.recommendations,
                 onAction = { amount -> onRecLog(amount) }
@@ -371,6 +344,11 @@ private fun ColumnScope.StatsPages(
     val dragX = remember {
         androidx.compose.animation.core.Animatable(0f)
     }
+    // Fling counts as a vote too: fast flicks turn the page even when
+    // the finger hasn't crossed the distance threshold.
+    val flingTracker = remember {
+        androidx.compose.ui.input.pointer.util.VelocityTracker()
+    }
     androidx.compose.foundation.pager.HorizontalPager(
         state = pagerState,
         userScrollEnabled = false,
@@ -379,11 +357,23 @@ private fun ColumnScope.StatsPages(
             .height(168.dp)
             .pointerInput(pagerState) {
                 detectHorizontalDragGestures(
+                    onDragStart = {
+                        flingTracker.resetTracking()
+                    },
                     onDragEnd = {
+                        val velocity = try {
+                            flingTracker.calculateVelocity().x
+                        } catch (_: Exception) {
+                            0f
+                        }
                         val target = when {
                             dragX.value < -60f && pagerState.currentPage < 2 ->
                                 pagerState.currentPage + 1
                             dragX.value > 60f && pagerState.currentPage > 0 ->
+                                pagerState.currentPage - 1
+                            velocity < -600f && pagerState.currentPage < 2 ->
+                                pagerState.currentPage + 1
+                            velocity > 600f && pagerState.currentPage > 0 ->
                                 pagerState.currentPage - 1
                             else -> pagerState.currentPage
                         }
@@ -403,7 +393,10 @@ private fun ColumnScope.StatsPages(
                             )
                         }
                     },
-                    onHorizontalDrag = { _, dragAmount ->
+                    onHorizontalDrag = { change, dragAmount ->
+                        flingTracker.addPosition(
+                            change.uptimeMillis, change.position
+                        )
                         scope.launch { dragX.snapTo(dragX.value + dragAmount) }
                     }
                 )
@@ -422,12 +415,58 @@ private fun ColumnScope.StatsPages(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "${pace}%",
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                    // Status ring: progress circle around the %, colored
+                    // by where the day stands (red behind, green on
+                    // track, blue ahead, red over).
+                    val ringColor = when (state.status) {
+                        RecommendationEngine.HydrationStatus.Status.BEHIND ->
+                            Color(0xFFEF5350)
+                        RecommendationEngine.HydrationStatus.Status.ON_TRACK ->
+                            Color(0xFF43A047)
+                        RecommendationEngine.HydrationStatus.Status.AHEAD ->
+                            Color(0xFF1E88E5)
+                        RecommendationEngine.HydrationStatus.Status.OVER ->
+                            Color(0xFFFF5252)
+                    }
+                    val ringFrac = (pace / 100f).coerceIn(0f, 1f)
+                    val ringTrack = MaterialTheme.colorScheme.onSurface.copy(
+                        alpha = 0.12f
                     )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(148.dp)
+                    ) {
+                        androidx.compose.foundation.Canvas(
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            drawArc(
+                                color = ringTrack,
+                                startAngle = 0f,
+                                sweepAngle = 360f,
+                                useCenter = false,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                    width = 9.dp.toPx(),
+                                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                                )
+                            )
+                            drawArc(
+                                color = ringColor,
+                                startAngle = -90f,
+                                sweepAngle = 360f * ringFrac,
+                                useCenter = false,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                    width = 9.dp.toPx(),
+                                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                                )
+                            )
+                        }
+                        Text(
+                            text = "${pace}%",
+                            fontSize = 40.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                     Text(
                         text = "${state.totalEffectiveMl} / ${state.expectedMl} ml by now",
                         fontSize = 15.sp,

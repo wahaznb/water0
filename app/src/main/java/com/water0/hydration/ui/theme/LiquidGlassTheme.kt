@@ -44,8 +44,10 @@ fun LiquidGlassTheme(
 }
 
 object GlassColors {
+    // Deep-water dark: near-black navy instead of pure black — the field
+    // reads blue, cards float as slight-white glass on it.
     val dark = darkColorScheme(
-        background = Color(0xFF000000),
+        background = Color(0xFF0B1526),
         surface = Color(0xFF222738),
         surfaceVariant = Color(0xFF2E3550),
         onBackground = Color(0xFFC0CAF5),
@@ -77,9 +79,11 @@ object GlassColors {
 
     // Omarchy ships light-mode pairings too; keep a bright water theme
     // so the app respects the system setting instead of forcing dark.
+    // Soft pink-white field instead of stark white — easier on the
+    // eyes, nods at the dock pink.
     val light = lightColorScheme(
-        background = Color(0xFFFFFFFF),
-        surface = Color(0xFFFFFFFF),
+        background = Color(0xFFFBF2F4),
+        surface = Color(0xFFF6E9EC),
         surfaceVariant = Color(0xFFDCE9FA),
         onBackground = Color(0xFF000000),
         onSurface = Color(0xFF000000),
@@ -132,14 +136,14 @@ fun glassCardContainer(): Color {
     val style = LocalCardStyle.current
     // Glass mode: clearer fill so the background reads through like an
     // iPhone liquid-glass icon — clarity slides the fill from milky to
-    // near-clear. Frost keeps the fixed readable fills.
+    // near-clear. Frost: slight-white glass on the deep field.
     if (style.glass) {
         val a = 0.35f - style.clarity.coerceIn(0f, 1f) * 0.25f
-        return if (isDarkScheme()) MaterialTheme.colorScheme.surface.copy(alpha = a)
-        else Color(0xFFECECEC).copy(alpha = a + 0.20f)
+        return if (isDarkScheme()) Color.White.copy(alpha = a)
+        else Color.White.copy(alpha = a + 0.25f)
     }
-    return if (isDarkScheme()) MaterialTheme.colorScheme.surface.copy(alpha = Glass.CARD_ALPHA)
-    else Color(0xFFECECEC).copy(alpha = 0.60f)
+    return if (isDarkScheme()) Color.White.copy(alpha = 0.07f)
+    else Color(0xFFF6E9EC).copy(alpha = 0.60f)
 }
 
 /** True when the app theme is dark — one source for every theme branch. */
@@ -198,6 +202,17 @@ private data class GlowOrb(
     val angleRad: Float,
     val travelFrac: Float,
     val radiusDp: Float,
+    val birthUptimeMs: Long
+)
+
+// One jellyfish life: random spawn, random heading, fixed lifespan.
+// Respawned by the reaper — never the same swim twice.
+private data class JellySpawn(
+    val xFrac: Float,
+    val yFrac: Float,
+    val angleRad: Float,
+    val travelFrac: Float,
+    val sizeDp: Float,
     val birthUptimeMs: Long
 )
 
@@ -304,15 +319,40 @@ fun AuroraBackground(
         }
     }
     // Reaper: once a second, respawn anything past its lifespan — glow
-    // orbs at fresh random spots, bubbles at a fresh random x. Unseeded
-    // rolls every time, so neither field ever repeats. The state-list
-    // writes recompose; per-frame motion comes from the wall clock in
-    // draw, so nothing here costs a frame.
+    // orbs at fresh random spots, bubbles at a fresh random x, the
+    // jellyfish wherever it pleases. Unseeded rolls every time, so no
+    // field ever repeats. The state writes recompose; per-frame motion
+    // comes from the wall clock in draw, so nothing here costs a frame.
+    val jellyLifeMs = 26_000L
+    val jelly = remember(bgSeed) {
+        val rng = kotlin.random.Random(bgSeed)
+        val now = android.os.SystemClock.uptimeMillis()
+        androidx.compose.runtime.mutableStateOf(
+            JellySpawn(
+                xFrac = rng.nextFloat(),
+                yFrac = 0.15f + rng.nextFloat() * 0.5f,
+                angleRad = rng.nextFloat() * 6.28f,
+                travelFrac = 0.12f + rng.nextFloat() * 0.10f,
+                sizeDp = 44f + rng.nextFloat() * 20f,
+                birthUptimeMs = now - rng.nextLong(jellyLifeMs)
+            )
+        )
+    }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         while (true) {
             kotlinx.coroutines.delay(1000L)
             val now = android.os.SystemClock.uptimeMillis()
             val rng = kotlin.random.Random.Default
+            if (now - jelly.value.birthUptimeMs >= jellyLifeMs) {
+                jelly.value = JellySpawn(
+                    xFrac = rng.nextFloat(),
+                    yFrac = 0.15f + rng.nextFloat() * 0.5f,
+                    angleRad = rng.nextFloat() * 6.28f,
+                    travelFrac = 0.12f + rng.nextFloat() * 0.10f,
+                    sizeDp = 44f + rng.nextFloat() * 20f,
+                    birthUptimeMs = now
+                )
+            }
             for (i in orbs.indices) {
                 if (now - orbs[i].birthUptimeMs >= OrbLifeMs) {
                     orbs[i] = GlowOrb(
@@ -346,9 +386,10 @@ fun AuroraBackground(
     androidx.compose.foundation.Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
-        // Pure black base in dark; theme background in light.
+        // Theme background base in both modes (deep navy dark,
+        // pink-white light) — the field and the theme never disagree.
         drawRect(
-            color = if (dark) Color.Black else background,
+            color = background,
             size = size
         )
         // Each wash orbits slowly — light field only. Dark has no washes;
@@ -494,22 +535,27 @@ fun AuroraBackground(
                 strokeWidth = 0.75.dp.toPx()
             )
         }
+        // Jellyfish draw: random spawn, random heading, one 26s life —
+        // nothing scripted, never the same swim twice (see reaper).
+        // Dome breathes, six tentacles sway, all fading in/out of zero.
         if (hydrationTint != Color.Transparent) {
             drawRect(color = hydrationTint, size = size)
         }
-        // Jellyfish: one slow drifter for the deep-water read. Dome
-        // breathes, six tentacles sway on staggered phases, the whole
-        // animal hovers around the right-center so cards never cover it
-        // fully. Rides the shared clocks — no new animation, no new cost
-        // beyond ~10 draw ops. Calm mode (backgroundOn=false) skips the
-        // whole canvas, jelly included.
         run {
-            val t = rise * 6.28f
-            val jx = w * (0.62f + 0.06f * kotlin.math.sin(t * 0.5f).toFloat())
-            val jy = h * (0.34f + 0.03f * kotlin.math.sin(t * 0.35f + 1f).toFloat())
-            val pulse = 1f + 0.07f * kotlin.math.sin(t).toFloat()
-            val r = 52.dp.toPx() * pulse
-            val jelly = primary.copy(alpha = (0.16f + energy * 0.08f))
+            val j = jelly.value
+            val now = android.os.SystemClock.uptimeMillis()
+            val progress = ((now - j.birthUptimeMs).toFloat() / jellyLifeMs)
+                .coerceIn(0f, 1f)
+            if (progress < 1f) {
+                val fade = kotlin.math.sin(progress * kotlin.math.PI).toFloat()
+                val tSway = now / 1000f
+                val jx = ((j.xFrac + kotlin.math.cos(j.angleRad) * j.travelFrac * progress) * w)
+                    .coerceIn(0f, w)
+                val jy = ((j.yFrac + kotlin.math.sin(j.angleRad) * j.travelFrac * progress) * h)
+                    .coerceIn(0f, h)
+                val pulse = 1f + 0.07f * kotlin.math.sin(tSway * 1.1f).toFloat()
+                val r = j.sizeDp.dp.toPx() * pulse
+                val jelly = primary.copy(alpha = (0.16f + energy * 0.08f) * fade)
             // Dome.
             val dome = androidx.compose.ui.graphics.Path().apply {
                 moveTo(jx - r, jy)
@@ -540,7 +586,7 @@ fun AuroraBackground(
             )
             // Inner glow.
             drawCircle(
-                color = secondary.copy(alpha = 0.10f + energy * 0.06f),
+                color = secondary.copy(alpha = (0.10f + energy * 0.06f) * fade),
                 radius = r * 0.45f,
                 center = androidx.compose.ui.geometry.Offset(jx, jy - r * 0.55f)
             )
@@ -549,8 +595,8 @@ fun AuroraBackground(
                 val fx = (i - 2.5f) / 2.5f // -1..1 across the rim
                 val sx = jx + fx * r * 0.8f
                 val len = (76 + (1f - kotlin.math.abs(fx)) * 52f).dp.toPx()
-                val sway = kotlin.math.sin(t * 1.3f + i * 1.1f).toFloat() * 10.dp.toPx()
-                val sway2 = kotlin.math.sin(t * 1.3f + i * 1.1f + 0.9f).toFloat() * 14.dp.toPx()
+                val sway = kotlin.math.sin(tSway * 1.3f + i * 1.1f).toFloat() * 10.dp.toPx()
+                val sway2 = kotlin.math.sin(tSway * 1.3f + i * 1.1f + 0.9f).toFloat() * 14.dp.toPx()
                 val tent = androidx.compose.ui.graphics.Path().apply {
                     moveTo(sx, jy)
                     quadraticBezierTo(
@@ -560,18 +606,19 @@ fun AuroraBackground(
                 }
                 drawPath(
                     path = tent,
-                    color = primary.copy(alpha = (0.13f + energy * 0.05f) * (1f - 0.25f * kotlin.math.abs(fx))),
+                    color = primary.copy(alpha = (0.13f + energy * 0.05f) * (1f - 0.25f * kotlin.math.abs(fx)) * fade),
                     style = androidx.compose.ui.graphics.drawscope.Stroke(
                         width = (1.5f + (1f - kotlin.math.abs(fx))).dp.toPx(),
                         cap = androidx.compose.ui.graphics.StrokeCap.Round
                     )
                 )
                 drawCircle(
-                    color = primary.copy(alpha = 0.16f),
+                    color = primary.copy(alpha = 0.16f * fade),
                     radius = 2.dp.toPx(),
                     center = androidx.compose.ui.geometry.Offset(sx + sway2, jy + len)
                 )
             }
+            } // jelly life (skip drawing while awaiting respawn)
         }
         // Film grain last: whisper-thin, so it never veils the black.
         // Static-feel speckle, capped at 80 — 300 per-frame circles

@@ -108,10 +108,13 @@ fun PaceCurveCard(
                 end = Offset(x(sleepHour.toFloat()), y(goalMl.toFloat())),
                 strokeWidth = 1.5.dp.toPx()
             )
-            // Actual: rising steps + soft fill under them.
+            // Actual: rising steps + soft fill under them. Red everywhere
+            // the day is behind the line — the color IS the verdict.
             var prevX = x(wakeHour.toFloat())
             var prevY = y(0f)
-            val stepColor = primary
+            val behindNow = awake && drunkNow < expectedNow
+            val stepColor = if (behindNow) Color(0xFFEF5350) else primary
+            val stepFill = if (behindNow) Color(0xFFEF5350) else primary
             val fill = androidx.compose.ui.graphics.Path().apply {
                 moveTo(x(wakeHour.toFloat()), h)
                 lineTo(x(wakeHour.toFloat()), y(0f))
@@ -139,8 +142,8 @@ fun PaceCurveCard(
                 path = fill,
                 brush = Brush.verticalGradient(
                     listOf(
-                        primary.copy(alpha = 0.22f),
-                        primary.copy(alpha = 0.02f)
+                        stepFill.copy(alpha = 0.22f),
+                        stepFill.copy(alpha = 0.02f)
                     )
                 )
             )

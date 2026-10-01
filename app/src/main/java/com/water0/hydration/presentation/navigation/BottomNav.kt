@@ -160,7 +160,8 @@ fun GlassBoxScope.GlassBottomBar(
             ) {
                 // Light layer, drawn first so icons sit on top of it:
                 // resting glow on the selected tab + bright pool tracking
-                // the finger while touching/scrubbing.
+                // the finger while touching/scrubbing. End stops fade the
+                // SAME hue (never Transparent black — that renders as mud).
                 val glowWhite = Color.White.copy(alpha = 0.10f)
                 val touchWhite = Color.White
                 val touchPrimary = MaterialTheme.colorScheme.primary
@@ -174,7 +175,7 @@ fun GlassBoxScope.GlassBottomBar(
                         brush = Brush.radialGradient(
                             listOf(
                                 glowWhite,
-                                Color.Transparent
+                                Color.White.copy(alpha = 0f)
                             ),
                             center = androidx.compose.ui.geometry.Offset(sx, cy),
                             radius = glowR
@@ -192,7 +193,7 @@ fun GlassBoxScope.GlassBottomBar(
                                     touchPrimary.copy(
                                         alpha = 0.20f * lightAlpha
                                     ),
-                                    Color.Transparent
+                                    touchPrimary.copy(alpha = 0f)
                                 ),
                                 center = androidx.compose.ui.geometry.Offset(lx, cy),
                                 radius = touchR
