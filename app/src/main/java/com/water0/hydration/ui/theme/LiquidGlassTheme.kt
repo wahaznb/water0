@@ -83,7 +83,7 @@ object GlassColors {
     // Soft sky-blue field; cards sit on it as white-tinted glass,
     // bubbles and glows run white.
     val light = lightColorScheme(
-        background = Color(0xFFD9E7F7),
+        background = Color(0xFFCFE3F7),
         surface = Color(0xFFFFFFFF),
         surfaceVariant = Color(0xFFDCE9FA),
         onBackground = Color(0xFF000000),
@@ -585,11 +585,12 @@ fun AuroraBackground(
                         radius = r * 2.4f,
                         center = androidx.compose.ui.geometry.Offset(jx, jy - r * 0.4f)
                     )
-                    // Marginal tentacles (behind the dome): long trailers.
-                    for (i in 0 until 8) {
-                        val fx = (i - 3.5f) / 3.5f
-                        val sx = jx + fx * r * 0.85f
-                        val len = (110f + (1f - kotlin.math.abs(fx)) * 60f).dp.toPx()
+                    // Marginal tentacles (behind the dome): a full curtain
+                    // of long trailers, longer in the middle.
+                    for (i in 0 until 12) {
+                        val fx = (i - 5.5f) / 5.5f
+                        val sx = jx + fx * r * 0.9f
+                        val len = (130f + (1f - kotlin.math.abs(fx)) * 80f).dp.toPx()
                         val sway = kotlin.math.sin(tSway * 1.3f + i * 0.9f).toFloat() * 10.dp.toPx()
                         val sway2 = kotlin.math.sin(tSway * 1.3f + i * 0.9f + 0.9f).toFloat() * 15.dp.toPx()
                         val tent = androidx.compose.ui.graphics.Path().apply {
@@ -613,10 +614,12 @@ fun AuroraBackground(
                             center = androidx.compose.ui.geometry.Offset(sx + sway2, jy + len)
                         )
                     }
-                    // Oral arms: three thick folded ribbons at the mouth.
+                    // Oral arms: big frilly central mass — wide folded
+                    // ribbons with lighter fold lines, the anchor below
+                    // the bell.
                     for (k in -1..1) {
                         val bx = jx + k * r * 0.22f
-                        val armLen = r * (1.35f + 0.15f * kotlin.math.abs(k.toFloat()))
+                        val armLen = r * (1.6f + 0.15f * kotlin.math.abs(k.toFloat()))
                         val aSway = kotlin.math.sin(tSway * 1.6f + k * 2.1f).toFloat() * 8.dp.toPx()
                         val arm = androidx.compose.ui.graphics.Path().apply {
                             moveTo(bx, jy + r * 0.05f)
@@ -627,9 +630,17 @@ fun AuroraBackground(
                         }
                         drawPath(
                             path = arm,
-                            color = ink.copy(alpha = 0.30f * fade),
+                            color = ink.copy(alpha = 0.38f * fade),
                             style = androidx.compose.ui.graphics.drawscope.Stroke(
-                                width = 3.5.dp.toPx(),
+                                width = 5.dp.toPx(),
+                                cap = androidx.compose.ui.graphics.StrokeCap.Round
+                            )
+                        )
+                        drawPath(
+                            path = arm,
+                            color = Color.White.copy(alpha = 0.30f * fade),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                width = 1.5.dp.toPx(),
                                 cap = androidx.compose.ui.graphics.StrokeCap.Round
                             )
                         )
@@ -661,8 +672,8 @@ fun AuroraBackground(
                         path = dome,
                         brush = Brush.verticalGradient(
                             listOf(
-                                ink.copy(alpha = (0.30f + energy * 0.10f) * fade),
-                                ink.copy(alpha = (0.06f + energy * 0.03f) * fade)
+                                ink.copy(alpha = (0.38f + energy * 0.10f) * fade),
+                                ink.copy(alpha = (0.08f + energy * 0.03f) * fade)
                             ),
                             startY = jy - r * 1.18f,
                             endY = jy + r * 0.2f
@@ -696,7 +707,32 @@ fun AuroraBackground(
                             )
                         )
                     }
-                    // Clover mark: the glowing signature at the dome crown.
+                    // Umbrella ribs: thin striations fanning from the crown,
+                    // like the reference bell folds.
+                    for (c in 0 until 9) {
+                        val ct = c / 8f
+                        val cang = kotlin.math.PI.toFloat() * (0.08f + 0.84f * ct)
+                        val rib = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(
+                                jx + kotlin.math.cos(cang).toFloat() * r * 0.30f,
+                                (jy - r * 0.06f) - kotlin.math.sin(cang).toFloat() * r * 0.34f
+                            )
+                            quadraticBezierTo(
+                                jx + kotlin.math.cos(cang).toFloat() * r * 0.62f,
+                                (jy - r * 0.06f) - kotlin.math.sin(cang).toFloat() * r * 0.72f,
+                                jx + kotlin.math.cos(cang).toFloat() * r * 0.94f,
+                                (jy - r * 0.06f) - kotlin.math.sin(cang).toFloat() * r * 1.04f
+                            )
+                        }
+                        drawPath(
+                            path = rib,
+                            color = Color.White.copy(alpha = 0.16f * fade),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                width = 1.25.dp.toPx(),
+                                cap = androidx.compose.ui.graphics.StrokeCap.Round
+                            )
+                        )
+                    }
                     val cloverC = androidx.compose.ui.geometry.Offset(jx, jy - r * 0.58f)
                     val petalD = r * 0.15f
                     val petalR = r * 0.085f
@@ -722,12 +758,20 @@ fun AuroraBackground(
                     drawOval(petal, androidx.compose.ui.geometry.Offset(cloverC.x + petalD - petalR * 1.3f, cloverC.y - petalR * 0.8f),
                         androidx.compose.ui.geometry.Size(petalR * 2.6f, petalR * 1.6f))
                     drawCircle(Color.White.copy(alpha = 0.9f * fade), r * 0.045f, cloverC)
-                    // Cel rim: bright outline over the whole bell.
+                    // Cel rim: bright outline over the whole bell, plus a
+                    // soft outer glow band so the edge burns like the
+                    // reference rim light.
                     drawPath(
                         path = dome,
-                        color = ink.copy(alpha = 0.55f * fade),
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                        color = ink.copy(alpha = 0.30f * fade),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 5.dp.toPx())
                     )
+                    drawPath(
+                        path = dome,
+                        color = ink.copy(alpha = 0.65f * fade),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5.dp.toPx())
+                    )
+                    // Clover mark: the glowing signature at the dome crown.
                     // Anime speculars: two curved streaks + shine blob, upper left.
                     val spec = Color.White.copy(alpha = 0.55f * fade)
                     val specPath = androidx.compose.ui.graphics.Path().apply {

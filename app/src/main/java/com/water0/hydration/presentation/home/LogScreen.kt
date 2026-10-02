@@ -125,6 +125,9 @@ fun LogScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             HydrationEntry.DrinkType.entries.forEach { type ->
+                com.water0.hydration.ui.theme.LensCard(
+                    shape = RoundedCornerShape(8.dp)
+                ) {
                 FilterChip(
                     selected = drinkType == type,
                     onClick = { drinkType = type },
@@ -135,6 +138,7 @@ fun LogScreen(
                         )
                     }
                 )
+                }
             }
         }
 
@@ -181,6 +185,9 @@ fun LogScreen(
                 selected = backdateChoice == 3,
                 onClick = { showTimePicker = true }
             )
+            com.water0.hydration.ui.theme.LensCard(
+                shape = RoundedCornerShape(8.dp)
+            ) {
             FilterChip(
                 selected = workoutBoost,
                 onClick = {
@@ -198,6 +205,8 @@ fun LogScreen(
                     )
                 }
             )
+            }
+            // (Lens-wrapped with its siblings above.)
         }
 
         if (showTimePicker) {
@@ -245,6 +254,9 @@ fun LogScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     recents.forEach { recent ->
+                        com.water0.hydration.ui.theme.LensCard(
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
                         FilterChip(
                             selected = false,
                             onClick = {
@@ -263,6 +275,7 @@ fun LogScreen(
                                 )
                             }
                         )
+                        }
                     }
                 }
             }

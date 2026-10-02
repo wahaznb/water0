@@ -1,6 +1,7 @@
 package com.water0.hydration.presentation.home.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +25,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import com.water0.hydration.ui.theme.glassCard
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.unit.dp
@@ -80,12 +83,25 @@ fun PaceCurveCard(
 
     com.water0.hydration.ui.theme.LensCard(
         modifier = modifier.fillMaxWidth(),
-        blurOverride = 0.5f
+        blurOverride = 0.7f
     ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .glassCard()
+            // iPhone-style top light: specular wash so the lens reads
+            // bright, not just bent.
+            .background(
+                Brush.radialGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.10f),
+                        Color.White.copy(alpha = 0f)
+                    ),
+                    center = androidx.compose.ui.geometry.Offset.Zero,
+                    radius = 700f
+                ),
+                RoundedCornerShape(com.water0.hydration.ui.theme.Radii.md)
+            )
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -169,6 +185,9 @@ fun PaceCurveCard(
             // zone), red once past it — the vertical reads the standing.
             val nowBehind = drunkNow < expectedNow
             val nowColor = if (nowBehind) green else red
+            // Now marker, only inside the wake window: parked at an
+            // edge overnight it reads as a glitch, not information.
+            if (awake) {
             val nx = x(nowHour)
             drawLine(
                 color = nowColor.copy(alpha = 0.85f),
@@ -180,6 +199,7 @@ fun PaceCurveCard(
                 )
             )
             drawCircle(nowColor, 3.5.dp.toPx(), Offset(nx, 0f))
+            }
             // Scrub cursor: vertical line + dot on the actual curve.
             // Same standing rule: green under the diagonal, red past it.
             touchFrac?.let { frac ->
