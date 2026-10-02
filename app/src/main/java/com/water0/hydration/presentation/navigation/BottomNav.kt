@@ -124,15 +124,8 @@ fun GlassBoxScope.GlassBottomBar(
         (((xPx - rowPadPx) / contentWidthPx()) * TABS.size).toInt()
             .coerceIn(0, TABS.size - 1)
 
-    // Touch glow, second attempt: same-hue gradient stops only (the
-    // transparent-black fade rendered as mud through the lens twice).
-    // If dots show again it is NOT this layer — it is deleted next.
-    var touchX by remember { mutableStateOf<Float?>(null) }
-    val lightAlpha by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (touchX != null) 1f else 0f,
-        animationSpec = androidx.compose.animation.core.tween(durationMillis = 220),
-        label = "touchLight"
-    )
+    // Touch glow fully removed (see DockInner): no glow state lives
+    // here anymore. Scrub preview still tints icons via activeIndex.
     val params = remember(config) {
         // No darkness/shadow on the dock: the shader's center-darkening
         // reads as black blobs on small lenses. Refraction + rim stay.
@@ -144,73 +137,17 @@ fun GlassBoxScope.GlassBottomBar(
 
     @Composable
     fun BoxScope.DockInner() {
-    // Density once: dp.toPx() has no receiver inside a plain scope.
-    val density = LocalDensity.current
-    val glowRPx = with(density) { 46.dp.toPx() }
-    val touchRPx = with(density) { 56.dp.toPx() }
     Box(
         modifier = Modifier.fillMaxWidth()
     ) {
-        // Touch glow, hue-fixed: white holds white to the edge,
-        // primary holds primary — verified gradient class after
-        // the black-dot incident.
-        val glowWhite = Color.White.copy(alpha = 0.10f)
-        val touchWhite = Color.White
-        val touchPrimary = MaterialTheme.colorScheme.primary
-        androidx.compose.foundation.Canvas(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            val cy = size.height / 2f
-            val glowR = glowRPx
-            val sx = tabCenterPx(selectedIndex)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    listOf(
-                        glowWhite,
-                        Color.White.copy(alpha = 0f)
-                    ),
-                    center = androidx.compose.ui.geometry.Offset(sx, cy),
-                    radius = glowR
-                ),
-                radius = glowR,
-                center = androidx.compose.ui.geometry.Offset(sx, cy)
-            )
-            val lx = (touchX ?: fingerX)?.coerceIn(0f, size.width)
-            if (lx != null && lightAlpha > 0.01f) {
-                val touchR = touchRPx
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        listOf(
-                            touchWhite.copy(alpha = 0.42f * lightAlpha),
-                            touchPrimary.copy(
-                                alpha = 0.20f * lightAlpha
-                            ),
-                            touchPrimary.copy(alpha = 0f)
-                        ),
-                        center = androidx.compose.ui.geometry.Offset(lx, cy),
-                        radius = touchR
-                    ),
-                    radius = touchR,
-                    center = androidx.compose.ui.geometry.Offset(lx, cy)
-                )
-            }
-        }
+        // No glow Canvas anymore: every gradient glow tried so far has
+        // rendered as black dots on this GPU. Icons tint for selection,
+        // scrub ticks haptics. If dots persist past this, they are the
+        // icons or the platform compositor — not our code.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .onSizeChanged { rowWidthPx = it.width.toFloat() }
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onPress = { offset ->
-                            touchX = offset.x
-                            try {
-                                awaitRelease()
-                            } finally {
-                                touchX = null
-                            }
-                        }
-                    )
-                }
                 .pointerInput(Unit) {
                     detectDragGesturesAfterLongPress(
                         onDragStart = { offset ->
