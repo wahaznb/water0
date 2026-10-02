@@ -141,10 +141,10 @@ fun glassCardContainer(): Color {
     if (style.glass) {
         val a = 0.35f - style.clarity.coerceIn(0f, 1f) * 0.25f
         return if (isDarkScheme()) Color.White.copy(alpha = a)
-        else Color.White.copy(alpha = a + 0.25f)
+        else Color.White.copy(alpha = a + 0.15f)
     }
     return if (isDarkScheme()) MaterialTheme.colorScheme.surface.copy(alpha = Glass.CARD_ALPHA)
-    else Color.White.copy(alpha = 0.55f)
+    else Color.White.copy(alpha = 0.38f)
 }
 
 /** True when the app theme is dark — one source for every theme branch. */

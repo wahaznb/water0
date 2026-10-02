@@ -132,7 +132,14 @@ fun GlassBoxScope.GlassBottomBar(
         animationSpec = androidx.compose.animation.core.tween(durationMillis = 220),
         label = "touchLight"
     )
-    val params = remember(config) { config.toLiquidParams(Color(0xFFEE2689)) }
+    val params = remember(config) {
+        // No darkness/shadow on the dock: the shader's center-darkening
+        // reads as black blobs on small lenses. Refraction + rim stay.
+        config.toLiquidParams(Color(0xFFEE2689)).copy(
+            darkness = 0f,
+            elevation = 0.dp
+        )
+    }
 
     // Full-width floating dock: spans the screen with slim side margins,
     // content flows beneath it. Height is hoisted for the toast lift.

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
@@ -313,11 +314,15 @@ private fun BackdateChip(
     selected: Boolean,
     onClick: () -> Unit
 ) {
+    com.water0.hydration.ui.theme.LensCard(
+        shape = RoundedCornerShape(8.dp)
+    ) {
     FilterChip(
         selected = selected,
         onClick = onClick,
         label = { Text(label, fontSize = 13.sp) }
     )
+    }
 }
 
 /** "2h ago" / "45min ago" / "14:05" for toasts and the picked chip. */
