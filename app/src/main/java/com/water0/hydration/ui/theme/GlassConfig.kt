@@ -23,7 +23,10 @@ data class GlassConfig(
     val backgroundOn: Boolean = true,
     val cardGlass: Boolean = true,
     // 0 = milky … 1 = near-clear. Read in glass mode.
-    val glassClarity: Float = 0.5f
+    val glassClarity: Float = 0.5f,
+    // Dock refraction kill-switch: frost dock, no lens element. Doubles
+    // as the black-dot diagnostic — dots with this off are not the lens.
+    val dockLens: Boolean = true
 ) {
     // No TankMode anymore: the tumbler lives only inside its Home card.
     object Defaults {

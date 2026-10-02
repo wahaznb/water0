@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -141,6 +142,127 @@ fun GlassBoxScope.GlassBottomBar(
         )
     }
 
+    @Composable
+    fun BoxScope.DockInner() {
+    // Density once: dp.toPx() has no receiver inside a plain scope.
+    val density = LocalDensity.current
+    val glowRPx = with(density) { 46.dp.toPx() }
+    val touchRPx = with(density) { 56.dp.toPx() }
+    Box(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // Touch glow, hue-fixed: white holds white to the edge,
+        // primary holds primary — verified gradient class after
+        // the black-dot incident.
+        val glowWhite = Color.White.copy(alpha = 0.10f)
+        val touchWhite = Color.White
+        val touchPrimary = MaterialTheme.colorScheme.primary
+        androidx.compose.foundation.Canvas(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            val cy = size.height / 2f
+            val glowR = glowRPx
+            val sx = tabCenterPx(selectedIndex)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(
+                        glowWhite,
+                        Color.White.copy(alpha = 0f)
+                    ),
+                    center = androidx.compose.ui.geometry.Offset(sx, cy),
+                    radius = glowR
+                ),
+                radius = glowR,
+                center = androidx.compose.ui.geometry.Offset(sx, cy)
+            )
+            val lx = (touchX ?: fingerX)?.coerceIn(0f, size.width)
+            if (lx != null && lightAlpha > 0.01f) {
+                val touchR = touchRPx
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        listOf(
+                            touchWhite.copy(alpha = 0.42f * lightAlpha),
+                            touchPrimary.copy(
+                                alpha = 0.20f * lightAlpha
+                            ),
+                            touchPrimary.copy(alpha = 0f)
+                        ),
+                        center = androidx.compose.ui.geometry.Offset(lx, cy),
+                        radius = touchR
+                    ),
+                    radius = touchR,
+                    center = androidx.compose.ui.geometry.Offset(lx, cy)
+                )
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .onSizeChanged { rowWidthPx = it.width.toFloat() }
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = { offset ->
+                            touchX = offset.x
+                            try {
+                                awaitRelease()
+                            } finally {
+                                touchX = null
+                            }
+                        }
+                    )
+                }
+                .pointerInput(Unit) {
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = { offset ->
+                            fingerX = offset.x
+                            val idx = indexAt(offset.x)
+                            if (idx != dragIndex) {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                            dragIndex = idx
+                        },
+                        onDragCancel = {
+                            dragIndex = null
+                            fingerX = null
+                        },
+                        onDragEnd = {
+                            dragIndex?.let { onSelect(TABS[it].route) }
+                            dragIndex = null
+                            fingerX = null
+                        },
+                        onDrag = { change, _ ->
+                            fingerX = change.position.x
+                            val idx = indexAt(change.position.x)
+                            if (idx != dragIndex) {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                            dragIndex = idx
+                            change.consume()
+                        }
+                    )
+                }
+                .padding(horizontal = 8.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TABS.forEachIndexed { index, tab ->
+                GlassTab(
+                    selected = index == activeIndex,
+                    onClick = { onSelect(tab.route) },
+                    modifier = Modifier.weight(1f),
+                    icon = {
+                        Icon(
+                            tab.icon,
+                            contentDescription = tab.label,
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
+                )
+            }
+        }
+    }
+    }
+
     // Full-width floating dock: spans the screen with slim side margins,
     // content flows beneath it. Height is hoisted for the toast lift.
     // NOTE: this wrapper must fillMaxSize — BottomCenter only pushes the
@@ -151,127 +273,43 @@ fun GlassBoxScope.GlassBottomBar(
             .padding(horizontal = 12.dp, vertical = 12.dp),
         contentAlignment = Alignment.BottomCenter
     ) {
-        this@GlassBottomBar.LiquidGlassBox(
-            modifier = Modifier
-                .fillMaxWidth()
-                .onSizeChanged {
-                    onHeight(with(density) { it.height.toDp() })
-                },
-            params = params,
-            shape = RoundedCornerShape(config.dockCorner.coerceIn(8.dp, 64.dp))
-        ) {
-            Box(
-                modifier = Modifier.fillMaxWidth()
+        // Dock lens kill-switch: frost dock, no refraction. Doubles
+        // as the black-dot diagnostic — dots with this off are not
+        // the lens, the glow, or anything our code draws.
+        if (config.dockLens) {
+            this@GlassBottomBar.LiquidGlassBox(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onSizeChanged {
+                        onHeight(with(density) { it.height.toDp() })
+                    },
+                params = params,
+                shape = RoundedCornerShape(config.dockCorner.coerceIn(8.dp, 64.dp))
             ) {
-                // Touch glow, hue-fixed: white holds white to the edge,
-                // primary holds primary — verified gradient class after
-                // the black-dot incident.
-                val glowWhite = Color.White.copy(alpha = 0.10f)
-                val touchWhite = Color.White
-                val touchPrimary = MaterialTheme.colorScheme.primary
-                androidx.compose.foundation.Canvas(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    val cy = size.height / 2f
-                    val glowR = 46.dp.toPx()
-                    val sx = tabCenterPx(selectedIndex)
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            listOf(
-                                glowWhite,
-                                Color.White.copy(alpha = 0f)
-                            ),
-                            center = androidx.compose.ui.geometry.Offset(sx, cy),
-                            radius = glowR
-                        ),
-                        radius = glowR,
-                        center = androidx.compose.ui.geometry.Offset(sx, cy)
+                DockInner()
+            }
+        } else {
+            val frostShape = RoundedCornerShape(config.dockCorner.coerceIn(8.dp, 64.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onSizeChanged {
+                        onHeight(with(density) { it.height.toDp() })
+                    }
+                    .clip(frostShape)
+                    .background(
+                        com.water0.hydration.ui.theme.glassCardContainer(),
+                        frostShape
                     )
-                    val lx = (touchX ?: fingerX)?.coerceIn(0f, size.width)
-                    if (lx != null && lightAlpha > 0.01f) {
-                        val touchR = 56.dp.toPx()
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                listOf(
-                                    touchWhite.copy(alpha = 0.42f * lightAlpha),
-                                    touchPrimary.copy(
-                                        alpha = 0.20f * lightAlpha
-                                    ),
-                                    touchPrimary.copy(alpha = 0f)
-                                ),
-                                center = androidx.compose.ui.geometry.Offset(lx, cy),
-                                radius = touchR
-                            ),
-                            radius = touchR,
-                            center = androidx.compose.ui.geometry.Offset(lx, cy)
-                        )
-                    }
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onSizeChanged { rowWidthPx = it.width.toFloat() }
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onPress = { offset ->
-                                    touchX = offset.x
-                                    try {
-                                        awaitRelease()
-                                    } finally {
-                                        touchX = null
-                                    }
-                                }
-                            )
-                        }
-                        .pointerInput(Unit) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = { offset ->
-                                    fingerX = offset.x
-                                    val idx = indexAt(offset.x)
-                                    if (idx != dragIndex) {
-                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    }
-                                    dragIndex = idx
-                                },
-                                onDragCancel = {
-                                    dragIndex = null
-                                    fingerX = null
-                                },
-                                onDragEnd = {
-                                    dragIndex?.let { onSelect(TABS[it].route) }
-                                    dragIndex = null
-                                    fingerX = null
-                                },
-                                onDrag = { change, _ ->
-                                    fingerX = change.position.x
-                                    val idx = indexAt(change.position.x)
-                                    if (idx != dragIndex) {
-                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    }
-                                    dragIndex = idx
-                                    change.consume()
-                                }
-                            )
-                        }
-                        .padding(horizontal = 8.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TABS.forEachIndexed { index, tab ->
-                        GlassTab(
-                            selected = index == activeIndex,
-                            onClick = { onSelect(tab.route) },
-                            modifier = Modifier.weight(1f),
-                            icon = {
-                                Icon(
-                                    tab.icon,
-                                    contentDescription = tab.label,
-                                    modifier = Modifier.size(34.dp)
-                                )
-                            }
-                        )
-                    }
-                }
+                    .border(
+                        1.dp,
+                        MaterialTheme.colorScheme.outline.copy(
+                            alpha = com.water0.hydration.ui.theme.Glass.BORDER_ALPHA
+                        ),
+                        frostShape
+                    )
+            ) {
+                DockInner()
             }
         }
     }
