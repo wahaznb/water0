@@ -1,3 +1,6 @@
+import java.text.SimpleDateFormat
+import java.util.Date
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -17,8 +20,8 @@ android {
         versionName = "0.3-beta"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
-        // Build number = commit count: unique per commit, so the About
-        // screen identifies exactly which build is on a phone.
+        // Build number = commit count (which source), plus wall-clock
+        // stamp (which binary — two APKs from one commit differ).
         val buildNumber = try {
             providers.exec {
                 commandLine("git", "rev-list", "--count", "HEAD")
@@ -27,6 +30,8 @@ android {
             0
         }
         buildConfigField("int", "BUILD_NUMBER", "$buildNumber")
+        val stamp = SimpleDateFormat("MMdd-HHmm").format(Date())
+        buildConfigField("String", "BUILD_STAMP", "\"$stamp\"")
     }
     
     buildTypes {

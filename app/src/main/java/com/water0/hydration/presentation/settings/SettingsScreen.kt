@@ -922,7 +922,8 @@ private fun AboutSection() {
         Text(
             text = "Water0 ${com.water0.hydration.BuildConfig.VERSION_NAME} " +
                 "(${com.water0.hydration.BuildConfig.VERSION_CODE}) · " +
-                "build ${com.water0.hydration.BuildConfig.BUILD_NUMBER}",
+                "build ${com.water0.hydration.BuildConfig.BUILD_NUMBER} " +
+                "(${com.water0.hydration.BuildConfig.BUILD_STAMP})",
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface

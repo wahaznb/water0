@@ -83,7 +83,7 @@ object GlassColors {
     // Soft sky-blue field; cards sit on it as white-tinted glass,
     // bubbles and glows run white.
     val light = lightColorScheme(
-        background = Color(0xFFCFE3F7),
+        background = Color(0xFF8FC3EC),
         surface = Color(0xFFFFFFFF),
         surfaceVariant = Color(0xFFDCE9FA),
         onBackground = Color(0xFF000000),
@@ -143,7 +143,7 @@ fun glassCardContainer(): Color {
         return if (isDarkScheme()) Color.White.copy(alpha = a)
         else Color.White.copy(alpha = a + 0.15f)
     }
-    return if (isDarkScheme()) MaterialTheme.colorScheme.surface.copy(alpha = Glass.CARD_ALPHA)
+    return if (isDarkScheme()) MaterialTheme.colorScheme.surface.copy(alpha = 0.15f)
     else Color.White.copy(alpha = 0.38f)
 }
 

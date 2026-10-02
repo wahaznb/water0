@@ -583,7 +583,23 @@ private val GLASS_DISPLACEMENT_SHADER = """
             }
         }
 
-        float4 color = contents.eval(finalCoord);
+        // Diffraction: where the lens bent the ray, split RGB along the
+        // bend direction (prismatic fringe, iPhone-style). Still water
+        // (no bend) samples once — zero extra cost outside glass.
+        float2 bendVec = finalCoord - fragCoord;
+        float bendLen = length(bendVec);
+        float4 color;
+        if (bendLen > 0.5) {
+            float2 bendDir = bendVec / bendLen;
+            float caPx = min(bendLen * 0.12, 2.5);
+            float r = contents.eval(finalCoord + bendDir * caPx).r;
+            float g = contents.eval(finalCoord).g;
+            float b = contents.eval(finalCoord - bendDir * caPx).b;
+            float a = contents.eval(finalCoord).a;
+            color = float4(r, g, b, a);
+        } else {
+            color = contents.eval(finalCoord);
+        }
 
         if (blurRadius > 0.0) {
             float4 blurredColor = float4(0.0);

@@ -429,7 +429,13 @@ private fun ColumnScope.StatsPages(
                         }
                     }
                     Text(
-                        text = "${state.totalEffectiveMl} / ${state.expectedMl} ml by now",
+                        text = if (state.expectedMl <= 0) {
+                            // Outside the wake window there is no "by now":
+                            // show the day instead of "X / 0 ml".
+                            "${state.totalEffectiveMl} of ${state.goalMl} ml today"
+                        } else {
+                            "${state.totalEffectiveMl} / ${state.expectedMl} ml by now"
+                        },
                         fontSize = 15.sp,
                         color = MaterialTheme.colorScheme.onSurface
                     )
