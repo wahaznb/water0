@@ -9,6 +9,13 @@
     <!-- Boot completed for rescheduling -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     
+    <!-- Health Connect runtime reads. The API 34+ platform sheet
+      auto-denies permissions that aren't declared here — this was
+      the whole connect failure (provider available, grant impossible).
+      Mirrors health_permissions.xml + readPermissions(). -->
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+
     <!-- Health Connect (optional, API 34+) -->
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
