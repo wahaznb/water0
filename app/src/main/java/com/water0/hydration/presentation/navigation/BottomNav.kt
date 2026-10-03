@@ -3,6 +3,7 @@ package com.water0.hydration.presentation.navigation
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -152,21 +153,6 @@ fun GlassBoxScope.GlassBottomBar(
     // never morphs. Deeper, softer shadow sells the thickness. Touch
     // glow below is a blurred disc (no gradient math — dot-class
     // retired for good).
-    // Big dock: wide cells and a capsule to match — the slim build
-    // read too small on real phones.
-    val pillW = 70.dp
-    val pillH = 54.dp
-    val pillShape = RoundedCornerShape(50)
-    val pillX by animateDpAsState(
-        targetValue = with(density) {
-            tabCenterPx(selectedIndex).toDp() - pillW / 2
-        },
-        animationSpec = spring(
-            dampingRatio = 0.75f,
-            stiffness = 300f
-        ),
-        label = "tabPill"
-    )
     // Press glow state: pooled light at the finger, eased in fast,
     // out soft. Blur disc, never a gradient.
     var touchX by remember { mutableStateOf<Float?>(null) }
@@ -186,30 +172,63 @@ fun GlassBoxScope.GlassBottomBar(
     } catch (_: Exception) {
         false
     }
+    // Selected bubble: a lens in its own right (reference behavior) —
+    // follows the finger 1:1 while pressed/scrubbing, grows and goes
+    // more rectangular under the finger, glides home on release.
+    val fingerDown = touchX != null || fingerX != null
+    val pillW by animateDpAsState(
+        targetValue = if (fingerDown && !calmMode) 104.dp else 88.dp,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = 300f),
+        label = "pillW"
+    )
+    val pillH by animateDpAsState(
+        targetValue = if (fingerDown && !calmMode) 66.dp else 58.dp,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = 300f),
+        label = "pillH"
+    )
+    val pillCorner by animateDpAsState(
+        targetValue = if (fingerDown && !calmMode) 16.dp else 29.dp,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = 300f),
+        label = "pillCorner"
+    )
+    val pillShape = RoundedCornerShape(pillCorner)
+    val pillAnchorX = (touchX ?: fingerX)
+        ?: tabCenterPx(selectedIndex)
+    val pillX by animateDpAsState(
+        targetValue = with(density) {
+            pillAnchorX.toDp() - pillW / 2
+        },
+        // Finger tracking stays tight; tab-to-tab glides spring.
+        animationSpec = if (fingerDown) tween(durationMillis = 80)
+        else spring(
+            dampingRatio = 0.75f,
+            stiffness = 300f
+        ),
+        label = "tabPill"
+    )
 
     @Composable
     fun BoxScope.DockInner() {
     Box(
-        modifier = Modifier.wrapContentSize()
+        modifier = Modifier.fillMaxWidth()
     ) {
-        // Selected capsule, drawn first so icons sit on top of it.
-        // No shadow: chrome carries no drop shadows (plate or dock).
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .offset(x = pillX)
-                .size(width = pillW, height = pillH)
-                .clip(pillShape)
-                .background(
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
-                    pillShape
-                )
-                .border(
-                    1.dp,
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-                    pillShape
-                )
-        )
+        // Selected bubble, drawn first so tabs sit on top of it. A real
+        // lens with no children: pure backdrop refraction, like the
+        // reference drag bubble. No shadow on chrome.
+        with(this@GlassBottomBar) {
+            LiquidGlassBox(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .offset(x = pillX)
+                    .size(width = pillW, height = pillH),
+                params = params.copy(
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+                ),
+                shape = pillShape,
+                chromatic = 1f,
+                content = { }
+            )
+        }
         // Press glow: one solid white disc, softened by a blur
         // modifier (a convolution, not a gradient — nothing here can
         // go muddy). Follows taps and scrubbing, fades on release.
@@ -233,7 +252,7 @@ fun GlassBoxScope.GlassBottomBar(
         }
         Row(
             modifier = Modifier
-                .wrapContentWidth()
+                .fillMaxWidth()
                 .onSizeChanged { rowWidthPx = it.width.toFloat() }
                 .pointerInput(Unit) {
                     detectTapGestures(
@@ -280,7 +299,7 @@ fun GlassBoxScope.GlassBottomBar(
                         }
                     )
                 }
-                .padding(horizontal = 10.dp, vertical = 14.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -289,14 +308,15 @@ fun GlassBoxScope.GlassBottomBar(
                     selected = index == activeIndex,
                     animated = !calmMode,
                     onClick = { onSelect(tab.route) },
-                    modifier = Modifier.width(80.dp),
+                    modifier = Modifier.weight(1f),
                     icon = {
                         Icon(
                             tab.icon,
-                            contentDescription = tab.label,
-                            modifier = Modifier.size(46.dp)
+                            contentDescription = null,
+                            modifier = Modifier.size(26.dp)
                         )
-                    }
+                    },
+                    label = tab.label
                 )
             }
         }
@@ -310,14 +330,14 @@ fun GlassBoxScope.GlassBottomBar(
     // Dock lens kill-switch: frost dock, no refraction. Doubles
     // as the black-dot diagnostic — dots with this off are not
     // the lens, the glow, or anything our code draws.
-    // Compact floating pill (iOS 26): wraps the tabs and centers, never
-    // spans the screen. Stadium corner tracks the measured height.
+    // Wide short pill (reference language): spans the screen with slim
+    // side margins, height from the labeled tabs. Stadium lens.
     val dockShape = RoundedCornerShape(50)
     if (config.dockLens) {
         this@GlassBottomBar.LiquidGlassBox(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 12.dp)
+                .padding(horizontal = 12.dp, vertical = 12.dp)
                 .onSizeChanged {
                     onHeight(with(density) { it.height.toDp() })
                 },
@@ -331,7 +351,7 @@ fun GlassBoxScope.GlassBottomBar(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 12.dp)
+                .padding(horizontal = 12.dp, vertical = 12.dp)
                 .onSizeChanged {
                     onHeight(with(density) { it.height.toDp() })
                 }
@@ -359,6 +379,7 @@ private fun GlassTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     animated: Boolean = true,
+    label: String,
     icon: @Composable () -> Unit
 ) {
     val color = if (selected) MaterialTheme.colorScheme.primary
@@ -375,8 +396,8 @@ private fun GlassTab(
         ),
         label = "tabLift"
     )
-    // Compact cells in a wrapping row: the label lives in
-    // contentDescription for talkback. Tabs tint; press lifts.
+    // Wide short cells (reference language): icon over a small label,
+    // the visible label announcing the tab. Tabs tint; press lifts.
     // Selected trait exposed for accessibility services.
     Box(
         contentAlignment = Alignment.Center,
@@ -393,20 +414,21 @@ private fun GlassTab(
                 onClick = onClick
             )
     ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.size(72.dp)
+        androidx.compose.foundation.layout.Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(vertical = 2.dp)
         ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.size(38.dp)
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.material3.LocalContentColor provides color
             ) {
-                androidx.compose.runtime.CompositionLocalProvider(
-                    androidx.compose.material3.LocalContentColor provides color
-                ) {
-                    icon()
-                }
+                icon()
             }
+            Text(
+                text = label,
+                fontSize = 10.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                color = color
+            )
         }
     }
 }

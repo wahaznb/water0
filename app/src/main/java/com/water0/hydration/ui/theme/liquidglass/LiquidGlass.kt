@@ -685,19 +685,14 @@ private val GLASS_DISPLACEMENT_SHADER = """
                 wantChroma = max(wantChroma, chromaticFlags[j]);
             }
         }
+        // Chromatic runs THROUGH the blur kernel, not before it: splitting
+        // sharp samples and blurring after mixes the channels back
+        // together (fringe only survived at blur zero). Shifting R/B
+        // gathers in opposite directions keeps the fringe at any blur.
+        float doChroma = (bendLen > 0.5 && wantChroma > 0.5) ? 1.0 : 0.0;
+        float2 bendDir = doChroma > 0.5 ? bendVec / bendLen : float2(0.0);
+        float caPx = min(bendLen * 0.12, 2.5);
         float4 color;
-        if (bendLen > 0.5 && wantChroma > 0.5) {
-            float2 bendDir = bendVec / bendLen;
-            float caPx = min(bendLen * 0.12, 2.5);
-            float r = contents.eval(finalCoord + bendDir * caPx).r;
-            float g = contents.eval(finalCoord).g;
-            float b = contents.eval(finalCoord - bendDir * caPx).b;
-            float a = contents.eval(finalCoord).a;
-            color = float4(r, g, b, a);
-        } else {
-            color = contents.eval(finalCoord);
-        }
-
         if (blurRadius > 0.0) {
             float4 blurredColor = float4(0.0);
             float totalWeight = 0.0;
@@ -708,11 +703,25 @@ private val GLASS_DISPLACEMENT_SHADER = """
                     float2 offset = float2(float(dx), float(dy)) * blurRadius * 0.4;
                     float distance = length(offset) * invRadius;
                     float weight = exp(-distance * distance * 2.0);
-                    blurredColor += contents.eval(finalCoord + offset) * weight;
+                    float4 tap = contents.eval(finalCoord + offset);
+                    if (doChroma > 0.5) {
+                        float r = contents.eval(finalCoord + offset + bendDir * caPx).r;
+                        float b = contents.eval(finalCoord + offset - bendDir * caPx).b;
+                        tap = float4(r, tap.g, b, tap.a);
+                    }
+                    blurredColor += tap * weight;
                     totalWeight += weight;
                 }
             }
             color = blurredColor / totalWeight;
+        } else if (doChroma > 0.5) {
+            float r = contents.eval(finalCoord + bendDir * caPx).r;
+            float g = contents.eval(finalCoord).g;
+            float b = contents.eval(finalCoord - bendDir * caPx).b;
+            float a = contents.eval(finalCoord).a;
+            color = float4(r, g, b, a);
+        } else {
+            color = contents.eval(finalCoord);
         }
 
         if (tintColor.a > 0.0) {
