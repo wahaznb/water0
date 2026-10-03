@@ -47,6 +47,9 @@ fun LensCard(
     // Refraction strength multiplier (lens displacement + center
     // distortion): buttons and graphs bend harder than chrome.
     refraction: Float = 1f,
+    // Diffraction (chromatic split) on/off per surface: graphs and
+    // small buttons refract clean, chrome keeps the fringe.
+    chromatic: Float = 1f,
     content: @Composable BoxScope.() -> Unit
 ) {
     val glass = LocalLensScope.current
@@ -68,6 +71,7 @@ fun LensCard(
             modifier = modifier,
             params = params,
             shape = shape,
+            chromatic = chromatic,
             content = content
         )
     }

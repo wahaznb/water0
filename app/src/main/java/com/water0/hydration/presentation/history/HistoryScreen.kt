@@ -187,7 +187,8 @@ private fun WeekGraph(days: List<GetHistoryUseCase.DaySummary>) {
     com.water0.hydration.ui.theme.LensCard(
         modifier = Modifier.fillMaxWidth(),
         blurOverride = 0.7f,
-        refraction = 2f
+        refraction = 1f,
+        chromatic = 0f
     ) {
     Card(
         modifier = Modifier.fillMaxWidth(),

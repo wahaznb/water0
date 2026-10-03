@@ -60,7 +60,8 @@ data class LiquidParams(
     val centerDistortion: Float = 0.25f,
     val elevation: Dp = 8.dp,
     val darkness: Float = 0.15f,
-    val warpEdges: Float = 0.35f
+    val warpEdges: Float = 0.35f,
+    val chromatic: Float = 1f
 )
 
 /** Pure mapping, unit-tested. Blur 24dp saturates the 0..1 range. */
@@ -85,6 +86,7 @@ internal data class GlassElement(
     val tint: Color,
     val darkness: Float,
     val warpEdges: Float,
+    val chromatic: Float,
 ) {
     fun equalsWithTolerance(other: GlassElement): Boolean {
         if (id != other.id) return false
@@ -102,6 +104,7 @@ internal data class GlassElement(
             kotlin.math.abs(elevation - other.elevation) < tolerance &&
             kotlin.math.abs(darkness - other.darkness) < tolerance &&
             kotlin.math.abs(warpEdges - other.warpEdges) < tolerance &&
+            kotlin.math.abs(chromatic - other.chromatic) < tolerance &&
             tint == other.tint
     }
 }
@@ -117,6 +120,7 @@ interface GlassScope {
         tint: Color = Color.Transparent,
         darkness: Float = 0f,
         warpEdges: Float = 0f,
+        chromatic: Float = 1f,
     ): Modifier
 }
 
@@ -129,6 +133,7 @@ fun GlassBoxScope.LiquidGlassBox(
     propagateMinConstraints: Boolean = false,
     params: LiquidParams,
     shape: CornerBasedShape = RoundedCornerShape(0.dp),
+    chromatic: Float = 1f,
     content: @Composable BoxScope.() -> Unit = { },
 ) {
     val id = remember { Random.nextLong() }
@@ -142,7 +147,8 @@ fun GlassBoxScope.LiquidGlassBox(
             params.elevation,
             params.tint,
             params.darkness.coerceIn(0f, 1f),
-            params.warpEdges.coerceIn(0f, 1f)
+            params.warpEdges.coerceIn(0f, 1f),
+            chromatic
         ),
         contentAlignment, propagateMinConstraints, content
     )
@@ -183,6 +189,7 @@ private class GlassScopeImpl(private val density: Density) : GlassScope {
         tint: Color,
         darkness: Float,
         warpEdges: Float,
+        chromatic: Float,
     ): Modifier = this
         .background(color = Color.Transparent, shape = shape)
         .onGloballyPositioned { coordinates ->
@@ -204,6 +211,7 @@ private class GlassScopeImpl(private val density: Density) : GlassScope {
                 tint = tint,
                 darkness = darkness,
                 warpEdges = warpEdges,
+                chromatic = chromatic,
             )
 
             val existingIndex = elements.indexOfFirst { it.id == element.id }
@@ -233,6 +241,7 @@ private class GlassScopeFallbackImpl(private val density: Density) : GlassScope 
         tint: Color,
         darkness: Float,
         warpEdges: Float,
+        chromatic: Float,
     ): Modifier {
         val glassTint = if (tint == Color.Transparent) {
             Color.White.copy(alpha = 0.1f)
@@ -341,9 +350,18 @@ private fun GlassContainerWithShader(
                 val darkness = FloatArray(maxElements)
                 val warpEdges = FloatArray(maxElements)
                 val blurs = FloatArray(maxElements)
+                val chromatics = FloatArray(maxElements)
 
                 val elementsCount = minOf(elements.size, maxElements)
                 shader.setIntUniform("elementsCount", elementsCount)
+                if (elements.size > 40) {
+                    android.util.Log.w(
+                        "GlassLens",
+                        "elements=${elements.size} " + elements.take(3).joinToString(";") {
+                            "${it.size.width.toInt()}x${it.size.height.toInt()}@${it.position.x.toInt()},${it.position.y.toInt()}"
+                        }
+                    )
+                }
 
                 for (i in 0 until elementsCount) {
                     val element = elements[i]
@@ -364,6 +382,7 @@ private fun GlassContainerWithShader(
                     darkness[i] = element.darkness
                     warpEdges[i] = element.warpEdges
                     blurs[i] = element.blur
+                    chromatics[i] = element.chromatic
                 }
 
                 shader.setFloatUniform("glassPositions", positions)
@@ -376,10 +395,12 @@ private fun GlassContainerWithShader(
                 shader.setFloatUniform("glassDarkness", darkness)
                 shader.setFloatUniform("glassWarpEdges", warpEdges)
                 shader.setFloatUniform("glassBlurs", blurs)
+                shader.setFloatUniform("chromaticFlags", chromatics)
 
-                renderEffect = RenderEffect.createRuntimeShaderEffect(
-                    shader, "contents"
-                ).asComposeRenderEffect()
+                renderEffect = null // DIAG-OFF: bypass lens shader entirely
+                //RenderEffect.createRuntimeShaderEffect(
+                //    shader, "contents"
+                //).asComposeRenderEffect()
             }
     ) {
         content()
@@ -420,6 +441,7 @@ private val GLASS_DISPLACEMENT_SHADER = """
     uniform float glassDarkness[48];
     uniform float glassWarpEdges[48];
     uniform float glassBlurs[48];
+    uniform float chromaticFlags[48];
 
     float sdfRoundedRect(float2 p, float2 halfSize, float radius) {
         float2 d = abs(p) - halfSize + radius;
@@ -588,8 +610,11 @@ private val GLASS_DISPLACEMENT_SHADER = """
         // (no bend) samples once — zero extra cost outside glass.
         float2 bendVec = finalCoord - fragCoord;
         float bendLen = length(bendVec);
+        // Per-surface diffraction gate: only elements opted in split
+        // the ray; the rest refract clean. (DIAG-OFF for testing.)
+        float wantChroma = 0.0;
         float4 color;
-        if (bendLen > 0.5) {
+        if (false && bendLen > 0.5 && wantChroma > 0.5) {
             float2 bendDir = bendVec / bendLen;
             float caPx = min(bendLen * 0.12, 2.5);
             float r = contents.eval(finalCoord + bendDir * caPx).r;

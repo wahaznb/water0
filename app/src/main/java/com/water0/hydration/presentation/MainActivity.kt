@@ -114,6 +114,17 @@ class MainActivity : ComponentActivity() {
         // (killed app, update, reboot race) instead of next tick.
         AppContainer.getNotificationScheduler(this).ensureScheduled()
         AppContainer.getNotificationScheduler(this).poke()
+        // Belt and braces: post the status line directly on every launch
+        // instead of trusting the worker chain delay alone. Still gated
+        // on opt-in + permission + quiet hours inside.
+        lifecycleScope.launch {
+            try {
+                com.water0.hydration.presentation.notification.showStatusNotifications(
+                    this@MainActivity
+                )
+            } catch (_: Exception) {
+            }
+        }
         // Theme choice persists in plain SharedPreferences: a single
         // boolean flag is exactly what prefs are for (no DB migration).
         // Default is dark, Omarchy-style.

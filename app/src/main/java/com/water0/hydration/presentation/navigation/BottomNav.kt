@@ -36,14 +36,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -135,10 +141,11 @@ fun GlassBoxScope.GlassBottomBar(
             elevation = 0.dp
         )
     }
-    // Selected-tab pill (iOS-style, after liquid_glass_widgets'
-    // GlassTabBar): calm fixed circle that GLIDES between tabs —
-    // never morphs. Primary fill + soft primary shadow = the glow.
-    val pillD = 56.dp
+    // Selected-tab pill (iOS-style capsule language): slim fixed
+    // circle that GLIDES between tabs on a 0.35s spring — never morphs.
+    // Deeper, softer shadow sells the thickness. Touch glow below is a
+    // blurred disc (no gradient math — dot-class retired for good).
+    val pillD = 52.dp
     val pillX by animateDpAsState(
         targetValue = with(density) {
             tabCenterPx(selectedIndex).toDp() - pillD / 2
@@ -149,6 +156,25 @@ fun GlassBoxScope.GlassBottomBar(
         ),
         label = "tabPill"
     )
+    // Press glow state: pooled light at the finger, eased in fast,
+    // out soft. Blur disc, never a gradient.
+    var touchX by remember { mutableStateOf<Float?>(null) }
+    val glowAlpha by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (touchX != null) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 150),
+        label = "pressGlowIn"
+    )
+    // Calm mode (system animator off): static pill, no glow, no bounce.
+    val contentResolver = LocalContext.current.contentResolver
+    val calmMode = try {
+        android.provider.Settings.Global.getFloat(
+            contentResolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f
+        ) == 0f
+    } catch (_: Exception) {
+        false
+    }
 
     @Composable
     fun BoxScope.DockInner() {
@@ -162,13 +188,13 @@ fun GlassBoxScope.GlassBottomBar(
                 .offset(x = pillX)
                 .size(pillD)
                 .shadow(
-                    elevation = 8.dp,
+                    elevation = 12.dp,
                     shape = CircleShape,
-                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
                 )
                 .clip(CircleShape)
                 .background(
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
                     CircleShape
                 )
                 .border(
@@ -177,10 +203,46 @@ fun GlassBoxScope.GlassBottomBar(
                     CircleShape
                 )
         )
+        // Press glow: one solid white disc, softened by a blur
+        // modifier (a convolution, not a gradient — nothing here can
+        // go muddy). Follows taps and scrubbing, fades on release.
+        // matchParentSize (NOT fillMaxSize): the lens wraps the Row —
+        // a fill child would stretch it to full-screen height.
+        if (!calmMode) {
+            androidx.compose.foundation.Canvas(
+                modifier = Modifier
+                    .matchParentSize()
+                    .blur(18.dp)
+                    .alpha(glowAlpha)
+            ) {
+                val lx = (touchX ?: fingerX)?.coerceIn(0f, size.width)
+                    ?: return@Canvas
+                drawCircle(
+                    Color.White.copy(alpha = 0.55f),
+                    26.dp.toPx(),
+                    androidx.compose.ui.geometry.Offset(lx, size.height / 2f)
+                )
+            }
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .onSizeChanged { rowWidthPx = it.width.toFloat() }
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = { offset ->
+                            touchX = offset.x
+                            haptics.performHapticFeedback(
+                                HapticFeedbackType.LongPress
+                            )
+                            try {
+                                awaitRelease()
+                            } finally {
+                                touchX = null
+                            }
+                        }
+                    )
+                }
                 .pointerInput(Unit) {
                     detectDragGesturesAfterLongPress(
                         onDragStart = { offset ->
@@ -218,6 +280,7 @@ fun GlassBoxScope.GlassBottomBar(
             TABS.forEachIndexed { index, tab ->
                 GlassTab(
                     selected = index == activeIndex,
+                    animated = !calmMode,
                     onClick = { onSelect(tab.route) },
                     modifier = Modifier.weight(1f),
                     icon = {
@@ -233,40 +296,38 @@ fun GlassBoxScope.GlassBottomBar(
     }
     }
 
-    // Full-width floating dock: spans the screen with slim side margins,
-    // content flows beneath it. Height is hoisted for the toast lift.
-    // NOTE: this wrapper must fillMaxSize — BottomCenter only pushes the
-    // dock down when the box actually spans the overlay.
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        // Dock lens kill-switch: frost dock, no refraction. Doubles
-        // as the black-dot diagnostic — dots with this off are not
-        // the lens, the glow, or anything our code draws.
-        if (config.dockLens) {
-            this@GlassBottomBar.LiquidGlassBox(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onSizeChanged {
-                        onHeight(with(density) { it.height.toDp() })
-                    },
-                params = params,
-                shape = RoundedCornerShape(config.dockCorner.coerceIn(8.dp, 64.dp))
-            ) {
-                DockInner()
-            }
-        } else {
-            val frostShape = RoundedCornerShape(config.dockCorner.coerceIn(8.dp, 64.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onSizeChanged {
-                        onHeight(with(density) { it.height.toDp() })
-                    }
-                    .clip(frostShape)
+    // Dock pins straight to the glass-layer Box via align — no
+    // full-screen wrapper. The old wrapper (fillMaxSize + BottomCenter)
+    // parked the Row at the top, covering the screen; align is the
+    // robust idiom and leaves content touches alone.
+    // Dock lens kill-switch: frost dock, no refraction. Doubles
+    // as the black-dot diagnostic — dots with this off are not
+    // the lens, the glow, or anything our code draws.
+    if (config.dockLens) {
+        this@GlassBottomBar.LiquidGlassBox(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .onSizeChanged {
+                    onHeight(with(density) { it.height.toDp() })
+                },
+            params = params,
+            shape = RoundedCornerShape(config.dockCorner.coerceIn(8.dp, 64.dp))
+        ) {
+            DockInner()
+        }
+    } else {
+        val frostShape = RoundedCornerShape(config.dockCorner.coerceIn(8.dp, 64.dp))
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .onSizeChanged {
+                    onHeight(with(density) { it.height.toDp() })
+                }
+                .clip(frostShape)
                     .background(
                         com.water0.hydration.ui.theme.glassCardContainer(),
                         frostShape
@@ -282,7 +343,6 @@ fun GlassBoxScope.GlassBottomBar(
                 DockInner()
             }
         }
-    }
 }
 
 @Composable
@@ -290,22 +350,39 @@ private fun GlassTab(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    animated: Boolean = true,
     icon: @Composable () -> Unit
 ) {
     val color = if (selected) MaterialTheme.colorScheme.primary
     else MaterialTheme.colorScheme.onSurfaceVariant
+    // Press lift (prompt spec): 1.05x spring with slight overshoot
+    // under the finger; calm mode renders static.
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val lift by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (pressed && animated) 1.05f else 1f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.5f,
+            stiffness = 300f
+        ),
+        label = "tabLift"
+    )
     // Full-width dock: each tab takes an equal share (weight comes from
     // the Row scope caller). Icon-only: the label lives in
-    // contentDescription for talkback. No tap animation — no magnify, no
-    // ripple; touch light is the only motion. Tabs just tint.
+    // contentDescription for talkback. Tabs tint; press lifts.
     Box(
         contentAlignment = Alignment.Center,
-        modifier = modifier.clickable(
-            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-            indication = null,
-            role = androidx.compose.ui.semantics.Role.Button,
-            onClick = onClick
-        )
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = lift
+                scaleY = lift
+            }
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = androidx.compose.ui.semantics.Role.Button,
+                onClick = onClick
+            )
     ) {
         Box(
             contentAlignment = Alignment.Center,

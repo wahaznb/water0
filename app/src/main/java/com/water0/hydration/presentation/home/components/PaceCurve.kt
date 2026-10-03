@@ -84,7 +84,8 @@ fun PaceCurveCard(
     com.water0.hydration.ui.theme.LensCard(
         modifier = modifier.fillMaxWidth(),
         blurOverride = 0.7f,
-        refraction = 2f
+        refraction = 1f,
+        chromatic = 0f
     ) {
     Column(
         modifier = Modifier
@@ -115,6 +116,14 @@ fun PaceCurveCard(
             (goalMl * ((hour - wakeHour + 1) / span).coerceIn(0f, 1f)).roundToInt()
         fun drunkAt(hour: Float) =
             steps.lastOrNull { it.first <= hour }?.second ?: 0
+        // Body water: each drink absorbs exponentially (tau ~25 min,
+        // gastric emptying), so the curve rises like physiology, not
+        // stairs. Sampled densely it draws smooth.
+        fun absorbedAt(hour: Float): Float =
+            steps.filter { it.first <= hour }.sumOf { (h, amt) ->
+                val dtMin = ((hour - h) * 60f).coerceAtLeast(0f)
+                (amt * (1f - kotlin.math.exp(-dtMin / 25f))).toDouble()
+            }.toFloat()
         val dark = com.water0.hydration.ui.theme.isDarkScheme()
         val red = Color(0xFFEF5350)
         val green = Color(0xFF43A047)
@@ -162,29 +171,36 @@ fun PaceCurveCard(
                 end = Offset(x(sleepHour.toFloat()), y(goalMl.toFloat())),
                 strokeWidth = 1.5.dp.toPx()
             )
-            // Actual, colored per segment: green where that hour's total
-            // covers its target, red everywhere it doesn't.
-            var prevX = x(wakeHour.toFloat())
-            var prevY = y(0f)
-            for ((hour, total) in steps) {
-                val cx = x(hour)
-                val cy = y(total.toFloat())
-                val seg = if (total >= expectedAt(hour)) green else red
-                drawLine(seg, Offset(prevX, prevY), Offset(cx, prevY), 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                drawLine(seg, Offset(cx, prevY), Offset(cx, cy), 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                drawCircle(seg, 3.5.dp.toPx(), Offset(cx, cy))
-                drawCircle(Color.White.copy(alpha = 0.85f), 1.5.dp.toPx(), Offset(cx, cy))
-                prevX = cx
-                prevY = cy
-            }
-            // Extend flat to now, colored by the current standing.
-            if (steps.isNotEmpty()) {
-                val nowSeg = if (drunkNow >= expectedNow) green else red
-                drawLine(nowSeg, Offset(prevX, prevY), Offset(x(nowHour), prevY), 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            // Actual as physiology: 140 absorption samples from wake
+            // to now, colored per sample by the target at that hour.
+            // Dense samples draw a smooth curve, not stairs.
+            val endHour = minOf(nowHour, sleepHour.toFloat())
+            if (endHour > wakeHour && steps.isNotEmpty()) {
+                val samples = 140
+                var px = x(wakeHour.toFloat())
+                var py = y(0f)
+                for (i in 1..samples) {
+                    val hour = wakeHour + (endHour - wakeHour) * i / samples
+                    val cx = x(hour)
+                    val cy = y(absorbedAt(hour))
+                    val mid = wakeHour + (endHour - wakeHour) * (i - 0.5f) / samples
+                    val seg = if (absorbedAt(mid) >= expectedAt(mid)) green else red
+                    drawLine(seg, Offset(px, py), Offset(cx, cy), 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    px = cx
+                    py = cy
+                }
+                // Drink dots sit on the curve where each landed.
+                for ((hour, _) in steps) {
+                    if (hour > endHour) continue
+                    val dot = Offset(x(hour), y(absorbedAt(hour)))
+                    val dotCol = if (absorbedAt(hour) >= expectedAt(hour)) green else red
+                    drawCircle(dotCol, 3.5.dp.toPx(), dot)
+                    drawCircle(Color.White.copy(alpha = 0.85f), 1.5.dp.toPx(), dot)
+                }
             }
             // Now marker: green while under the diagonal (in the safe
             // zone), red once past it — the vertical reads the standing.
-            val nowBehind = drunkNow < expectedNow
+            val nowBehind = absorbedAt(nowHour) < expectedAt(nowHour)
             val nowColor = if (nowBehind) green else red
             // Now marker, only inside the wake window: parked at an
             // edge overnight it reads as a glitch, not information.
@@ -205,7 +221,7 @@ fun PaceCurveCard(
             // Same standing rule: green under the diagonal, red past it.
             touchFrac?.let { frac ->
                 val hour = wakeHour + frac * span
-                val drunk = drunkAt(hour)
+                val drunk = absorbedAt(hour).roundToInt()
                 val cx = frac * w
                 val cy = y(drunk.toFloat())
                 val cur = if (drunk < expectedAt(hour)) green else red
@@ -225,7 +241,7 @@ fun PaceCurveCard(
             val hour = wakeHour + frac * span
             val hh = hour.toInt().coerceIn(0, 23)
             val mm = ((hour - hh) * 60).toInt().coerceIn(0, 59)
-            "%02d:%02d · %d drunk / %d expected".format(hh, mm, drunkAt(hour), expectedAt(hour))
+            "%02d:%02d · %d in system / %d expected".format(hh, mm, absorbedAt(hour).roundToInt(), expectedAt(hour))
         }
         Text(
             text = readout ?: caption,
