@@ -97,14 +97,8 @@ fun PaceCurveCard(
         else -> "${expectedNow - drunkNow} ml under the line — steady sips close it."
     }
 
-    com.water0.hydration.ui.theme.LensCard(
-        modifier = modifier.fillMaxWidth(),
-        blurOverride = 0.7f,
-        refraction = 1f,
-        chromatic = 0f
-    ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .glassCard()
             // iPhone-style top light: specular wash so the lens reads
@@ -142,6 +136,15 @@ fun PaceCurveCard(
         val green = Color(0xFF43A047)
         // Reference black: the goal line up top. Neutral in both modes.
         val refLine = Color.Black.copy(alpha = if (dark) 0.65f else 0.45f)
+        // Plot-only lens: the graph refracts, title/caption stay crisp
+        // frost above it. A full-card lens bends its own text.
+        com.water0.hydration.ui.theme.LensCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            blurOverride = 0.4f,
+            refraction = 0.6f,
+            chromatic = 0f
+        ) {
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
@@ -248,6 +251,7 @@ fun PaceCurveCard(
                 drawCircle(cur, 4.dp.toPx(), Offset(cx, cy))
             }
         }
+        }
         // Readout follows the finger; caption returns when untouched.
         // (touchFrac persists after release so the reading lingers.)
         val readout = touchFrac?.let { frac ->
@@ -277,6 +281,5 @@ fun PaceCurveCard(
                 color = onVariant
             )
         }
-    }
     }
 }

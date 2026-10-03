@@ -74,7 +74,7 @@ fun GlassConfig.toLiquidParams(
     scale = scale
 )
 
-internal data class GlassElement(
+data class GlassElement(
     val id: String,
     val position: Offset,
     val size: Size,
@@ -110,6 +110,18 @@ internal data class GlassElement(
 }
 
 interface GlassScope {
+    fun upsertElement(element: GlassElement)
+    fun unregisterElement(id: String)
+    fun refreshElementParams(
+        id: String,
+        tint: Color,
+        darkness: Float,
+        warpEdges: Float,
+        chromatic: Float,
+        blur: Float,
+        scale: Float,
+        centerDistortion: Float,
+    )
     fun Modifier.glassBackground(
         id: Long,
         scale: Float,
@@ -126,8 +138,14 @@ interface GlassScope {
 
 interface GlassBoxScope : BoxScope, GlassScope
 
+/** Hoisted lens scope, provided around BOTH container layers so
+ * content-layer cards (graphs, buttons) register lenses just like
+ * glass-layer chrome. Null in tests/previews -> plain frost. */
+val LocalGlassScope =
+    androidx.compose.runtime.compositionLocalOf<GlassScope?> { null }
+
 @Composable
-fun GlassBoxScope.LiquidGlassBox(
+fun GlassScope.LiquidGlassBox(
     modifier: Modifier = Modifier,
     contentAlignment: Alignment = Alignment.TopStart,
     propagateMinConstraints: Boolean = false,
@@ -137,6 +155,24 @@ fun GlassBoxScope.LiquidGlassBox(
     content: @Composable BoxScope.() -> Unit = { },
 ) {
     val id = remember { Random.nextLong() }
+    val elementId = "glass_$id"
+    // Explicit lifetime: disposal unregisters, so the container never
+    // has to guess (the old mark-and-sweep wiped static chrome on
+    // every scroll-triggered recomposition).
+    DisposableEffect(elementId) {
+        onDispose { unregisterElement(elementId) }
+    }
+    // Param refresh without a layout change: Glass Lab retunes live.
+    SideEffect {
+        refreshElementParams(
+            elementId, params.tint,
+            params.darkness.coerceIn(0f, 1f),
+            params.warpEdges.coerceIn(0f, 1f),
+            chromatic, params.blur.coerceIn(0f, 1f),
+            params.scale.coerceIn(0f, 1f),
+            params.centerDistortion.coerceIn(0f, 1f)
+        )
+    }
     Box(
         modifier = modifier.glassBackground(
             id,
@@ -164,19 +200,48 @@ private class GlassScopeImpl(private val density: Density) : GlassScope {
 
     var updateCounter by mutableStateOf(0)
     val elements: MutableList<GlassElement> = mutableListOf()
-    private val activeElements = mutableSetOf<String>()
 
-    fun markElementAsActive(elementId: String) {
-        activeElements.add(elementId)
-    }
-
-    fun cleanupInactiveElements() {
-        val elementsToRemove = elements.filter { it.id !in activeElements }
-        if (elementsToRemove.isNotEmpty()) {
-            elements.removeAll { it.id !in activeElements }
+    override fun upsertElement(element: GlassElement) {
+        val i = elements.indexOfFirst { it.id == element.id }
+        if (i == -1) {
+            elements.add(element)
+            updateCounter++
+        } else if (!elements[i].equalsWithTolerance(element)) {
+            elements[i] = element
             updateCounter++
         }
-        activeElements.clear()
+    }
+
+    override fun unregisterElement(id: String) {
+        if (elements.removeAll { it.id == id }) updateCounter++
+    }
+
+    override fun refreshElementParams(
+        id: String,
+        tint: Color,
+        darkness: Float,
+        warpEdges: Float,
+        chromatic: Float,
+        blur: Float,
+        scale: Float,
+        centerDistortion: Float,
+    ) {
+        val i = elements.indexOfFirst { it.id == id }
+        if (i == -1) return
+        val e = elements[i]
+        if (e.tint != tint || e.darkness != darkness ||
+            e.warpEdges != warpEdges || e.chromatic != chromatic ||
+            e.blur != blur || e.scale != scale ||
+            e.centerDistortion != centerDistortion
+        ) {
+            elements[i] = e.copy(
+                tint = tint, darkness = darkness,
+                warpEdges = warpEdges, chromatic = chromatic,
+                blur = blur, scale = scale,
+                centerDistortion = centerDistortion
+            )
+            updateCounter++
+        }
     }
 
     override fun Modifier.glassBackground(
@@ -194,42 +259,43 @@ private class GlassScopeImpl(private val density: Density) : GlassScope {
         .background(color = Color.Transparent, shape = shape)
         .onGloballyPositioned { coordinates ->
             val elementId = "glass_$id"
-            markElementAsActive(elementId)
-
             val position = coordinates.positionInRoot()
             val size = coordinates.size.toSize()
 
-            val element = GlassElement(
-                id = elementId,
-                position = position,
-                size = size,
-                cornerRadius = shape.topStart.toPx(size, density),
-                scale = scale,
-                blur = blur,
-                centerDistortion = centerDistortion,
-                elevation = with(density) { elevation.toPx() },
-                tint = tint,
-                darkness = darkness,
-                warpEdges = warpEdges,
-                chromatic = chromatic,
+            upsertElement(
+                GlassElement(
+                    id = elementId,
+                    position = position,
+                    size = size,
+                    cornerRadius = shape.topStart.toPx(size, density),
+                    scale = scale,
+                    blur = blur,
+                    centerDistortion = centerDistortion,
+                    elevation = with(density) { elevation.toPx() },
+                    tint = tint,
+                    darkness = darkness,
+                    warpEdges = warpEdges,
+                    chromatic = chromatic,
+                )
             )
-
-            val existingIndex = elements.indexOfFirst { it.id == element.id }
-            if (existingIndex == -1) {
-                elements.add(element)
-                updateCounter++
-            } else {
-                val existing = elements[existingIndex]
-                if (!existing.equalsWithTolerance(element)) {
-                    elements[existingIndex] = element
-                    updateCounter++
-                }
-            }
         }
 }
 
 /** Fallback for API < 33: gradient glass simulation, no backdrop blur. */
 private class GlassScopeFallbackImpl(private val density: Density) : GlassScope {
+
+    override fun upsertElement(element: GlassElement) = Unit
+    override fun unregisterElement(id: String) = Unit
+    override fun refreshElementParams(
+        id: String,
+        tint: Color,
+        darkness: Float,
+        warpEdges: Float,
+        chromatic: Float,
+        blur: Float,
+        scale: Float,
+        centerDistortion: Float,
+    ) = Unit
 
     override fun Modifier.glassBackground(
         id: Long,
@@ -299,10 +365,21 @@ fun LiquidGlassContainer(
     content: @Composable () -> Unit,
     glassContent: @Composable GlassBoxScope.() -> Unit,
 ) {
+    val density = LocalDensity.current
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        GlassContainerWithShader(modifier, content, glassContent)
+        val glassScope = remember { GlassScopeImpl(density) }
+        androidx.compose.runtime.CompositionLocalProvider(
+            LocalGlassScope provides glassScope
+        ) {
+            GlassContainerWithShader(modifier, content, glassContent, glassScope)
+        }
     } else {
-        GlassContainerFallback(modifier, content, glassContent)
+        val glassScope = remember { GlassScopeFallbackImpl(density) }
+        androidx.compose.runtime.CompositionLocalProvider(
+            LocalGlassScope provides glassScope
+        ) {
+            GlassContainerFallback(modifier, content, glassContent, glassScope)
+        }
     }
 }
 
@@ -312,22 +389,10 @@ private fun GlassContainerWithShader(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
     glassContent: @Composable GlassBoxScope.() -> Unit,
+    glassScope: GlassScopeImpl,
 ) {
-    val density = LocalDensity.current
-    val glassScope = remember { GlassScopeImpl(density) }
-
     val shader = remember(glassScope.updateCounter) {
         RuntimeShader(GLASS_DISPLACEMENT_SHADER)
-    }
-
-    SideEffect {
-        glassScope.cleanupInactiveElements()
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            glassScope.elements.clear()
-        }
     }
 
     Box(
@@ -354,14 +419,6 @@ private fun GlassContainerWithShader(
 
                 val elementsCount = minOf(elements.size, maxElements)
                 shader.setIntUniform("elementsCount", elementsCount)
-                if (elements.size > 40) {
-                    android.util.Log.w(
-                        "GlassLens",
-                        "elements=${elements.size} " + elements.take(3).joinToString(";") {
-                            "${it.size.width.toInt()}x${it.size.height.toInt()}@${it.position.x.toInt()},${it.position.y.toInt()}"
-                        }
-                    )
-                }
 
                 for (i in 0 until elementsCount) {
                     val element = elements[i]
@@ -416,10 +473,8 @@ private fun GlassContainerFallback(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
     glassContent: @Composable GlassBoxScope.() -> Unit,
+    glassScope: GlassScopeFallbackImpl,
 ) {
-    val density = LocalDensity.current
-    val glassScope = remember { GlassScopeFallbackImpl(density) }
-
     Box(modifier = modifier) {
         content()
     }

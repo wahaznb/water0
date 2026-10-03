@@ -608,11 +608,13 @@ private fun FitnessSection() {
     var statusLine by remember { mutableStateOf("Checking…") }
     var sleepLine by remember { mutableStateOf<String?>(null) }
     var showConnect by remember { mutableStateOf(false) }
+    var providerLine by remember { mutableStateOf<String?>(null) }
 
     fun refresh() {
         scope.launch {
             sleepLine = null
             showConnect = false
+            providerLine = "Provider: ${source.sdkStatusName()}"
             if (!source.isAvailable()) {
                 statusLine = if (source.needsUpdate())
                     "Health Connect is installed but needs an update — " +
@@ -652,6 +654,13 @@ private fun FitnessSection() {
             fontSize = 13.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        providerLine?.let {
+            Text(
+                text = it,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        }
         sleepLine?.let {
             Text(
                 text = it,
@@ -660,7 +669,16 @@ private fun FitnessSection() {
             )
         }
         if (showConnect) {
-            OutlinedButton(onClick = { launcher.launch(source.readPermissions()) }) {
+            OutlinedButton(onClick = {
+                try {
+                    launcher.launch(source.readPermissions())
+                } catch (e: Exception) {
+                    statusLine = "Couldn't open the permission sheet " +
+                        "(${e.javaClass.simpleName}) — try Open Health " +
+                        "Connect below first."
+                    showConnect = false
+                }
+            }) {
                 Text("Connect Health Connect")
             }
         } else if (sleepLine == null) {

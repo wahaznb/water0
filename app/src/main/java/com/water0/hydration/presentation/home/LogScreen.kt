@@ -127,6 +127,8 @@ fun LogScreen(
             HydrationEntry.DrinkType.entries.forEach { type ->
                 com.water0.hydration.ui.theme.LensCard(
                     shape = RoundedCornerShape(8.dp),
+                    blurOverride = 0.05f,
+                    refraction = 0.3f,
                     chromatic = 0f
                 ) {
                 FilterChip(
@@ -188,6 +190,8 @@ fun LogScreen(
             )
             com.water0.hydration.ui.theme.LensCard(
                 shape = RoundedCornerShape(8.dp),
+                blurOverride = 0.05f,
+                refraction = 0.3f,
                 chromatic = 0f
             ) {
             FilterChip(
@@ -258,6 +262,8 @@ fun LogScreen(
                     recents.forEach { recent ->
                         com.water0.hydration.ui.theme.LensCard(
                             shape = RoundedCornerShape(8.dp),
+                            blurOverride = 0.05f,
+                            refraction = 0.3f,
                             chromatic = 0f
                         ) {
                         FilterChip(
@@ -331,7 +337,10 @@ private fun BackdateChip(
     onClick: () -> Unit
 ) {
     com.water0.hydration.ui.theme.LensCard(
-        shape = RoundedCornerShape(8.dp)
+        shape = RoundedCornerShape(8.dp),
+        blurOverride = 0.05f,
+        refraction = 0.3f,
+        chromatic = 0f
     ) {
     FilterChip(
         selected = selected,

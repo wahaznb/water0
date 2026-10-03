@@ -19,6 +19,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -52,6 +55,8 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -118,7 +123,8 @@ fun GlassBoxScope.GlassBottomBar(
     val activeIndex = dragIndex ?: selectedIndex
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
-    // Full-width dock: tabs share the measured CONTENT width equally. The
+    // Compact dock: tabs sit in fixed cells; centers come off the
+    // measured Row width. (Full-width dock: tabs share the measured CONTENT width equally. The
     // Row's 8dp side padding is part of its measured width, so centers
     // subtract it first — forgetting this sat edge tabs (Home/Settings)
     // a few dp off-center.
@@ -141,18 +147,21 @@ fun GlassBoxScope.GlassBottomBar(
             elevation = 0.dp
         )
     }
-    // Selected-tab pill (iOS-style capsule language): slim fixed
-    // circle that GLIDES between tabs on a 0.35s spring — never morphs.
-    // Deeper, softer shadow sells the thickness. Touch glow below is a
-    // blurred disc (no gradient math — dot-class retired for good).
-    val pillD = 52.dp
+    // Selected-tab capsule (iOS 26 language): fixed stadium pill that
+    // GLIDES between tabs on a ~0.35s spring with slight overshoot —
+    // never morphs. Deeper, softer shadow sells the thickness. Touch
+    // glow below is a blurred disc (no gradient math — dot-class
+    // retired for good).
+    val pillW = 54.dp
+    val pillH = 42.dp
+    val pillShape = RoundedCornerShape(50)
     val pillX by animateDpAsState(
         targetValue = with(density) {
-            tabCenterPx(selectedIndex).toDp() - pillD / 2
+            tabCenterPx(selectedIndex).toDp() - pillW / 2
         },
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = 170f
+            dampingRatio = 0.75f,
+            stiffness = 300f
         ),
         label = "tabPill"
     )
@@ -179,28 +188,28 @@ fun GlassBoxScope.GlassBottomBar(
     @Composable
     fun BoxScope.DockInner() {
     Box(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.wrapContentSize()
     ) {
-        // Selected pill, drawn first so icons sit on top of it.
+        // Selected capsule, drawn first so icons sit on top of it.
         Box(
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .offset(x = pillX)
-                .size(pillD)
+                .size(width = pillW, height = pillH)
                 .shadow(
                     elevation = 12.dp,
-                    shape = CircleShape,
+                    shape = pillShape,
                     spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
                 )
-                .clip(CircleShape)
+                .clip(pillShape)
                 .background(
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
-                    CircleShape
+                    pillShape
                 )
                 .border(
                     1.dp,
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-                    CircleShape
+                    pillShape
                 )
         )
         // Press glow: one solid white disc, softened by a blur
@@ -226,7 +235,7 @@ fun GlassBoxScope.GlassBottomBar(
         }
         Row(
             modifier = Modifier
-                .fillMaxWidth()
+                .wrapContentWidth()
                 .onSizeChanged { rowWidthPx = it.width.toFloat() }
                 .pointerInput(Unit) {
                     detectTapGestures(
@@ -282,7 +291,7 @@ fun GlassBoxScope.GlassBottomBar(
                     selected = index == activeIndex,
                     animated = !calmMode,
                     onClick = { onSelect(tab.route) },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.width(60.dp),
                     icon = {
                         Icon(
                             tab.icon,
@@ -303,27 +312,28 @@ fun GlassBoxScope.GlassBottomBar(
     // Dock lens kill-switch: frost dock, no refraction. Doubles
     // as the black-dot diagnostic — dots with this off are not
     // the lens, the glow, or anything our code draws.
+    // Compact floating pill (iOS 26): wraps the tabs and centers, never
+    // spans the screen. Stadium corner tracks the measured height.
+    val dockShape = RoundedCornerShape(50)
     if (config.dockLens) {
         this@GlassBottomBar.LiquidGlassBox(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .padding(bottom = 12.dp)
                 .onSizeChanged {
                     onHeight(with(density) { it.height.toDp() })
                 },
             params = params,
-            shape = RoundedCornerShape(config.dockCorner.coerceIn(8.dp, 64.dp))
+            shape = dockShape
         ) {
             DockInner()
         }
     } else {
-        val frostShape = RoundedCornerShape(config.dockCorner.coerceIn(8.dp, 64.dp))
+        val frostShape = RoundedCornerShape(50)
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .padding(bottom = 12.dp)
                 .onSizeChanged {
                     onHeight(with(density) { it.height.toDp() })
                 }
@@ -367,12 +377,13 @@ private fun GlassTab(
         ),
         label = "tabLift"
     )
-    // Full-width dock: each tab takes an equal share (weight comes from
-    // the Row scope caller). Icon-only: the label lives in
+    // Compact cells in a wrapping row: the label lives in
     // contentDescription for talkback. Tabs tint; press lifts.
+    // Selected trait exposed for accessibility services.
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
+            .semantics { this.selected = selected }
             .graphicsLayer {
                 scaleX = lift
                 scaleY = lift

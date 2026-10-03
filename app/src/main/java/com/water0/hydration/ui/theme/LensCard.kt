@@ -52,9 +52,10 @@ fun LensCard(
     chromatic: Float = 1f,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val glass = LocalLensScope.current
+    val lens =
+        com.water0.hydration.ui.theme.liquidglass.LocalGlassScope.current
     val config = LocalLensConfig.current
-    if (glass == null || !config.cardGlass) {
+    if (lens == null || !config.cardGlass) {
         Box(modifier = modifier) { content() }
         return
     }
@@ -66,7 +67,7 @@ fun LensCard(
         scale = (base.scale * refraction).coerceIn(0f, 1f),
         centerDistortion = (base.centerDistortion * refraction).coerceIn(0f, 1f)
     )
-    with(glass) {
+    with(lens) {
         LiquidGlassBox(
             modifier = modifier,
             params = params,

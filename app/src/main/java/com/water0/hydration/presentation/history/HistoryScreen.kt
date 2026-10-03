@@ -184,12 +184,6 @@ private fun WeekGraph(days: List<GetHistoryUseCase.DaySummary>) {
             else -> "S"
         }
     }
-    com.water0.hydration.ui.theme.LensCard(
-        modifier = Modifier.fillMaxWidth(),
-        blurOverride = 0.7f,
-        refraction = 1f,
-        chromatic = 0f
-    ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(com.water0.hydration.ui.theme.Radii.md),
@@ -207,6 +201,15 @@ private fun WeekGraph(days: List<GetHistoryUseCase.DaySummary>) {
                 fontWeight = FontWeight.Bold,
                 color = onSurface
             )
+            // Bars-only lens: the graph refracts, title/initials stay
+            // crisp frost. A full-card lens bends its own text.
+            com.water0.hydration.ui.theme.LensCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                blurOverride = 0.4f,
+                refraction = 0.6f,
+                chromatic = 0f
+            ) {
             androidx.compose.foundation.Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -248,6 +251,7 @@ private fun WeekGraph(days: List<GetHistoryUseCase.DaySummary>) {
                     )
                 }
             }
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround,
@@ -281,7 +285,6 @@ private fun WeekGraph(days: List<GetHistoryUseCase.DaySummary>) {
             }
         }
     }
-    } // WeekGraph LensCard
 } // WeekGraph fun
 
 @Composable

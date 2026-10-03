@@ -42,6 +42,20 @@ class FitnessDataSource(private val context: Context) {
         false
     }
 
+    /** Raw provider state for the Settings status line (debug-honest:
+     * tells the user exactly what the phone reports). */
+    fun sdkStatusName(): String = try {
+        when (HealthConnectClient.getSdkStatus(context)) {
+            HealthConnectClient.SDK_AVAILABLE -> "available"
+            HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED ->
+                "installed, needs update"
+
+            else -> "not on this phone"
+        }
+    } catch (e: Exception) {
+        "check failed (${e.javaClass.simpleName})"
+    }
+
     /** Raw permission strings, built by the library so the prefix
      * (`android.permission.health.*` since 1.1.x) always matches what
      * the permission contract validates — hardcoded old-prefix
