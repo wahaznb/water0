@@ -44,6 +44,9 @@ fun LensCard(
     // Per-surface blur (0..1, 24dp saturates): graphs run stronger than
     // buttons. Null = Glass Lab default.
     blurOverride: Float? = null,
+    // Refraction strength multiplier (lens displacement + center
+    // distortion): buttons and graphs bend harder than chrome.
+    refraction: Float = 1f,
     content: @Composable BoxScope.() -> Unit
 ) {
     val glass = LocalLensScope.current
@@ -55,8 +58,11 @@ fun LensCard(
     val base = remember(config) {
         config.toLiquidParams(Color.Transparent)
     }
-    val params = if (blurOverride != null) base.copy(blur = blurOverride.coerceIn(0f, 1f))
-    else base
+    val params = base.copy(
+        blur = (blurOverride ?: base.blur).coerceIn(0f, 1f),
+        scale = (base.scale * refraction).coerceIn(0f, 1f),
+        centerDistortion = (base.centerDistortion * refraction).coerceIn(0f, 1f)
+    )
     with(glass) {
         LiquidGlassBox(
             modifier = modifier,

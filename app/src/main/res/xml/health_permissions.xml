@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <health-permissions>
-    <permission name="android.health.permission.READ_STEPS" />
-    <permission name="android.health.permission.READ_SLEEP" />
-    <permission name="android.health.permission.READ_EXERCISE" />
-    <permission name="android.health.permission.READ_EXERCISE_ROUTE" />
-    <permission name="android.health.permission.READ_HEART_RATE" />
+    <permission name="android.permission.health.READ_STEPS" />
+    <permission name="android.permission.health.READ_SLEEP" />
+    <permission name="android.permission.health.READ_EXERCISE" />
+    <permission name="android.permission.health.READ_EXERCISE_ROUTE" />
+    <permission name="android.permission.health.READ_HEART_RATE" />
 </health-permissions>

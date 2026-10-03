@@ -135,16 +135,13 @@ val LocalCardStyle = androidx.compose.runtime.compositionLocalOf { CardStyle() }
 @Composable
 fun glassCardContainer(): Color {
     val style = LocalCardStyle.current
-    // Glass mode: clearer fill so the background reads through like an
-    // iPhone liquid-glass icon — clarity slides the fill from milky to
-    // near-clear. Frost: slight-white glass on the deep field.
+    // Same fill as the Update buttons (primaryContainer 0.16): cards
+    // and buttons share one transparency, frost or glass.
     if (style.glass) {
-        val a = 0.35f - style.clarity.coerceIn(0f, 1f) * 0.25f
-        return if (isDarkScheme()) Color.White.copy(alpha = a)
-        else Color.White.copy(alpha = a + 0.15f)
+        val a = (0.16f - style.clarity.coerceIn(0f, 1f) * 0.10f).coerceAtLeast(0.04f)
+        return MaterialTheme.colorScheme.primaryContainer.copy(alpha = a)
     }
-    return if (isDarkScheme()) MaterialTheme.colorScheme.surface.copy(alpha = 0.15f)
-    else Color.White.copy(alpha = 0.38f)
+    return MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.16f)
 }
 
 /** True when the app theme is dark — one source for every theme branch. */

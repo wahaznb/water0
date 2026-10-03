@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -134,16 +135,48 @@ fun GlassBoxScope.GlassBottomBar(
             elevation = 0.dp
         )
     }
+    // Selected-tab pill (iOS-style, after liquid_glass_widgets'
+    // GlassTabBar): calm fixed circle that GLIDES between tabs —
+    // never morphs. Primary fill + soft primary shadow = the glow.
+    val pillD = 56.dp
+    val pillX by animateDpAsState(
+        targetValue = with(density) {
+            tabCenterPx(selectedIndex).toDp() - pillD / 2
+        },
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = 170f
+        ),
+        label = "tabPill"
+    )
 
     @Composable
     fun BoxScope.DockInner() {
     Box(
         modifier = Modifier.fillMaxWidth()
     ) {
-        // No glow Canvas anymore: every gradient glow tried so far has
-        // rendered as black dots on this GPU. Icons tint for selection,
-        // scrub ticks haptics. If dots persist past this, they are the
-        // icons or the platform compositor — not our code.
+        // Selected pill, drawn first so icons sit on top of it.
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .offset(x = pillX)
+                .size(pillD)
+                .shadow(
+                    elevation = 8.dp,
+                    shape = CircleShape,
+                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+                )
+                .clip(CircleShape)
+                .background(
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                    CircleShape
+                )
+                .border(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
+                    CircleShape
+                )
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()

@@ -1,0 +1,12 @@
+{
+  // JDK for the Java language server + Gradle daemons spawned by VSCode
+  // (matches the repo toolchain: Temurin 17 in ~/.jdk, see learning-guide).
+  "java.jdt.ls.java.home": "/home/wz/.jdk/17",
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-17",
+      "path": "/home/wz/.jdk/17",
+      "default": true
+    }
+  ]
+}

@@ -91,7 +91,8 @@ fun QuickAddButton(
     // glow under the finger, replacing the old bounce.
     com.water0.hydration.ui.theme.LensCard(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(12.dp),
+        refraction = 2f
     ) {
     Button(
         onClick = onClick,

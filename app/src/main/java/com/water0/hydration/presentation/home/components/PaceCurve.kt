@@ -83,7 +83,8 @@ fun PaceCurveCard(
 
     com.water0.hydration.ui.theme.LensCard(
         modifier = modifier.fillMaxWidth(),
-        blurOverride = 0.7f
+        blurOverride = 0.7f,
+        refraction = 2f
     ) {
     Column(
         modifier = Modifier

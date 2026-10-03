@@ -34,8 +34,14 @@ class FitnessDataSource(private val context: Context) {
         false
     }
 
-    /** Raw permission strings (stable public API names). */
-    fun readPermissions(): Set<String> = setOf(READ_SLEEP, READ_EXERCISE)
+    /** Raw permission strings, built by the library so the prefix
+     * (`android.permission.health.*` since 1.1.x) always matches what
+     * the permission contract validates — hardcoded old-prefix
+     * strings crash it with IllegalArgumentException. */
+    fun readPermissions(): Set<String> = setOf(
+        HealthPermission.getReadPermission(SleepSessionRecord::class),
+        HealthPermission.getReadPermission(ExerciseSessionRecord::class)
+    )
 
     suspend fun hasPermissions(): Boolean = try {
         client().permissionController.getGrantedPermissions()
@@ -91,9 +97,6 @@ class FitnessDataSource(private val context: Context) {
         HealthConnectClient.Companion.getOrCreate(context)
 
     companion object {
-        const val READ_SLEEP = "android.health.permission.READ_SLEEP"
-        const val READ_EXERCISE = "android.health.permission.READ_EXERCISE"
-
         fun requestContract() =
             PermissionController.createRequestPermissionResultContract()
     }
