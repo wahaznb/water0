@@ -35,6 +35,22 @@ import com.water0.hydration.ui.theme.SectionHeader
 import kotlin.math.roundToInt
 
 /**
+ * Body-water absorption: each (hour, ml) drink contributes
+ * ml * (1 - e^(-dt/tau)) with tau ~25 min (gastric emptying), summed
+ * over drinks so far. Pure + unit-tested (AbsorbedMlTest): zero before
+ * the first drink, smooth and monotone after, asymptotes to the total.
+ */
+internal fun absorbedMl(
+    drinks: List<Pair<Float, Int>>,
+    hour: Float,
+    tauMin: Float = 25f
+): Float =
+    drinks.filter { it.first <= hour }.sumOf { (h, amt) ->
+        val dtMin = ((hour - h) * 60f).coerceAtLeast(0f)
+        (amt * (1f - kotlin.math.exp(-dtMin / tauMin))).toDouble()
+    }.toFloat()
+
+/**
  * Today's pace curve: the plan vs you. Straight expected line from wake
  * (0) to sleep (goal), actual intake as rising steps, now-marker with a
  * dot, dashed goal line. Same idea as a 24h caffeine curve, drawn for
@@ -116,14 +132,11 @@ fun PaceCurveCard(
             (goalMl * ((hour - wakeHour + 1) / span).coerceIn(0f, 1f)).roundToInt()
         fun drunkAt(hour: Float) =
             steps.lastOrNull { it.first <= hour }?.second ?: 0
-        // Body water: each drink absorbs exponentially (tau ~25 min,
-        // gastric emptying), so the curve rises like physiology, not
-        // stairs. Sampled densely it draws smooth.
-        fun absorbedAt(hour: Float): Float =
-            steps.filter { it.first <= hour }.sumOf { (h, amt) ->
-                val dtMin = ((hour - h) * 60f).coerceAtLeast(0f)
-                (amt * (1f - kotlin.math.exp(-dtMin / 25f))).toDouble()
-            }.toFloat()
+        // Body water, shared with the caption: each drink absorbs
+        // exponentially (tau ~25 min, gastric emptying), so the curve
+        // rises like physiology, not stairs. Sampled densely it draws
+        // smooth — see absorbedMl + AbsorbedMlTest.
+        fun absorbedAt(hour: Float): Float = absorbedMl(steps, hour)
         val dark = com.water0.hydration.ui.theme.isDarkScheme()
         val red = Color(0xFFEF5350)
         val green = Color(0xFF43A047)

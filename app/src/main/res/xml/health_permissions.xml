@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <health-permissions>
-    <permission name="android.permission.health.READ_STEPS" />
+    <!-- Requested == declared: SLEEP + EXERCISE only (see
+      FitnessDataSource.readPermissions). Add a line here only when
+      request code asks for it. -->
     <permission name="android.permission.health.READ_SLEEP" />
     <permission name="android.permission.health.READ_EXERCISE" />
-    <permission name="android.permission.health.READ_EXERCISE_ROUTE" />
-    <permission name="android.permission.health.READ_HEART_RATE" />
 </health-permissions>

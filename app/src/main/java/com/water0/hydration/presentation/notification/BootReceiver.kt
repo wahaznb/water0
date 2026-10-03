@@ -12,7 +12,11 @@ import com.water0.hydration.di.AppContainer
 // until the next chain tick, hours away.
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+        // QUICKBOOT_POWERON covers HTC-style fast-boot resumes that skip
+        // BOOT_COMPLETED; without it the chain never restarts there.
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
+            intent.action == "android.intent.action.QUICKBOOT_POWERON"
+        ) {
             val scheduler = AppContainer.getNotificationScheduler(context)
             scheduler.ensureScheduled()
             scheduler.poke()

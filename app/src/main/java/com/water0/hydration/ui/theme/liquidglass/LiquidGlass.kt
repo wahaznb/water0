@@ -397,10 +397,11 @@ private fun GlassContainerWithShader(
                 shader.setFloatUniform("glassBlurs", blurs)
                 shader.setFloatUniform("chromaticFlags", chromatics)
 
-                renderEffect = null // DIAG-OFF: bypass lens shader entirely
-                //RenderEffect.createRuntimeShaderEffect(
-                //    shader, "contents"
-                //).asComposeRenderEffect()
+                // Full-screen-lens smear source is gone (glow is
+                // matchParentSize now), so the lens is back on.
+                renderEffect = RenderEffect.createRuntimeShaderEffect(
+                    shader, "contents"
+                ).asComposeRenderEffect()
             }
     ) {
         content()
@@ -611,10 +612,18 @@ private val GLASS_DISPLACEMENT_SHADER = """
         float2 bendVec = finalCoord - fragCoord;
         float bendLen = length(bendVec);
         // Per-surface diffraction gate: only elements opted in split
-        // the ray; the rest refract clean. (DIAG-OFF for testing.)
+        // the ray; the rest refract clean.
         float wantChroma = 0.0;
+        for (int j = 0; j < 48; j++) {
+            if (j >= elementsCount) break;
+            float2 c = glassPositions[j] + glassSizes[j] * 0.5;
+            float2 hSize = glassSizes[j] * 0.5;
+            if (abs(fragCoord.x - c.x) < hSize.x && abs(fragCoord.y - c.y) < hSize.y) {
+                wantChroma = max(wantChroma, chromaticFlags[j]);
+            }
+        }
         float4 color;
-        if (false && bendLen > 0.5 && wantChroma > 0.5) {
+        if (bendLen > 0.5 && wantChroma > 0.5) {
             float2 bendDir = bendVec / bendLen;
             float caPx = min(bendLen * 0.12, 2.5);
             float r = contents.eval(finalCoord + bendDir * caPx).r;

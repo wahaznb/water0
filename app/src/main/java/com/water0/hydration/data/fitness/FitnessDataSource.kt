@@ -34,6 +34,14 @@ class FitnessDataSource(private val context: Context) {
         false
     }
 
+    /** Provider present but too old: worth an update, not a dead end. */
+    fun needsUpdate(): Boolean = try {
+        HealthConnectClient.getSdkStatus(context) ==
+            HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED
+    } catch (_: Exception) {
+        false
+    }
+
     /** Raw permission strings, built by the library so the prefix
      * (`android.permission.health.*` since 1.1.x) always matches what
      * the permission contract validates — hardcoded old-prefix
@@ -44,8 +52,8 @@ class FitnessDataSource(private val context: Context) {
     )
 
     suspend fun hasPermissions(): Boolean = try {
-        client().permissionController.getGrantedPermissions()
-            .containsAll(readPermissions())
+        clientOrNull()?.permissionController?.getGrantedPermissions()
+            ?.containsAll(readPermissions()) == true
     } catch (_: Exception) {
         false
     }
@@ -54,7 +62,7 @@ class FitnessDataSource(private val context: Context) {
     suspend fun lastNightSleep(): SleepWindow? {
         return try {
             val end = Instant.now()
-            val latest = client().readRecords(
+            val latest = (clientOrNull() ?: return null).readRecords(
                 ReadRecordsRequest(
                     SleepSessionRecord::class,
                     timeRangeFilter = TimeRangeFilter.between(
@@ -80,7 +88,7 @@ class FitnessDataSource(private val context: Context) {
     suspend fun hadRecentWorkout(hoursBack: Long = 2): Boolean {
         return try {
             val end = Instant.now()
-            client().readRecords(
+            (clientOrNull() ?: return false).readRecords(
                 ReadRecordsRequest(
                     ExerciseSessionRecord::class,
                     timeRangeFilter = TimeRangeFilter.between(
@@ -93,8 +101,14 @@ class FitnessDataSource(private val context: Context) {
         }
     }
 
-    private fun client(): HealthConnectClient =
+    /** Central guard: getOrCreate throws with no provider on board
+     * (custom ROMs), so every caller goes through here instead of
+     * remembering its own try/catch. */
+    private fun clientOrNull(): HealthConnectClient? = try {
         HealthConnectClient.Companion.getOrCreate(context)
+    } catch (_: Exception) {
+        null
+    }
 
     companion object {
         fun requestContract() =

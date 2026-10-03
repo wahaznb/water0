@@ -530,6 +530,12 @@ private fun RemindersSection(profile: UserProfile, viewModel: SettingsViewModel)
         Slider(
             value = profile.reminderIntervalMinutes.toFloat(),
             onValueChange = { viewModel.updateReminderInterval(it.roundToInt()) },
+            // Timing edits re-fire the chain, otherwise the new cadence
+            // sits stale until the next tick, hours away.
+            onValueChangeFinished = {
+                com.water0.hydration.di.AppContainer
+                    .getNotificationScheduler(context).poke()
+            },
             valueRange = 30f..240f,
             steps = 6,
             enabled = profile.remindersEnabled
@@ -543,6 +549,10 @@ private fun RemindersSection(profile: UserProfile, viewModel: SettingsViewModel)
         Slider(
             value = profile.quietHoursStart.toFloat(),
             onValueChange = { viewModel.updateQuietHours(it.roundToInt(), profile.quietHoursEnd) },
+            onValueChangeFinished = {
+                com.water0.hydration.di.AppContainer
+                    .getNotificationScheduler(context).poke()
+            },
             valueRange = 0f..23f,
             steps = 22
         )
@@ -550,6 +560,10 @@ private fun RemindersSection(profile: UserProfile, viewModel: SettingsViewModel)
         Slider(
             value = profile.quietHoursEnd.toFloat(),
             onValueChange = { viewModel.updateQuietHours(profile.quietHoursStart, it.roundToInt()) },
+            onValueChangeFinished = {
+                com.water0.hydration.di.AppContainer
+                    .getNotificationScheduler(context).poke()
+            },
             valueRange = 0f..23f,
             steps = 22
         )
@@ -600,8 +614,12 @@ private fun FitnessSection() {
             sleepLine = null
             showConnect = false
             if (!source.isAvailable()) {
-                statusLine = "Health Connect isn't on this phone — " +
-                    "workouts and sleep stay manual."
+                statusLine = if (source.needsUpdate())
+                    "Health Connect is installed but needs an update — " +
+                        "hit Open Health Connect below, then Check again."
+                else
+                    "Health Connect isn't on this phone — " +
+                        "workouts and sleep stay manual."
                 return@launch
             }
             if (!source.hasPermissions()) {

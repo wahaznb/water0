@@ -94,14 +94,14 @@ class NotificationWorker(
         const val REMINDER_ID = 1002
         private const val FALLBACK_DELAY_MILLIS = 60 * 60 * 1000L
 
-        // Battery-friendly: the OS may defer us when the battery is low,
-        // and failures back off exponentially instead of hot-looping.
-        // This is what makes the chain cheap in the background: the
-        // system batches our work with other deferred jobs (Doze).
+        // Battery-friendly: failures back off exponentially instead of
+        // hot-looping, and the system batches our work with other
+        // deferred jobs (Doze). Deliberately NO battery-not-low gate:
+        // the job is a sub-second DB read + shade post, and gating it
+        // empties the persistent line on low-battery devices with no
+        // indication — exactly when a reminder is most useful.
         fun constraints(): Constraints =
-            Constraints.Builder()
-                .setRequiresBatteryNotLow(true)
-                .build()
+            Constraints.Builder().build()
 
         fun nextRequest(delayMillis: Long, show: Boolean): OneTimeWorkRequest =
             OneTimeWorkRequestBuilder<NotificationWorker>()
