@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.onSizeChanged
 import com.water0.hydration.ui.theme.glassCard
 import androidx.compose.ui.geometry.Offset
@@ -122,6 +124,28 @@ fun PaceCurveCard(
         // cursor + readout follow the finger.
         var touchFrac by remember { mutableStateOf<Float?>(null) }
         var plotWPx by remember { mutableFloatStateOf(1f) }
+        // Reveal sweep: the curve draws left to right every time Home
+        // (re)appears (pager disposes offscreen pages, so switching
+        // back replays it). Calm mode renders the full curve at once.
+        val reveal =
+            remember { androidx.compose.animation.core.Animatable(0f) }
+        val calmResolver = LocalContext.current.contentResolver
+        val calmReveal = try {
+            android.provider.Settings.Global.getFloat(
+                calmResolver,
+                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f
+            ) == 0f
+        } catch (_: Exception) {
+            false
+        }
+        LaunchedEffect(Unit) {
+            if (calmReveal) reveal.snapTo(1f)
+            else reveal.animateTo(
+                1f,
+                androidx.compose.animation.core.tween(durationMillis = 800)
+            )
+        }
         fun expectedAt(hour: Float) =
             (goalMl * ((hour - wakeHour + 1) / span).coerceIn(0f, 1f)).roundToInt()
         fun drunkAt(hour: Float) =
@@ -141,8 +165,8 @@ fun PaceCurveCard(
         com.water0.hydration.ui.theme.LensCard(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
-            blurOverride = 0.4f,
-            refraction = 0.6f,
+            blurOverride = 0.25f,
+            refraction = 0.35f,
             chromatic = 0f
         ) {
         Canvas(
@@ -193,25 +217,30 @@ fun PaceCurveCard(
             val endHour = minOf(nowHour, sleepHour.toFloat())
             if (endHour > wakeHour && steps.isNotEmpty()) {
                 val samples = 140
+                val drawUpTo =
+                    (samples * reveal.value).toInt().coerceIn(0, samples)
                 var px = x(wakeHour.toFloat())
                 var py = y(0f)
-                for (i in 1..samples) {
+                for (i in 1..drawUpTo) {
                     val hour = wakeHour + (endHour - wakeHour) * i / samples
                     val cx = x(hour)
                     val cy = y(absorbedAt(hour))
                     val mid = wakeHour + (endHour - wakeHour) * (i - 0.5f) / samples
                     val seg = if (absorbedAt(mid) >= expectedAt(mid)) green else red
-                    drawLine(seg, Offset(px, py), Offset(cx, cy), 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    drawLine(seg, Offset(px, py), Offset(cx, cy), 3.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
                     px = cx
                     py = cy
                 }
-                // Drink dots sit on the curve where each landed.
+                // Drink dots sit on the curve where each landed, joining
+                // the reveal as it passes them.
+                val dotUpTo =
+                    wakeHour + (endHour - wakeHour) * reveal.value
                 for ((hour, _) in steps) {
-                    if (hour > endHour) continue
+                    if (hour > endHour || hour > dotUpTo) continue
                     val dot = Offset(x(hour), y(absorbedAt(hour)))
                     val dotCol = if (absorbedAt(hour) >= expectedAt(hour)) green else red
-                    drawCircle(dotCol, 3.5.dp.toPx(), dot)
-                    drawCircle(Color.White.copy(alpha = 0.85f), 1.5.dp.toPx(), dot)
+                    drawCircle(dotCol, 4.5.dp.toPx(), dot)
+                    drawCircle(Color.White.copy(alpha = 0.85f), 2.dp.toPx(), dot)
                 }
             }
             // Now marker: green while under the diagonal (in the safe

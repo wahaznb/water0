@@ -191,16 +191,12 @@ fun GlassBoxScope.GlassBottomBar(
         modifier = Modifier.wrapContentSize()
     ) {
         // Selected capsule, drawn first so icons sit on top of it.
+        // No shadow: chrome carries no drop shadows (plate or dock).
         Box(
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .offset(x = pillX)
                 .size(width = pillW, height = pillH)
-                .shadow(
-                    elevation = 12.dp,
-                    shape = pillShape,
-                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
-                )
                 .clip(pillShape)
                 .background(
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
@@ -430,9 +426,10 @@ fun GlassBoxScope.LensPlate(
     options: (@Composable RowScope.() -> Unit)? = null
 ) {
     // TV Girl blue top lens: vivid blue #0351A3 from the Who Really Cares
-    // palette, at the Glass Lab tint strength.
+    // palette, at the Glass Lab tint strength. No elevation shadow on
+    // chrome (plate or dock); diffraction stays on (chromatic default).
     val params = remember(config) {
-        config.toLiquidParams(Color(0xFF0351A3))
+        config.toLiquidParams(Color(0xFF0351A3)).copy(elevation = 0.dp)
     }
     // Title: TV Girl blue in dark, pure black in light.
     val titleColor = if (isDarkScheme()) Color(0xFF0351A3) else Color.Black

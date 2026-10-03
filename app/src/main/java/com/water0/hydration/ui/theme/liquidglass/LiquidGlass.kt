@@ -359,6 +359,7 @@ private class GlassScopeFallbackImpl(private val density: Density) : GlassScope 
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun LiquidGlassContainer(
     modifier: Modifier = Modifier,
@@ -366,6 +367,12 @@ fun LiquidGlassContainer(
     glassContent: @Composable GlassBoxScope.() -> Unit,
 ) {
     val density = LocalDensity.current
+    // Overscroll stretch killed for BOTH layers: lists live in content
+    // but the kill used to sit in the glass layer, so flings stretched
+    // content while the lens stayed put.
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.foundation.LocalOverscrollConfiguration provides null
+    ) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         val glassScope = remember { GlassScopeImpl(density) }
         androidx.compose.runtime.CompositionLocalProvider(
@@ -381,6 +388,7 @@ fun LiquidGlassContainer(
             GlassContainerFallback(modifier, content, glassContent, glassScope)
         }
     }
+    } // overscroll-kill provider
 }
 
 @SuppressLint("NewApi")

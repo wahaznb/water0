@@ -215,8 +215,8 @@ class MainActivity : ComponentActivity() {
                 // height reserves the content inset; the toast is lifted
                 // above it for the same reason.
                 // Every successful log/delete refreshes the persistent shade
-                // line within seconds (poke = 10s primer work). Skips the
-                // initial 0 so launch doesn't double-schedule.
+                // line immediately (direct post) and re-primes the chain.
+                // Skips the initial 0 so launch doesn't double-schedule.
                 LaunchedEffect(Unit) {
                     var first = true
                     viewModel.dataChanged.collect {
@@ -225,6 +225,11 @@ class MainActivity : ComponentActivity() {
                             return@collect
                         }
                         AppContainer.getNotificationScheduler(this@MainActivity).poke()
+                        try {
+                            com.water0.hydration.presentation.notification
+                                .showStatusNotifications(this@MainActivity)
+                        } catch (_: Exception) {
+                        }
                     }
                 }
                 val snackbarHostState = remember { SnackbarHostState() }
