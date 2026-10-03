@@ -56,6 +56,23 @@ class FitnessDataSource(private val context: Context) {
         "check failed (${e.javaClass.simpleName})"
     }
 
+    /** Which permission road the 1.1.x contract takes on this phone:
+     * platform runtime-permissions sheet vs provider-app sheet. */
+    fun requestIntentLine(): String = try {
+        val intent = requestContract().createIntent(context, readPermissions())
+        "sheet: action=${intent.action} pkg=${intent.`package`}"
+    } catch (e: Exception) {
+        "sheet failed: ${e.javaClass.simpleName}"
+    }
+
+    /** What the provider says we hold right now (or why we can't ask). */
+    suspend fun grantedLine(): String = try {
+        val g = clientOrNull()?.permissionController?.getGrantedPermissions()
+        "granted: " + (g?.sorted()?.joinToString() ?: "no client")
+    } catch (e: Exception) {
+        "granted check failed: ${e.javaClass.simpleName}"
+    }
+
     /** Raw permission strings, built by the library so the prefix
      * (`android.permission.health.*` since 1.1.x) always matches what
      * the permission contract validates — hardcoded old-prefix

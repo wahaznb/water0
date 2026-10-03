@@ -152,8 +152,10 @@ fun GlassBoxScope.GlassBottomBar(
     // never morphs. Deeper, softer shadow sells the thickness. Touch
     // glow below is a blurred disc (no gradient math — dot-class
     // retired for good).
-    val pillW = 54.dp
-    val pillH = 42.dp
+    // Big dock: wide cells and a capsule to match — the slim build
+    // read too small on real phones.
+    val pillW = 70.dp
+    val pillH = 54.dp
     val pillShape = RoundedCornerShape(50)
     val pillX by animateDpAsState(
         targetValue = with(density) {
@@ -278,7 +280,7 @@ fun GlassBoxScope.GlassBottomBar(
                         }
                     )
                 }
-                .padding(horizontal = 8.dp, vertical = 12.dp),
+                .padding(horizontal = 10.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -287,12 +289,12 @@ fun GlassBoxScope.GlassBottomBar(
                     selected = index == activeIndex,
                     animated = !calmMode,
                     onClick = { onSelect(tab.route) },
-                    modifier = Modifier.width(60.dp),
+                    modifier = Modifier.width(80.dp),
                     icon = {
                         Icon(
                             tab.icon,
                             contentDescription = tab.label,
-                            modifier = Modifier.size(34.dp)
+                            modifier = Modifier.size(46.dp)
                         )
                     }
                 )
@@ -393,7 +395,7 @@ private fun GlassTab(
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.size(60.dp)
+            modifier = Modifier.size(72.dp)
         ) {
             Box(
                 contentAlignment = Alignment.Center,

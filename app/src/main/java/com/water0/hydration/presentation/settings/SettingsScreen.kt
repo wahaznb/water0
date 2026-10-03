@@ -609,12 +609,14 @@ private fun FitnessSection() {
     var sleepLine by remember { mutableStateOf<String?>(null) }
     var showConnect by remember { mutableStateOf(false) }
     var providerLine by remember { mutableStateOf<String?>(null) }
+    var diagLine by remember { mutableStateOf<String?>(null) }
 
     fun refresh() {
         scope.launch {
             sleepLine = null
             showConnect = false
             providerLine = "Provider: ${source.sdkStatusName()}"
+            diagLine = source.requestIntentLine() + "\n" + source.grantedLine()
             if (!source.isAvailable()) {
                 statusLine = if (source.needsUpdate())
                     "Health Connect is installed but needs an update — " +
@@ -645,7 +647,8 @@ private fun FitnessSection() {
         com.water0.hydration.data.fitness.FitnessDataSource.requestContract()
     ) { granted ->
         if (granted.isNotEmpty()) refresh()
-        else statusLine = "Not connected — tap anytime to try again."
+        else statusLine = "Permission sheet returned empty — allow Sleep " +
+            "+ Exercise inside Health Connect, then Check again."
     }
 
     SectionCard(title = "Fitness") {
@@ -655,6 +658,13 @@ private fun FitnessSection() {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         providerLine?.let {
+            Text(
+                text = it,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        }
+        diagLine?.let {
             Text(
                 text = it,
                 fontSize = 11.sp,
