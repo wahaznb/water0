@@ -53,7 +53,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.selected
@@ -156,6 +159,18 @@ fun GlassBoxScope.GlassBottomBar(
     // Press glow state: pooled light at the finger, eased in fast,
     // out soft. Blur disc, never a gradient.
     var touchX by remember { mutableStateOf<Float?>(null) }
+    // Scrub velocity (px/ms, smoothed): fast fingers stretch the
+    // bubble along the motion; it relaxes as the finger slows.
+    var fingerVel by remember { mutableFloatStateOf(0f) }
+    var lastFinger by remember { mutableStateOf<Pair<Float, Long>?>(null) }
+    // Decay while held: no move events means the finger stopped.
+    LaunchedEffect(touchX != null || fingerX != null) {
+        while (touchX != null || fingerX != null) {
+            kotlinx.coroutines.delay(50)
+            fingerVel *= 0.75f
+            if (kotlin.math.abs(fingerVel) < 0.05f) fingerVel = 0f
+        }
+    }
     val glowAlpha by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (touchX != null) 1f else 0f,
         animationSpec = androidx.compose.animation.core.tween(durationMillis = 150),
@@ -176,13 +191,16 @@ fun GlassBoxScope.GlassBottomBar(
     // follows the finger 1:1 while pressed/scrubbing, grows and goes
     // more rectangular under the finger, glides home on release.
     val fingerDown = touchX != null || fingerX != null
+    val stretch = if (calmMode) 0.dp else
+        (kotlin.math.abs(fingerVel) * 6f).coerceIn(0f, 26f).dp
     val pillW by animateDpAsState(
-        targetValue = if (fingerDown && !calmMode) 104.dp else 88.dp,
+        targetValue = (if (fingerDown && !calmMode) 104.dp else 88.dp) + stretch,
         animationSpec = spring(dampingRatio = 0.75f, stiffness = 300f),
         label = "pillW"
     )
     val pillH by animateDpAsState(
-        targetValue = if (fingerDown && !calmMode) 66.dp else 58.dp,
+        targetValue = ((if (fingerDown && !calmMode) 66.dp else 58.dp) -
+            stretch * 0.35f).coerceAtLeast(46.dp),
         animationSpec = spring(dampingRatio = 0.75f, stiffness = 300f),
         label = "pillH"
     )
@@ -192,6 +210,10 @@ fun GlassBoxScope.GlassBottomBar(
         label = "pillCorner"
     )
     val pillShape = RoundedCornerShape(pillCorner)
+    // Overflow: the bubble stands taller than the bar and bulges past
+    // its edges (reference behavior). Layout reports the bar height;
+    // the extra draws outside it.
+    val overflowExtra = (pillH - 54.dp).coerceAtLeast(0.dp)
     val pillAnchorX = (touchX ?: fingerX)
         ?: tabCenterPx(selectedIndex)
     val pillX by animateDpAsState(
@@ -220,12 +242,18 @@ fun GlassBoxScope.GlassBottomBar(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .offset(x = pillX)
-                    .size(width = pillW, height = pillH),
+                    .size(width = pillW, height = pillH)
+                    .bubbleOverflow(overflowExtra),
                 params = params.copy(
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                    // Calmer rim than the bar: the bubble bends less, so its
+                    // fringe over bright text stays a whisper (0.35), not
+                    // rainbows. Bar and plate keep full strength.
+                    scale = params.scale * 0.7f,
+                    centerDistortion = params.centerDistortion * 0.7f
                 ),
                 shape = pillShape,
-                chromatic = 1f,
+                chromatic = 0.35f,
                 content = { }
             )
         }
@@ -258,6 +286,8 @@ fun GlassBoxScope.GlassBottomBar(
                     detectTapGestures(
                         onPress = { offset ->
                             touchX = offset.x
+                            fingerVel = 0f
+                            lastFinger = null
                             haptics.performHapticFeedback(
                                 HapticFeedbackType.LongPress
                             )
@@ -265,6 +295,8 @@ fun GlassBoxScope.GlassBottomBar(
                                 awaitRelease()
                             } finally {
                                 touchX = null
+                                fingerVel = 0f
+                                lastFinger = null
                             }
                         }
                     )
@@ -273,6 +305,8 @@ fun GlassBoxScope.GlassBottomBar(
                     detectDragGesturesAfterLongPress(
                         onDragStart = { offset ->
                             fingerX = offset.x
+                            fingerVel = 0f
+                            lastFinger = offset.x to android.os.SystemClock.uptimeMillis()
                             val idx = indexAt(offset.x)
                             if (idx != dragIndex) {
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -282,13 +316,24 @@ fun GlassBoxScope.GlassBottomBar(
                         onDragCancel = {
                             dragIndex = null
                             fingerX = null
+                            fingerVel = 0f
+                            lastFinger = null
                         },
                         onDragEnd = {
                             dragIndex?.let { onSelect(TABS[it].route) }
                             dragIndex = null
                             fingerX = null
+                            fingerVel = 0f
+                            lastFinger = null
                         },
                         onDrag = { change, _ ->
+                            val nowMs = android.os.SystemClock.uptimeMillis()
+                            lastFinger?.let { (lx, lt) ->
+                                val dt = (nowMs - lt).coerceAtLeast(1L)
+                                val v = (change.position.x - lx) / dt
+                                fingerVel = fingerVel * 0.6f + v * 0.4f
+                            }
+                            lastFinger = change.position.x to nowMs
                             fingerX = change.position.x
                             val idx = indexAt(change.position.x)
                             if (idx != dragIndex) {
@@ -299,7 +344,7 @@ fun GlassBoxScope.GlassBottomBar(
                         }
                     )
                 }
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 12.dp, vertical = 5.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -372,6 +417,19 @@ fun GlassBoxScope.GlassBottomBar(
             }
         }
 }
+
+/**
+ * Draws [extra] taller than the parent grants: the parent wraps the
+ * bar height while the bubble bulges past its top and bottom edges.
+ */
+private fun Modifier.bubbleOverflow(extra: androidx.compose.ui.unit.Dp) =
+    this.layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        val e = extra.roundToPx()
+        layout(placeable.width, (placeable.height - e).coerceAtLeast(0)) {
+            placeable.place(0, -e / 2)
+        }
+    }
 
 @Composable
 private fun GlassTab(

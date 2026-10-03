@@ -399,9 +399,13 @@ private fun GlassContainerWithShader(
     glassContent: @Composable GlassBoxScope.() -> Unit,
     glassScope: GlassScopeImpl,
 ) {
-    val shader = remember(glassScope.updateCounter) {
+    // Compiled once — never keyed on lens movement. (Keying it on the
+    // update counter recompiled AGSL every animation frame.)
+    val shader = remember {
         RuntimeShader(GLASS_DISPLACEMENT_SHADER)
     }
+    @Suppress("UNUSED_EXPRESSION")
+    glassScope.updateCounter
 
     Box(
         modifier = modifier
@@ -689,18 +693,18 @@ private val GLASS_DISPLACEMENT_SHADER = """
         // sharp samples and blurring after mixes the channels back
         // together (fringe only survived at blur zero). Shifting R/B
         // gathers in opposite directions keeps the fringe at any blur.
-        float doChroma = (bendLen > 0.5 && wantChroma > 0.5) ? 1.0 : 0.0;
+        float doChroma = (bendLen > 0.5 && wantChroma > 0.01) ? 1.0 : 0.0;
         float2 bendDir = doChroma > 0.5 ? bendVec / bendLen : float2(0.0);
-        float caPx = min(bendLen * 0.12, 2.5);
+        float caPx = min(bendLen * 0.12, 2.5) * wantChroma;
         float4 color;
         if (blurRadius > 0.0) {
             float4 blurredColor = float4(0.0);
             float totalWeight = 0.0;
             float invRadius = 1.0 / max(blurRadius, 1.0);
 
-            for (int dx = -5; dx <= 5; dx++) {
-                for (int dy = -5; dy <= 5; dy++) {
-                    float2 offset = float2(float(dx), float(dy)) * blurRadius * 0.4;
+            for (int dx = -3; dx <= 3; dx++) {
+                for (int dy = -3; dy <= 3; dy++) {
+                    float2 offset = float2(float(dx), float(dy)) * blurRadius * 0.66;
                     float distance = length(offset) * invRadius;
                     float weight = exp(-distance * distance * 2.0);
                     float4 tap = contents.eval(finalCoord + offset);
