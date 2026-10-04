@@ -1,0 +1,81 @@
+{
+  "config": {
+    "users": 300,
+    "days": 60,
+    "seeds": 3,
+    "responsiveness": [
+      0.2,
+      0.5,
+      0.8
+    ],
+    "out": "reports/coach_simulation.json"
+  },
+  "by_responsiveness": {
+    "0.2": {
+      "control": {
+        "users": 900,
+        "goal_met_rate_mean": 0.391,
+        "goal_met_rate_p10_p90": [
+          0.1,
+          0.717
+        ],
+        "median_pct_of_goal_mean": 91.0
+      },
+      "coached": {
+        "users": 900,
+        "goal_met_rate_mean": 0.536,
+        "goal_met_rate_p10_p90": [
+          0.217,
+          0.833
+        ],
+        "median_pct_of_goal_mean": 104.1,
+        "nudges_per_day_mean": 5.8
+      },
+      "lift_pp": 14.5
+    },
+    "0.5": {
+      "control": {
+        "users": 900,
+        "goal_met_rate_mean": 0.393,
+        "goal_met_rate_p10_p90": [
+          0.1,
+          0.733
+        ],
+        "median_pct_of_goal_mean": 91.0
+      },
+      "coached": {
+        "users": 900,
+        "goal_met_rate_mean": 0.762,
+        "goal_met_rate_p10_p90": [
+          0.533,
+          0.95
+        ],
+        "median_pct_of_goal_mean": 116.6,
+        "nudges_per_day_mean": 5.2
+      },
+      "lift_pp": 36.9
+    },
+    "0.8": {
+      "control": {
+        "users": 900,
+        "goal_met_rate_mean": 0.395,
+        "goal_met_rate_p10_p90": [
+          0.117,
+          0.733
+        ],
+        "median_pct_of_goal_mean": 91.0
+      },
+      "coached": {
+        "users": 900,
+        "goal_met_rate_mean": 0.878,
+        "goal_met_rate_p10_p90": [
+          0.75,
+          0.983
+        ],
+        "median_pct_of_goal_mean": 121.5,
+        "nudges_per_day_mean": 4.2
+      },
+      "lift_pp": 48.3
+    }
+  }
+}
