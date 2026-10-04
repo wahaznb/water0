@@ -3,6 +3,39 @@
 All notable changes to Water0 are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+- Refracting tab bubble: a real lens that follows the finger 1:1 on
+  press/scrub, grows and goes rectangular under the finger, bulges
+  past the bar edges, stretches with scrub velocity, springs home on
+  release (press glow, haptics, calm-mode static, selected trait)
+- Labeled dock tabs (icon + name) in a wide short pill; sliding
+  capsule replaced the old circle
+- Pace curve draws left-to-right when Home (re)appears (calm-aware)
+- Health Connect Fitness diagnostics: provider status, permission
+  request route, granted set (for ROM-specific failures)
+
+### Changed
+- Lens scope shared by both layers: graphs, buttons, and chips
+  refract, not just top plate and dock
+- Chromatic fringe computed inside the blur kernel (survives any
+  blur) with per-surface strength; bubble rim kept subtle
+- Pace curve follows body-water absorption (exponential, ~25 min)
+  instead of stairs; plot-only lenses keep titles readable
+- Shade status line posts synchronously on every log/delete
+- Overscroll stretch disabled (content used to stretch past the end
+  while the lens stayed put)
+
+### Fixed
+- Fullscreen dock bug (tab row parked at the top covering the screen)
+- Diagonal screen smear (a fullscreen lens refracted everything)
+- Ghost lens frames after tab switches (shader now compiles once)
+- Health Connect never connecting: missing manifest permission
+  declarations (provider available, grant impossible)
+- Stale shade on low battery (dropped the battery gate), missed
+  fast-boot resumes, stale timing after slider edits
+
 ## [0.3-beta] - 2026-09-29
 
 ### Added
