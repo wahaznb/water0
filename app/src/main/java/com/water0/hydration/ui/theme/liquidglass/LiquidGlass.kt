@@ -121,6 +121,7 @@ interface GlassScope {
         blur: Float,
         scale: Float,
         centerDistortion: Float,
+        cornerRadiusPx: Float? = null,
     )
     fun Modifier.glassBackground(
         id: Long,
@@ -152,6 +153,10 @@ fun GlassScope.LiquidGlassBox(
     params: LiquidParams,
     shape: CornerBasedShape = RoundedCornerShape(0.dp),
     chromatic: Float = 1f,
+    // Explicit corner radius in px for lenses whose drawn shape animates
+    // without a layout change (dock bubble): keeps the fringe glued to
+    // the visible outline. Null = radius from registration geometry.
+    cornerRadiusPx: Float? = null,
     content: @Composable BoxScope.() -> Unit = { },
 ) {
     val id = remember { Random.nextLong() }
@@ -170,7 +175,8 @@ fun GlassScope.LiquidGlassBox(
             params.warpEdges.coerceIn(0f, 1f),
             chromatic, params.blur.coerceIn(0f, 1f),
             params.scale.coerceIn(0f, 1f),
-            params.centerDistortion.coerceIn(0f, 1f)
+            params.centerDistortion.coerceIn(0f, 1f),
+            cornerRadiusPx
         )
     }
     Box(
@@ -225,20 +231,24 @@ private class GlassScopeImpl(private val density: Density) : GlassScope {
         blur: Float,
         scale: Float,
         centerDistortion: Float,
+        cornerRadiusPx: Float?,
     ) {
         val i = elements.indexOfFirst { it.id == id }
         if (i == -1) return
         val e = elements[i]
+        val radius = cornerRadiusPx ?: e.cornerRadius
         if (e.tint != tint || e.darkness != darkness ||
             e.warpEdges != warpEdges || e.chromatic != chromatic ||
             e.blur != blur || e.scale != scale ||
-            e.centerDistortion != centerDistortion
+            e.centerDistortion != centerDistortion ||
+            e.cornerRadius != radius
         ) {
             elements[i] = e.copy(
                 tint = tint, darkness = darkness,
                 warpEdges = warpEdges, chromatic = chromatic,
                 blur = blur, scale = scale,
-                centerDistortion = centerDistortion
+                centerDistortion = centerDistortion,
+                cornerRadius = radius
             )
             updateCounter++
         }
@@ -295,6 +305,7 @@ private class GlassScopeFallbackImpl(private val density: Density) : GlassScope 
         blur: Float,
         scale: Float,
         centerDistortion: Float,
+        cornerRadiusPx: Float?,
     ) = Unit
 
     override fun Modifier.glassBackground(

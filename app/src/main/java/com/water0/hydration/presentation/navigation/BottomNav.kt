@@ -3,7 +3,7 @@ package com.water0.hydration.presentation.navigation
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
@@ -56,7 +57,6 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.selected
@@ -210,18 +210,14 @@ fun GlassBoxScope.GlassBottomBar(
         label = "pillCorner"
     )
     val pillShape = RoundedCornerShape(pillCorner)
-    // Overflow: the bubble stands taller than the bar and bulges past
-    // its edges (reference behavior). Layout reports the bar height;
-    // the extra draws outside it.
-    val overflowExtra = (pillH - 54.dp).coerceAtLeast(0.dp)
     val pillAnchorX = (touchX ?: fingerX)
         ?: tabCenterPx(selectedIndex)
     val pillX by animateDpAsState(
         targetValue = with(density) {
             pillAnchorX.toDp() - pillW / 2
         },
-        // Finger tracking stays tight; tab-to-tab glides spring.
-        animationSpec = if (fingerDown) tween(durationMillis = 80)
+        // Finger tracking is instant (snap); tab-to-tab glides spring.
+        animationSpec = if (fingerDown) snap()
         else spring(
             dampingRatio = 0.75f,
             stiffness = 300f
@@ -229,10 +225,14 @@ fun GlassBoxScope.GlassBottomBar(
         label = "tabPill"
     )
 
+    // Inner bar height, fixed: taps grow the bubble, never the bar.
+    val barH = 56.dp
     @Composable
     fun BoxScope.DockInner() {
     Box(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(barH)
     ) {
         // Selected bubble, drawn first so tabs sit on top of it. A real
         // lens with no children: pure backdrop refraction, like the
@@ -242,10 +242,10 @@ fun GlassBoxScope.GlassBottomBar(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .offset(x = pillX)
-                    .size(width = pillW, height = pillH)
-                    .bubbleOverflow(overflowExtra),
+                    .size(width = pillW, height = pillH),
                 params = params.copy(
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                    // Pink bubble tint, per request.
+                    tint = Color(0xFFEE2689).copy(alpha = 0.28f),
                     // Calmer rim than the bar: the bubble bends less, so its
                     // fringe over bright text stays a whisper (0.35), not
                     // rainbows. Bar and plate keep full strength.
@@ -254,6 +254,7 @@ fun GlassBoxScope.GlassBottomBar(
                 ),
                 shape = pillShape,
                 chromatic = 0.35f,
+                cornerRadiusPx = with(density) { pillCorner.toPx() },
                 content = { }
             )
         }
@@ -281,6 +282,7 @@ fun GlassBoxScope.GlassBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .align(Alignment.Center)
                 .onSizeChanged { rowWidthPx = it.width.toFloat() }
                 .pointerInput(Unit) {
                     detectTapGestures(
@@ -417,19 +419,6 @@ fun GlassBoxScope.GlassBottomBar(
             }
         }
 }
-
-/**
- * Draws [extra] taller than the parent grants: the parent wraps the
- * bar height while the bubble bulges past its top and bottom edges.
- */
-private fun Modifier.bubbleOverflow(extra: androidx.compose.ui.unit.Dp) =
-    this.layout { measurable, constraints ->
-        val placeable = measurable.measure(constraints)
-        val e = extra.roundToPx()
-        layout(placeable.width, (placeable.height - e).coerceAtLeast(0)) {
-            placeable.place(0, -e / 2)
-        }
-    }
 
 @Composable
 private fun GlassTab(
