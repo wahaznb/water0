@@ -252,17 +252,16 @@ fun GlassBoxScope.GlassBottomBar(
             .fillMaxWidth()
             .height(barH)
     ) {
-        // Inner glass travel band: 6dp frost margins on all four sides
-        // (66dp in a 78dp bar), same 29dp corners as the bubble. Uniform
-        // inner-to-outer spacing all the way around, seamless end merges.
-        // Micro bend + fringe against the frost shell.
+        // Inner glass travel band: EXACT bubble geometry (58dp tall,
+        // 29dp corners) so band and bubble share one edge everywhere.
+        // Frost margins live between band and bar shell instead.
         with(this@GlassBottomBar) {
             LiquidGlassBox(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .fillMaxWidth()
                     .padding(horizontal = 6.dp)
-                    .height(66.dp),
+                    .height(58.dp),
                 params = params.copy(
                     tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
                 ),

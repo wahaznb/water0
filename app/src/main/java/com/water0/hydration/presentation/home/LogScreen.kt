@@ -351,7 +351,9 @@ private fun PressableGlassChip(
         warpEdges = 0.06f,
         chromatic = if (pressed) 0.6f else 0.3f,
         elevation = 0.dp,
-        modifier = modifier
+        // Locked height: selected and unselected chips can never sit
+        // at different heights on any device, font scale, or state.
+        modifier = modifier.height(48.dp)
     ) {
         FilterChip(
             selected = selected,
