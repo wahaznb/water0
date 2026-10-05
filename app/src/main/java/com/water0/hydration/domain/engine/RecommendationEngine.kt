@@ -89,10 +89,13 @@ class RecommendationEngine {
     }
 
     fun calculateDailyGoal(profile: UserProfile): DailyGoal {
-        val base = (profile.sex.baseMlPerKg * profile.weightKg * profile.activityLevel.multiplier).roundToInt()
+        // Base excludes the activity multiplier so the three line items
+        // actually sum to the total (the old base folded the multiplier in
+        // and then never added activityExtra — the breakdown didn't add up).
+        val base = (profile.sex.baseMlPerKg * profile.weightKg).roundToInt()
         val activityExtra = (base * (profile.activityLevel.multiplier - 1f)).roundToInt()
         val climateExtra = profile.climate.extraMlPerDay
-        val total = base + climateExtra
+        val total = base + activityExtra + climateExtra
         return DailyGoal(base, activityExtra, climateExtra, total)
     }
 

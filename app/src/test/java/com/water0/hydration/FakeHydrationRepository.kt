@@ -57,7 +57,7 @@ class FakeHydrationRepository(
     override suspend fun getRecentEntries(limit: Int): List<HydrationEntry> =
         entries.value.sortedByDescending { it.timestamp }.take(limit)
 
-    override fun getUserProfile(): Flow<UserProfile> = profile
+    override fun getUserProfile(): Flow<UserProfile?> = profile
 
     override suspend fun getUserProfileSuspend(): UserProfile? = profile.value
 
@@ -65,7 +65,7 @@ class FakeHydrationRepository(
         profile.value = newProfile
     }
 
-    override fun getUserBehavior(): Flow<UserBehavior> = behavior
+    override fun getUserBehavior(): Flow<UserBehavior?> = behavior
 
     override suspend fun getUserBehaviorSuspend(): UserBehavior? = behavior.value
 
@@ -75,6 +75,10 @@ class FakeHydrationRepository(
 
     override suspend fun onWaterLogged(amountMl: Int, drinkType: HydrationEntry.DrinkType) {
         behavior.value = behavior.value.updateOnLog(amountMl, drinkType)
+    }
+
+    override suspend fun onReminderShown() {
+        behavior.value = behavior.value.onReminderShown()
     }
 
     override suspend fun getLastNightSleep():

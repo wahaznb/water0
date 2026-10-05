@@ -30,13 +30,23 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Real response tracking for the adaptive reminder interval:
+        // logs-within-30-min-of-a-tick count, everything else doesn't.
+        // Zeroed history starts neutral (0.5 default stays in code).
+        db.execSQL("ALTER TABLE user_behavior ADD COLUMN responses INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE user_behavior ADD COLUMN lastReminderMs INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
 @Database(
     entities = [
         HydrationEntry::class,
         UserProfile::class,
         UserBehavior::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -57,7 +67,7 @@ abstract class HydrationDatabase : RoomDatabase() {
                     HydrationDatabase::class.java,
                     "water0_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

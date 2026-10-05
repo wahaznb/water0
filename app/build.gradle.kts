@@ -1,6 +1,3 @@
-import java.text.SimpleDateFormat
-import java.util.Date
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -22,6 +19,9 @@ android {
         vectorDrawables.useSupportLibrary = true
         // Build number = commit count (which source), plus wall-clock
         // stamp (which binary — two APKs from one commit differ).
+        // The stamp is the COMMIT time, not build time: F-Droid requires
+        // reproducible builds, and a wall-clock stamp makes two builds
+        // from one commit produce different APKs.
         val buildNumber = try {
             providers.exec {
                 commandLine("git", "rev-list", "--count", "HEAD")
@@ -30,7 +30,13 @@ android {
             0
         }
         buildConfigField("int", "BUILD_NUMBER", "$buildNumber")
-        val stamp = SimpleDateFormat("MMdd-HHmm").format(Date())
+        val stamp = try {
+            providers.exec {
+                commandLine("git", "show", "-s", "--format=%ct", "HEAD")
+            }.standardOutput.asText.get().trim()
+        } catch (_: Exception) {
+            "0"
+        }
         buildConfigField("String", "BUILD_STAMP", "\"$stamp\"")
     }
     
@@ -103,7 +109,9 @@ dependencies {
     // when the provider is missing).
     implementation(libs.health.connect.client)
     testImplementation(libs.junit)
-    testImplementation(libs.junit.jupiter)
+    // JUnit 4 only — no Jupiter: with jupiter on the classpath Gradle
+    // runs the JUnit Platform, which cannot discover JUnit 4 tests
+    // without the vintage engine. Tests would "pass" having run zero.
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.espresso.core)

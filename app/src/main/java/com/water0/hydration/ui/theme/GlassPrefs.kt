@@ -17,7 +17,7 @@ class GlassPrefs(private val prefs: SharedPreferences) {
         tintAlpha = prefs.getFloat(KEY_TINT, GlassConfig.Defaults.TINT_ALPHA),
         dockCorner = prefs.getInt(KEY_DOCK_DP, 42).dp.coerceAtMost(45.dp),
         backgroundOn = prefs.getBoolean(KEY_BG_ON, true),
-        cardGlass = prefs.getBoolean(KEY_CARD_GLASS, false),
+        cardGlass = prefs.getBoolean(KEY_CARD_GLASS, true),
         glassClarity = prefs.getFloat(KEY_GLASS_CLARITY, 0.5f),
         dockLens = prefs.getBoolean(KEY_DOCK_LENS, true)
     )

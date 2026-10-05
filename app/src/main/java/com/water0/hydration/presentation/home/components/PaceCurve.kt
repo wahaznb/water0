@@ -29,6 +29,7 @@ import com.water0.hydration.ui.theme.glassCard
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -165,8 +166,8 @@ fun PaceCurveCard(
         com.water0.hydration.ui.theme.LensCard(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
-            blurOverride = 0.25f,
-            refraction = 0.35f,
+            blurOverride = 0.1f,
+            refraction = 0.3f,
             chromatic = 0f
         ) {
         Canvas(
@@ -219,6 +220,33 @@ fun PaceCurveCard(
                 val samples = 140
                 val drawUpTo =
                     (samples * reveal.value).toInt().coerceIn(0, samples)
+                // Area fill under the curve (CaffeineHealth language):
+                // standing color washing out downward, line drawn over it.
+                if (drawUpTo > 0) {
+                    val lastHour =
+                        wakeHour + (endHour - wakeHour) * drawUpTo / samples
+                    val fillPath = Path().apply {
+                        moveTo(x(wakeHour.toFloat()), h)
+                        lineTo(x(wakeHour.toFloat()), y(0f))
+                        for (i in 1..drawUpTo) {
+                            val hour = wakeHour + (endHour - wakeHour) * i / samples
+                            lineTo(x(hour), y(absorbedAt(hour)))
+                        }
+                        lineTo(x(lastHour), h)
+                        close()
+                    }
+                    val fillCol =
+                        if (absorbedAt(lastHour) >= expectedAt(lastHour)) green else red
+                    drawPath(
+                        fillPath,
+                        Brush.verticalGradient(
+                            listOf(
+                                fillCol.copy(alpha = 0.28f),
+                                fillCol.copy(alpha = 0f)
+                            )
+                        )
+                    )
+                }
                 var px = x(wakeHour.toFloat())
                 var py = y(0f)
                 for (i in 1..drawUpTo) {

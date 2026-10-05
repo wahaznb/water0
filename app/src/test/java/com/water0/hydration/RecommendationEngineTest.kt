@@ -54,10 +54,10 @@ class RecommendationEngineTest {
 
     @Test
     fun `daily goal applies weight, activity and climate`() {
-        // base = 33 * 70 * 1.2 = 2772; activity extra = 2772 * 0.2 = 554
+        // base = 33 * 70 = 2310; activity extra = 2310 * 0.2 = 462
         val goal = engine.calculateDailyGoal(profile)
-        assertEquals(2772, goal.baseMl)
-        assertEquals(554, goal.activityExtraMl)
+        assertEquals(2310, goal.baseMl)
+        assertEquals(462, goal.activityExtraMl)
         assertEquals(200, goal.climateExtraMl)
         assertEquals(2972, goal.totalMl)
     }
@@ -370,10 +370,10 @@ class RecommendationEngineTest {
     @Test
     fun `female base uses 31ml per kg`() {
         val female = profile.copy(sex = UserProfile.Sex.FEMALE)
-        // base = 31 * 70 * 1.2 = 2604; extra = 2604 * 0.2 = 521 (rounded)
+        // base = 31 * 70 = 2170; extra = 2170 * 0.2 = 434 (rounded)
         val goal = engine.calculateDailyGoal(female)
-        assertEquals(2604, goal.baseMl)
-        assertEquals(521, goal.activityExtraMl)
+        assertEquals(2170, goal.baseMl)
+        assertEquals(434, goal.activityExtraMl)
         assertEquals(200, goal.climateExtraMl)
         assertEquals(2804, goal.totalMl)
     }
@@ -382,7 +382,7 @@ class RecommendationEngineTest {
     fun `male base uses 33ml per kg`() {
         val male = profile.copy(sex = UserProfile.Sex.MALE)
         val goal = engine.calculateDailyGoal(male)
-        assertEquals(2772, goal.baseMl)
+        assertEquals(2310, goal.baseMl)
         assertEquals(2972, goal.totalMl)
     }
 

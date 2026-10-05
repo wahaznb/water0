@@ -6,6 +6,7 @@ import com.water0.hydration.data.local.dao.UserProfileDao
 import com.water0.hydration.data.local.entity.HydrationEntry
 import com.water0.hydration.data.local.entity.UserBehavior
 import com.water0.hydration.data.local.entity.UserProfile
+import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -44,22 +45,43 @@ class HydrationRepositoryImpl(
 
     override suspend fun getRecentEntries(limit: Int): List<HydrationEntry> = entryDao.getRecentEntries(limit)
 
-    override fun getUserProfile(): Flow<UserProfile> = profileDao.getProfile()
+    override fun getUserProfile(): Flow<UserProfile?> = profileDao.getProfile()
 
     override suspend fun getUserProfileSuspend(): UserProfile? = profileDao.getProfileSuspend()
 
     override suspend fun updateUserProfile(profile: UserProfile) { profileDao.update(profile) }
 
-    override fun getUserBehavior(): Flow<UserBehavior> = behaviorDao.getBehavior()
+    override fun getUserBehavior(): Flow<UserBehavior?> = behaviorDao.getBehavior()
 
     override suspend fun getUserBehaviorSuspend(): UserBehavior? = behaviorDao.getBehaviorSuspend()
 
     override suspend fun updateUserBehavior(behavior: UserBehavior) { behaviorDao.update(behavior) }
 
     override suspend fun onWaterLogged(amountMl: Int, drinkType: HydrationEntry.DrinkType) {
-        val currentBehavior = getUserBehaviorSuspend() ?: UserBehavior()
-        val updatedBehavior = currentBehavior.updateOnLog(amountMl, drinkType)
-        behaviorDao.update(updatedBehavior)
+        // Atomic read-modify-write: two rapid logs (or a notification
+        // +1 and a manual log) could lost-update the behavior row, and
+        // a process death between insert and this would log water
+        // without updating behavior.
+        appContext?.let { ctx ->
+            com.water0.hydration.di.AppContainer.getDatabase(ctx).withTransaction {
+                val current = behaviorDao.getBehaviorSuspend() ?: UserBehavior()
+                behaviorDao.update(current.updateOnLog(amountMl, drinkType))
+            }
+        } ?: run {
+            val currentBehavior = getUserBehaviorSuspend() ?: UserBehavior()
+            behaviorDao.update(currentBehavior.updateOnLog(amountMl, drinkType))
+        }
+    }
+
+    override suspend fun onReminderShown() {
+        appContext?.let { ctx ->
+            com.water0.hydration.di.AppContainer.getDatabase(ctx).withTransaction {
+                val current = behaviorDao.getBehaviorSuspend() ?: UserBehavior()
+                behaviorDao.update(current.onReminderShown())
+            }
+        } ?: behaviorDao.update(
+            (getUserBehaviorSuspend() ?: UserBehavior()).onReminderShown()
+        )
     }
 
     override suspend fun getLastNightSleep():

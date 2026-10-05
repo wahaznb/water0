@@ -993,12 +993,17 @@ private fun AboutSection() {
             )
             IconButton(
                 onClick = {
-                    context.startActivity(
-                        Intent(
-                            Intent.ACTION_VIEW,
-                            Uri.parse("https://github.com/wahaznb/water0")
+                    try {
+                        context.startActivity(
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://github.com/wahaznb/water0")
+                            )
                         )
-                    )
+                    } catch (_: android.content.ActivityNotFoundException) {
+                        // No browser on this device (common on de-Googled
+                        // ROMs) — don't crash over a link.
+                    }
                 }
             ) {
                 Icon(

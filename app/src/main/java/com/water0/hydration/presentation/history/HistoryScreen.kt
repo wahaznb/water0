@@ -293,7 +293,11 @@ private fun DayCard(
     initiallyExpanded: Boolean,
     onDelete: (Long) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(initiallyExpanded) }
+    // Keyed on the day so a new "first" day re-derives expanded state
+    // instead of keeping the stale initial value.
+    var expanded by remember(day.dayStartMillis) {
+        mutableStateOf(initiallyExpanded)
+    }
     val statusColor = when {
         day.percentage >= 100 -> Color(0xFF1E88E5)
         day.percentage >= 70 -> Color(0xFF43A047)

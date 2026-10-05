@@ -85,14 +85,14 @@ def split(df: pd.DataFrame, seed: int = 42):
 
 
 def train_sklearn(train: pd.DataFrame, test: pd.DataFrame,
-                  test_noisy: pd.DataFrame, out_dir: Path) -> dict:
+                  test_noisy: pd.DataFrame, out_dir: Path, seed: int = 42) -> dict:
     X_train, y_reg_train = train[FEATURES], train[REG_TARGET]
     X_test, y_reg_test = test[FEATURES], test[REG_TARGET]
     Xn_test, yn_reg_test = test_noisy[FEATURES], test_noisy[REG_TARGET]
     y_clf_train, y_clf_test = train[CLF_TARGET], test[CLF_TARGET]
     yn_clf_test = test_noisy[CLF_TARGET]
 
-    reg = HistGradientBoostingRegressor(max_iter=300, random_state=42)
+    reg = HistGradientBoostingRegressor(max_iter=300, random_state=seed)
     reg.fit(X_train, y_reg_train)
     pred = reg.predict(X_test)
     pred_noisy = reg.predict(Xn_test)
@@ -104,7 +104,7 @@ def train_sklearn(train: pd.DataFrame, test: pd.DataFrame,
     print(f"[regression] MAE={metrics['regression_mae_ml']} ml  R2={metrics['regression_r2']}  "
           f"MAE(noisy)={metrics['regression_mae_ml_noisy']} ml")
 
-    clf = HistGradientBoostingClassifier(max_iter=300, random_state=42)
+    clf = HistGradientBoostingClassifier(max_iter=300, random_state=seed)
     clf.fit(X_train, y_clf_train)
     acc = accuracy_score(y_clf_test, clf.predict(X_test))
     acc_noisy = accuracy_score(yn_clf_test, clf.predict(Xn_test))
@@ -154,8 +154,17 @@ def train_tflite(train: pd.DataFrame, test: pd.DataFrame, out_dir: Path) -> dict
             [tf.keras.layers.Dense(1)]
         )
         model.compile(optimizer="adam", loss="mae")
+        # Seed TF's global RNG so identical seeds give identical models
+        # (fit shuffles with it; without this, runs aren't reproducible).
+        tf.keras.utils.set_random_seed(seed)
         model.fit(X_train, y_train, epochs=20, batch_size=256, verbose=0,
                   validation_split=0.1)
+        # Selection metric: validation MAE (the held-out test set is
+        # touched ONCE, for the already-chosen winner — selecting on it
+        # optimistically biases the reported number).
+        mae_val = float(model.evaluate(X_train[-max(1, len(X_train) // 10):],
+                                       y_train[-max(1, len(X_train) // 10):],
+                                       verbose=0))
         mae = float(model.evaluate(X_test, y_test, verbose=0))
 
         # dynamic: weight quantization (fast) / float16: GPU-friendly /
@@ -202,15 +211,17 @@ def train_tflite(train: pd.DataFrame, test: pd.DataFrame, out_dir: Path) -> dict
                 "arch": spec["name"], "quant": quant,
                 "mae_ml": round(mae, 1), "kb": round(len(blob) / 1024, 1),
                 "ms_per_infer": round(ms, 3),
+                "mae_val_ml": round(mae_val, 1),
                 "_blob": blob,
             })
             print(f"[{spec['name']}/{quant}] MAE={mae:.1f} ml  "
+                  f"MAE(val)={mae_val:.1f} ml  "
                   f"{len(blob) / 1024:.1f} KB  {ms:.3f} ms/infer")
 
     feasible = [r for r in results if r["kb"] <= 100.0]
-    best_mae = min(r["mae_ml"] for r in feasible)
+    best_mae = min(r["mae_val_ml"] for r in feasible)
     winner = min(
-        (r for r in feasible if r["mae_ml"] <= best_mae * 1.05),
+        (r for r in feasible if r["mae_val_ml"] <= best_mae * 1.05),
         key=lambda r: r["kb"],
     )
     print(f"[tflite] winner: {winner['arch']}/{winner['quant']} "

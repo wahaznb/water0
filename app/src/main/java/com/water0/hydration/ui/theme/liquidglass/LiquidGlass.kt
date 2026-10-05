@@ -425,7 +425,10 @@ private fun GlassContainerWithShader(
                 @Suppress("UNUSED_EXPRESSION")
                 glassScope.updateCounter
 
-                val elements = glassScope.elements
+                // Snapshot: the list can mutate during composition (a
+                // lens registering/unregistering), and reading it live
+                // risks ConcurrentModificationException mid-frame.
+                val elements = glassScope.elements.toList()
 
                 val maxElements = 48
                 val positions = FloatArray(maxElements * 2)

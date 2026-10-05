@@ -40,7 +40,8 @@ def main() -> None:
     df = pd.read_csv(args.data)
     X, y, groups = windows(df)
     rng = np.random.default_rng(args.seed)
-    test_users = set(rng.choice(df["user_id"].unique(), size=40, replace=False))
+    test_users = set(rng.choice(df["user_id"].unique(),
+                                        size=min(40, df["user_id"].nunique()), replace=False))
     te_mask = np.array([g in test_users for g in groups])
     Xtr, ytr, Xte, yte = X[~te_mask], y[~te_mask], X[te_mask], y[te_mask]
 

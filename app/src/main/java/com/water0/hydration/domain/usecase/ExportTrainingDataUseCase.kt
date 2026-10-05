@@ -52,7 +52,9 @@ class ExportTrainingDataUseCase(
         var streak = 0
 
         for (day in 0 until daysBack) {
-            val dayStart = startInclusive + day * DAY_MILLIS
+            // DST-aware day start: fixed 24h arithmetic lands on the wrong
+            // day across a DST transition and silently drops that day.
+            val dayStart = startOfDayMillis(startInclusive + day * DAY_MILLIS)
             val total = (byDay[dayStart] ?: emptyList())
                 .sumOf { it.effectiveHydrationMl }
             val met = if (total >= goalMl) 1 else 0

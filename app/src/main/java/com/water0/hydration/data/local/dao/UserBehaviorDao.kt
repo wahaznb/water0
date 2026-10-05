@@ -18,7 +18,7 @@ interface UserBehaviorDao {
     suspend fun update(behavior: UserBehavior): Int
 
     @Query("SELECT * FROM user_behavior WHERE id = 1")
-    fun getBehavior(): Flow<UserBehavior>
+    fun getBehavior(): Flow<UserBehavior?>
 
     @Query("SELECT * FROM user_behavior WHERE id = 1")
     suspend fun getBehaviorSuspend(): UserBehavior?

@@ -31,9 +31,13 @@ class GetTodayProgressUseCase(
     )
 
     operator fun invoke(): Flow<ProgressResult> {
+        // Nullable flows with defaults: Room emits nothing for an empty
+        // table, so a non-nullable flow would make combine hang forever.
         val profileFlow = repository.getUserProfile()
+            .map { it ?: UserProfile() }
         val entriesFlow = repository.getTodayEntries()
         val behaviorFlow = repository.getUserBehavior()
+            .map { it ?: com.water0.hydration.data.local.entity.UserBehavior() }
         val todayStart = startOfTodayMillis()
         // Past 7 completed days feed the personal-pace nudge. Reactive
         // Flow, so pace adapts as history is logged or deleted.

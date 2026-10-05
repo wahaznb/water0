@@ -65,6 +65,9 @@ class NotificationWorker(
             !inQuietHours(profile.quietHoursStart, profile.quietHoursEnd)
         ) {
             showStatusNotifications(context)
+            // A log within 30 min of this tick counts as a response —
+            // the signal the adaptive interval actually branches on.
+            AppContainer.getRepository(context).onReminderShown()
         } else {
             // Quiet hours or a silent tick: never let stale notifications
             // sit overnight.

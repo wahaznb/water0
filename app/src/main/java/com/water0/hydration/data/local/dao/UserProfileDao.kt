@@ -18,7 +18,7 @@ interface UserProfileDao {
     suspend fun update(profile: UserProfile): Int
 
     @Query("SELECT * FROM user_profile WHERE id = 1")
-    fun getProfile(): Flow<UserProfile>
+    fun getProfile(): Flow<UserProfile?>
 
     @Query("SELECT * FROM user_profile WHERE id = 1")
     suspend fun getProfileSuspend(): UserProfile?

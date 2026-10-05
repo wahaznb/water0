@@ -39,12 +39,12 @@ interface HydrationEntryDao {
         SELECT SUM(
             CASE type
                 WHEN 'WATER' THEN amountMl
-                WHEN 'COFFEE' THEN CAST(amountMl * 0.6 AS INTEGER)
-                WHEN 'TEA' THEN CAST(amountMl * 0.8 AS INTEGER)
-                WHEN 'JUICE' THEN CAST(amountMl * 0.9 AS INTEGER)
-                WHEN 'SODA' THEN CAST(amountMl * 0.5 AS INTEGER)
-                WHEN 'ALCOHOL' THEN CAST(amountMl * -0.5 AS INTEGER)
-                ELSE CAST(amountMl * 0.7 AS INTEGER)
+                WHEN 'COFFEE' THEN CAST(ROUND(amountMl * 0.6) AS INTEGER)
+                WHEN 'TEA' THEN CAST(ROUND(amountMl * 0.8) AS INTEGER)
+                WHEN 'JUICE' THEN CAST(ROUND(amountMl * 0.9) AS INTEGER)
+                WHEN 'SODA' THEN CAST(ROUND(amountMl * 0.5) AS INTEGER)
+                WHEN 'ALCOHOL' THEN CAST(ROUND(amountMl * -0.5) AS INTEGER)
+                ELSE CAST(ROUND(amountMl * 0.7) AS INTEGER)
             END
         ) FROM hydration_entries WHERE date(timestamp/1000, 'unixepoch', 'localtime') = date('now', 'localtime')
     """)

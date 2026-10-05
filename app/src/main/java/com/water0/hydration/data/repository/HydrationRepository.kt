@@ -21,15 +21,16 @@ interface HydrationRepository {
     suspend fun getRecentEntries(limit: Int): List<HydrationEntry>
 
     // User Profile
-    fun getUserProfile(): Flow<UserProfile>
+    fun getUserProfile(): Flow<UserProfile?>
     suspend fun getUserProfileSuspend(): UserProfile?
     suspend fun updateUserProfile(profile: UserProfile)
 
     // User Behavior
-    fun getUserBehavior(): Flow<UserBehavior>
+    fun getUserBehavior(): Flow<UserBehavior?>
     suspend fun getUserBehaviorSuspend(): UserBehavior?
     suspend fun updateUserBehavior(behavior: UserBehavior)
     suspend fun onWaterLogged(amountMl: Int, drinkType: HydrationEntry.DrinkType)
+    suspend fun onReminderShown()
 
     // Fitness plugin (Health Connect, optional — null/false when
     // unavailable, never throws)

@@ -1,6 +1,7 @@
 package com.water0.hydration.domain.usecase
 
 import com.water0.hydration.data.local.entity.HydrationEntry
+import com.water0.hydration.data.local.entity.UserProfile
 import com.water0.hydration.data.repository.HydrationRepository
 import com.water0.hydration.domain.engine.RecommendationEngine
 import java.text.SimpleDateFormat
@@ -8,6 +9,7 @@ import java.util.Calendar
 import java.util.Locale
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 
 class GetHistoryUseCase(
     private val repository: HydrationRepository,
@@ -28,36 +30,51 @@ class GetHistoryUseCase(
         val endExclusive = startOfTodayMillis() + DAY_MILLIS
         val startInclusive = endExclusive - daysBack * DAY_MILLIS
 
-        return combine(
-            repository.getUserProfile(),
-            repository.getEntriesInRange(startInclusive, endExclusive - 1)
-        ) { profile, entries ->
-            val goalMl = engine.calculateDailyGoal(profile).totalMl
-            val byDay = entries.groupBy { startOfDayMillis(it.timestamp) }
-
-            // Walk every day in range (today first) so empty days
-            // still show up with 0 ml instead of vanishing.
-            val days = mutableListOf<DaySummary>()
-            var cursor = endExclusive - DAY_MILLIS
-            while (cursor >= startInclusive) {
-                val dayEntries =
-                    (byDay[cursor] ?: emptyList()).sortedByDescending { it.timestamp }
-                val total = dayEntries.sumOf { it.effectiveHydrationMl }
-                days.add(
-                    DaySummary(
-                        dayStartMillis = cursor,
-                        label = dayLabel(cursor),
-                        totalEffectiveMl = total,
-                        goalMl = goalMl,
-                        percentage = if (goalMl > 0) (total * 100) / goalMl else 0,
-                        entryCount = dayEntries.size,
-                        entries = dayEntries
-                    )
-                )
-                cursor -= DAY_MILLIS
+        // Nullable flows with defaults: Room emits nothing for an empty
+        // table, so a non-nullable flow would make combine hang forever.
+        val profileFlow: Flow<UserProfile> =
+            repository.getUserProfile().map { p ->
+                p ?: UserProfile()
             }
-            days
+        val entriesFlow = repository.getEntriesInRange(startInclusive, endExclusive - 1)
+        return combine(profileFlow, entriesFlow) { profile, entries ->
+            buildDays(profile, entries, startInclusive, endExclusive)
         }
+    }
+
+    private fun buildDays(
+        profile: UserProfile,
+        entries: List<HydrationEntry>,
+        startInclusive: Long,
+        endExclusive: Long
+    ): List<DaySummary> {
+        val goalMl = engine.calculateDailyGoal(profile).totalMl
+        val byDay = entries.groupBy { startOfDayMillis(it.timestamp) }
+
+        // Walk every day in range (today first) so empty days
+        // still show up with 0 ml instead of vanishing. Day starts
+        // come from Calendar (DST-aware) — fixed 24h arithmetic
+        // misses the day on DST transitions.
+        val days = mutableListOf<DaySummary>()
+        var cursor = startOfDayMillis(endExclusive - 1)
+        while (cursor >= startInclusive) {
+            val dayEntries =
+                (byDay[cursor] ?: emptyList()).sortedByDescending { it.timestamp }
+            val total = dayEntries.sumOf { it.effectiveHydrationMl }
+            days.add(
+                DaySummary(
+                    dayStartMillis = cursor,
+                    label = dayLabel(cursor),
+                    totalEffectiveMl = total,
+                    goalMl = goalMl,
+                    percentage = if (goalMl > 0) (total * 100) / goalMl else 0,
+                    entryCount = dayEntries.size,
+                    entries = dayEntries
+                )
+            )
+            cursor = startOfDayMillis(cursor - 1)
+        }
+        return days
     }
 
     private fun startOfTodayMillis(): Long {
@@ -83,7 +100,7 @@ class GetHistoryUseCase(
         val today = startOfTodayMillis()
         return when (dayStartMillis) {
             today -> "Today"
-            today - DAY_MILLIS -> "Yesterday"
+            startOfDayMillis(today - 1) -> "Yesterday"
             else -> SimpleDateFormat("EEE, MMM d", Locale.getDefault())
                 .format(dayStartMillis)
         }

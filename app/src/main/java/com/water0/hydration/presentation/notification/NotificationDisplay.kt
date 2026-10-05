@@ -100,7 +100,6 @@ suspend fun showStatusNotifications(context: Context): Boolean {
         .setColor(waterBlue)
         .setContentTitle(title)
         .setContentText(text)
-        .setStyle(NotificationCompat.BigTextStyle().bigText(text))
         // The ONE progress bar: the system template's, natively styled.
         // (A second bar inside the custom view rendered double bars.)
         .setProgress(goalMl, totalMl.coerceAtMost(goalMl), false)

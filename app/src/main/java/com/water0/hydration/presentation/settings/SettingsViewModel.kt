@@ -21,6 +21,10 @@ class SettingsViewModel(
     private val _profile = MutableStateFlow<UserProfile?>(null)
     val profile: StateFlow<UserProfile?> = _profile
 
+    // One interpreter for the ViewModel's life — building a new
+    // OnDeviceForecast per call leaked a native interpreter each time.
+    private var forecast: com.water0.hydration.data.ml.OnDeviceForecast? = null
+
     init {
         viewModelScope.launch {
             repository.getUserProfile().collect { _profile.value = it }
@@ -80,8 +84,9 @@ class SettingsViewModel(
                 val day = weekStart + i * DAY_MILLIS
                 byDay[day]?.sumOf { it.effectiveHydrationMl } ?: return null
             }
-            com.water0.hydration.data.ml.OnDeviceForecast(context)
-                .predictTomorrowMl(totals)
+            val f = forecast ?: com.water0.hydration.data.ml.OnDeviceForecast(context)
+                .also { forecast = it }
+            f.predictTomorrowMl(totals)
         } catch (_: Exception) {
             null
         }
