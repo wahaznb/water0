@@ -50,6 +50,9 @@ fun LensCard(
     // Edge-warp band (0..1): small text chips keep a whisper so their
     // own labels don't slide into neighbors. Null = config default.
     warpEdges: Float? = null,
+    // Refractive lens on/off. Off = plain frost box: guaranteed-crisp
+    // labels where a lens provably smears text on real phones.
+    refract: Boolean = true,
     // Diffraction (chromatic split) on/off per surface: graphs and
     // small buttons refract clean, chrome keeps the fringe.
     chromatic: Float = 1f,
@@ -58,7 +61,7 @@ fun LensCard(
     val lens =
         com.water0.hydration.ui.theme.liquidglass.LocalGlassScope.current
     val config = LocalLensConfig.current
-    if (lens == null || !config.cardGlass) {
+    if (!refract || lens == null || !config.cardGlass) {
         Box(modifier = modifier) { content() }
         return
     }

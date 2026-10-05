@@ -4,6 +4,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -193,23 +195,30 @@ fun GlassBoxScope.GlassBottomBar(
     val fingerDown = touchX != null || fingerX != null
     val stretch = if (calmMode) 0.dp else
         (kotlin.math.abs(fingerVel) * 6f).coerceIn(0f, 26f).dp
+    val pressSpec = if (fingerDown) tween<Dp>(durationMillis = 120)
+    else spring<Dp>(dampingRatio = 0.75f, stiffness = 300f)
     val pillW by animateDpAsState(
         targetValue = (if (fingerDown && !calmMode) 104.dp else 88.dp) + stretch,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 300f),
+        animationSpec = pressSpec,
         label = "pillW"
     )
     val pillH by animateDpAsState(
-        targetValue = ((if (fingerDown && !calmMode) 66.dp else 58.dp) -
+        targetValue = ((if (fingerDown && !calmMode) 76.dp else 58.dp) -
             stretch * 0.35f).coerceAtLeast(46.dp),
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 300f),
+        animationSpec = pressSpec,
         label = "pillH"
     )
     val pillCorner by animateDpAsState(
         targetValue = if (fingerDown && !calmMode) 16.dp else 29.dp,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 300f),
+        animationSpec = pressSpec,
         label = "pillCorner"
     )
     val pillShape = RoundedCornerShape(pillCorner)
+    val pressLiftY by animateDpAsState(
+        targetValue = if (fingerDown && !calmMode) (-10).dp else 0.dp,
+        animationSpec = pressSpec,
+        label = "pressLiftY"
+    )
     val pillAnchorX = (touchX ?: fingerX)
         ?: tabCenterPx(selectedIndex)
     val pillX by animateDpAsState(
@@ -241,7 +250,7 @@ fun GlassBoxScope.GlassBottomBar(
             LiquidGlassBox(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .offset(x = pillX)
+                    .offset(x = pillX, y = pressLiftY)
                     .size(width = pillW, height = pillH),
                 params = params.copy(
                     // Pink bubble tint, per request.
