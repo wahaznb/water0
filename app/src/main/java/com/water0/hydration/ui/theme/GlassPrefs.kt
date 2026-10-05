@@ -14,7 +14,9 @@ class GlassPrefs(private val prefs: SharedPreferences) {
 
     fun applied(): GlassConfig = GlassConfig(
         blurRadius = prefs.getInt(KEY_BLUR_DP, 6).dp,
-        tintAlpha = prefs.getFloat(KEY_TINT, GlassConfig.Defaults.TINT_ALPHA),
+        // No tint UI anymore: fixed default, so a stale stored value
+        // can't linger invisibly.
+        tintAlpha = GlassConfig.Defaults.TINT_ALPHA,
         backgroundOn = prefs.getBoolean(KEY_BG_ON, true),
         cardGlass = prefs.getBoolean(KEY_CARD_GLASS, true),
         glassClarity = prefs.getFloat(KEY_GLASS_CLARITY, 0.5f),

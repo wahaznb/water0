@@ -203,7 +203,7 @@ fun GlassBoxScope.GlassBottomBar(
         label = "pillW"
     )
     val pillH by animateDpAsState(
-        targetValue = ((if (fingerDown && !calmMode) 84.dp else 58.dp) -
+        targetValue = ((if (fingerDown && !calmMode) 96.dp else 58.dp) -
             stretch * 0.35f).coerceAtLeast(46.dp),
         animationSpec = pressSpec,
         label = "pillH"
@@ -215,7 +215,7 @@ fun GlassBoxScope.GlassBottomBar(
     )
     val pillShape = RoundedCornerShape(pillCorner)
     val pressLiftY by animateDpAsState(
-        targetValue = if (fingerDown && !calmMode) (-12).dp else 0.dp,
+        targetValue = if (fingerDown && !calmMode) (-6).dp else 0.dp,
         animationSpec = pressSpec,
         label = "pressLiftY"
     )
@@ -273,8 +273,8 @@ fun GlassBoxScope.GlassBottomBar(
                     .offset(x = pillX, y = pressLiftY)
                     .size(width = pillW, height = pillH),
                 params = params.copy(
-                    // No tint on the bubble: clear glass, bend + rim only.
-                    tint = Color.Transparent,
+                    // Pink bubble tint.
+                    tint = Color(0xFFEE2689).copy(alpha = 0.28f),
                     // Press loupe: strong magnification of whatever sits
                     // under the finger (no color split on the bubble, so
                     // this stays clean, not rainbow). Calm at rest.
