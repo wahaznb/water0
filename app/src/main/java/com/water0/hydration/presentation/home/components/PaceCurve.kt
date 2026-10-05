@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.water0.hydration.data.local.entity.HydrationEntry
+import com.water0.hydration.domain.engine.RecommendationEngine
 import com.water0.hydration.ui.theme.SectionHeader
 import kotlin.math.roundToInt
 
@@ -87,13 +88,29 @@ fun PaceCurveCard(
     val nowHour = java.util.Calendar.getInstance()
         .get(java.util.Calendar.HOUR_OF_DAY) +
         java.util.Calendar.getInstance().get(java.util.Calendar.MINUTE) / 60f
-    val span = (sleepHour - wakeHour).coerceAtLeast(1).toFloat()
+    val span = RecommendationEngine.windowSpanHours(wakeHour, sleepHour).toFloat()
+    // Window fraction of an hour-of-day (0 at wake, 1 at sleep),
+    // overnight-aware. Normal windows behave exactly as before.
+    fun windowFrac(hour: Float): Float {
+        if (sleepHour > wakeHour) return ((hour - wakeHour) / span).coerceIn(0f, 1f)
+        return (((hour - wakeHour) % 24 + 24) % 24 / span).coerceIn(0f, 1f)
+    }
+    fun elapsedH(hour: Float): Float = windowFrac(hour) * span
+    // A drink counts as "by hour" when it happened after the current
+    // window started: overnight, 1am drinks belong to yesterday's window.
+    fun inWindowPast(drinkHour: Float, hour: Float): Boolean =
+        if (sleepHour > wakeHour) drinkHour <= hour
+        else elapsedH(drinkHour) <= elapsedH(hour) + 1e-6f
     val maxMl = maxOf(goalMl, steps.lastOrNull()?.second ?: 0, 1).toFloat()
     // Verdict doubles as the caption: behind/on/ahead in one line.
-    val expectedNow = (goalMl * ((nowHour - wakeHour + 1) / span).coerceIn(0f, 1f)).roundToInt()
-    val drunkNow = steps.lastOrNull { it.first <= nowHour }?.second ?: 0
+    val expectedNow =
+        (goalMl * ((elapsedH(nowHour) + 1) / span).coerceIn(0f, 1f)).roundToInt()
+    val drunkNow = steps.filter { inWindowPast(it.first, nowHour) }
+        .lastOrNull()?.second ?: 0
     // Outside the wake window there is no "by now" — show the day.
-    val awake = nowHour >= wakeHour && nowHour < sleepHour
+    val awake = RecommendationEngine.isAwakeHour(
+        nowHour.toInt(), wakeHour, sleepHour
+    )
     val caption = when {
         !awake -> "$drunkNow of $goalMl ml today."
         drunkNow >= expectedNow -> "On pace — $drunkNow of $expectedNow ml by now."
@@ -148,14 +165,15 @@ fun PaceCurveCard(
             )
         }
         fun expectedAt(hour: Float) =
-            (goalMl * ((hour - wakeHour + 1) / span).coerceIn(0f, 1f)).roundToInt()
+            (goalMl * ((elapsedH(hour) + 1) / span).coerceIn(0f, 1f)).roundToInt()
         fun drunkAt(hour: Float) =
-            steps.lastOrNull { it.first <= hour }?.second ?: 0
+            steps.filter { inWindowPast(it.first, hour) }.lastOrNull()?.second ?: 0
         // Body water, shared with the caption: each drink absorbs
         // exponentially (tau ~25 min, gastric emptying), so the curve
         // rises like physiology, not stairs. Sampled densely it draws
         // smooth — see absorbedMl + AbsorbedMlTest.
-        fun absorbedAt(hour: Float): Float = absorbedMl(steps, hour)
+        fun absorbedAt(hour: Float): Float =
+            absorbedMl(steps.filter { inWindowPast(it.first, hour) }, hour)
         val dark = com.water0.hydration.ui.theme.isDarkScheme()
         val red = Color(0xFFEF5350)
         val green = Color(0xFF43A047)
@@ -193,7 +211,7 @@ fun PaceCurveCard(
         ) {
             val w = size.width
             val h = size.height
-            fun x(hour: Float) = ((hour - wakeHour) / span).coerceIn(0f, 1f) * w
+            fun x(hour: Float) = windowFrac(hour) * w
             fun y(ml: Float) = h * (1f - (ml / maxMl).coerceIn(0f, 1f))
             // Goal reference, black dashed.
             drawLine(
@@ -215,21 +233,28 @@ fun PaceCurveCard(
             // Actual as physiology: 140 absorption samples from wake
             // to now, colored per sample by the target at that hour.
             // Dense samples draw a smooth curve, not stairs.
-            val endHour = minOf(nowHour, sleepHour.toFloat())
-            if (endHour > wakeHour && steps.isNotEmpty()) {
+            // Displayed fraction: live while awake, full once the window
+            // closed (tonight's curve stays up), empty pre-wake.
+            val displayFrac = when {
+                awake -> windowFrac(nowHour)
+                sleepHour > wakeHour && nowHour >= sleepHour -> 1f
+                sleepHour <= wakeHour -> 1f // overnight gap: last window
+                else -> 0f
+            }
+            fun hourAt(frac: Float) = (wakeHour + frac * span) % 24
+            if (displayFrac > 0f && steps.isNotEmpty()) {
                 val samples = 140
                 val drawUpTo =
                     (samples * reveal.value).toInt().coerceIn(0, samples)
                 // Area fill under the curve (CaffeineHealth language):
                 // standing color washing out downward, line drawn over it.
                 if (drawUpTo > 0) {
-                    val lastHour =
-                        wakeHour + (endHour - wakeHour) * drawUpTo / samples
+                    val lastHour = hourAt(displayFrac * drawUpTo / samples)
                     val fillPath = Path().apply {
                         moveTo(x(wakeHour.toFloat()), h)
                         lineTo(x(wakeHour.toFloat()), y(0f))
                         for (i in 1..drawUpTo) {
-                            val hour = wakeHour + (endHour - wakeHour) * i / samples
+                            val hour = hourAt(displayFrac * i / samples)
                             lineTo(x(hour), y(absorbedAt(hour)))
                         }
                         lineTo(x(lastHour), h)
@@ -250,10 +275,10 @@ fun PaceCurveCard(
                 var px = x(wakeHour.toFloat())
                 var py = y(0f)
                 for (i in 1..drawUpTo) {
-                    val hour = wakeHour + (endHour - wakeHour) * i / samples
+                    val hour = hourAt(displayFrac * i / samples)
                     val cx = x(hour)
                     val cy = y(absorbedAt(hour))
-                    val mid = wakeHour + (endHour - wakeHour) * (i - 0.5f) / samples
+                    val mid = hourAt(displayFrac * (i - 0.5f) / samples)
                     val seg = if (absorbedAt(mid) >= expectedAt(mid)) green else red
                     drawLine(seg, Offset(px, py), Offset(cx, cy), 3.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
                     px = cx
@@ -261,10 +286,10 @@ fun PaceCurveCard(
                 }
                 // Drink dots sit on the curve where each landed, joining
                 // the reveal as it passes them.
-                val dotUpTo =
-                    wakeHour + (endHour - wakeHour) * reveal.value
+                val dotUpTo = displayFrac * reveal.value
                 for ((hour, _) in steps) {
-                    if (hour > endHour || hour > dotUpTo) continue
+                    if (windowFrac(hour) > displayFrac || windowFrac(hour) > dotUpTo) continue
+                    if (!inWindowPast(hour, hourAt(displayFrac))) continue
                     val dot = Offset(x(hour), y(absorbedAt(hour)))
                     val dotCol = if (absorbedAt(hour) >= expectedAt(hour)) green else red
                     drawCircle(dotCol, 4.5.dp.toPx(), dot)
@@ -293,7 +318,7 @@ fun PaceCurveCard(
             // Scrub cursor: vertical line + dot on the actual curve.
             // Same standing rule: green under the diagonal, red past it.
             touchFrac?.let { frac ->
-                val hour = wakeHour + frac * span
+                val hour = (wakeHour + frac * span) % 24
                 val drunk = absorbedAt(hour).roundToInt()
                 val cx = frac * w
                 val cy = y(drunk.toFloat())

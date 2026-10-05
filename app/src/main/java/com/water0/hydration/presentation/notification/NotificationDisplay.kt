@@ -60,7 +60,9 @@ suspend fun showStatusNotifications(context: Context): Boolean {
         met -> "Goal $goalMl ml · sip only if thirsty."
         else -> {
             val gapH = if (lastDrinkMs == null) {
-                (hour - profile.wakeUpHour + 1).coerceAtLeast(1).toFloat()
+                (com.water0.hydration.domain.engine.RecommendationEngine.elapsedSinceWake(
+                    hour, profile.wakeUpHour, profile.sleepHour
+                ) + 1).toFloat()
             } else {
                 ((nowMs - lastDrinkMs) / 3600000f).coerceAtLeast(0f)
             }

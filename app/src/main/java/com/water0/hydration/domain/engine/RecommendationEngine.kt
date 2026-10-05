@@ -29,6 +29,28 @@ class RecommendationEngine {
     }
 
     companion object {
+        /** Wake-window span in hours, overnight-aware: 9->23 is 14,
+         * 12->3 is 15 (sleep lands next day). */
+        fun windowSpanHours(wakeUpHour: Int, sleepHour: Int): Int {
+            val s = (sleepHour - wakeUpHour) % 24
+            return if (s <= 0) s + 24 else s
+        }
+
+        /** True when hour falls inside the wake window, overnight-aware. */
+        fun isAwakeHour(hour: Int, wakeUpHour: Int, sleepHour: Int): Boolean =
+            if (sleepHour > wakeUpHour) hour in wakeUpHour until sleepHour
+            else hour >= wakeUpHour || hour < sleepHour
+
+        /** Elapsed whole hours since wake, 0..span, overnight-aware.
+         * Outside the window: pre-wake reads 0, everything else full. */
+        fun elapsedSinceWake(hour: Int, wakeUpHour: Int, sleepHour: Int): Int {
+            val span = windowSpanHours(wakeUpHour, sleepHour)
+            if (!isAwakeHour(hour, wakeUpHour, sleepHour)) {
+                if (sleepHour > wakeUpHour && hour < wakeUpHour) return 0
+                return span
+            }
+            return (((hour - wakeUpHour) % 24) + 24) % 24
+        }
         // Safety cap: 150% of the daily goal. Past this point more water
         // stops helping and can harm (overhydration strains the kidneys
         // and dilutes blood sodium). This is a cautious heuristic, not
@@ -125,8 +147,12 @@ class RecommendationEngine {
 
     /** Fraction of the wake→sleep day elapsed at this hour (0..1). */
     fun dayFraction(currentHour: Int, wakeUpHour: Int, sleepHour: Int): Float {
-        val active = (sleepHour - wakeUpHour).coerceAtLeast(1)
-        return ((currentHour - wakeUpHour + 1).coerceIn(0, active)).toFloat() / active
+        val active = windowSpanHours(wakeUpHour, sleepHour)
+        if (!isAwakeHour(currentHour, wakeUpHour, sleepHour)) {
+            return if (sleepHour > wakeUpHour && currentHour < wakeUpHour) 0f else 1f
+        }
+        val elapsed = (((currentHour - wakeUpHour) % 24) + 24) % 24
+        return ((elapsed + 1).coerceIn(0, active)).toFloat() / active
     }
 
     /**
@@ -165,9 +191,9 @@ class RecommendationEngine {
     ): Recommendation? {
         val cal = java.util.Calendar.getInstance().apply { timeInMillis = nowMs }
         val currentHour = cal.get(java.util.Calendar.HOUR_OF_DAY)
-        if (currentHour < wakeUpHour || currentHour >= sleepHour) return null
+        if (!isAwakeHour(currentHour, wakeUpHour, sleepHour)) return null
         val gapH = if (lastDrinkMs == null) {
-            (currentHour - wakeUpHour + 1).coerceAtLeast(1).toFloat()
+            (elapsedSinceWake(currentHour, wakeUpHour, sleepHour) + 1).toFloat()
         } else {
             ((nowMs - lastDrinkMs) / 3600000f).coerceAtLeast(0f)
         }
@@ -388,15 +414,16 @@ class RecommendationEngine {
         consumedTodayMl: Int,
         currentHour: Int
     ): Recommendation? {
-        if (currentHour < profile.wakeUpHour || currentHour >= profile.sleepHour) return null
+        if (!isAwakeHour(currentHour, profile.wakeUpHour, profile.sleepHour)) return null
         val dailyTotals = pastWeekEntries
             .groupBy { startOfDayMillis(it.timestamp) }
             .values
             .map { day -> day.sumOf { it.effectiveHydrationMl } }
             .filter { it > 0 }
         if (dailyTotals.size < 3) return null
-        val activeHours = (profile.sleepHour - profile.wakeUpHour).coerceAtLeast(1)
-        val elapsed = (currentHour - profile.wakeUpHour + 1).coerceIn(0, activeHours)
+        val activeHours = windowSpanHours(profile.wakeUpHour, profile.sleepHour)
+        val elapsed = (elapsedSinceWake(currentHour, profile.wakeUpHour, profile.sleepHour) + 1)
+            .coerceIn(0, activeHours)
         val expected = dailyTotals.average() * elapsed / activeHours
         if (consumedTodayMl >= expected * 0.8) return null
         val gap = (expected - consumedTodayMl).roundToInt().coerceIn(100, 500)

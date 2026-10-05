@@ -75,7 +75,18 @@ class ExportDrinkWindowUseCase(
             val avg7d = recent.average().roundToInt()
 
             val wakeMs = dayStart + profile.wakeUpHour * 3_600_000L
-            val sleepMs = dayStart + profile.sleepHour * 3_600_000L
+            // Overnight windows (sleep <= wake) run past midnight: the
+            // window belongs to this day but ends tomorrow. Without the
+            // +24h the slot loop never runs and the day exports empty.
+            var sleepMs = dayStart + profile.sleepHour * 3_600_000L
+            if (sleepMs <= wakeMs) sleepMs += 24 * 3_600_000L
+            // Entries inside the window, including past-midnight ones
+            // filed under the next calendar day.
+            val nextDayStart = startOfDayMillis(dayStart + 24 * 3_600_000L)
+            val windowEntries = (dayEntries +
+                (byDay[nextDayStart] ?: emptyList())
+                    .filter { it.timestamp < sleepMs })
+                .sortedBy { it.timestamp }
             var slotStart = wakeMs
             while (slotStart < sleepMs) {
                 // No future slots: the label (did they drink next?) cannot
@@ -84,14 +95,14 @@ class ExportDrinkWindowUseCase(
                 val slotHour = Calendar.getInstance().apply {
                     timeInMillis = slotStart
                 }.get(Calendar.HOUR_OF_DAY)
-                val prior = dayEntries.filter { it.timestamp <= slotStart }
+                val prior = windowEntries.filter { it.timestamp <= slotStart }
                 val lastDrinkMs = prior.maxOfOrNull { it.timestamp }
                 val minsSinceLast = if (lastDrinkMs == null) {
                     ((slotStart - wakeMs) / 60_000L).toInt()
                 } else {
                     ((slotStart - lastDrinkMs) / 60_000L).toInt()
                 }.coerceIn(0, 480)
-                val last3h = dayEntries
+                val last3h = windowEntries
                     .filter { it.timestamp in (slotStart - window3hMs + 1)..slotStart }
                     .sumOf { it.effectiveHydrationMl }
                 val consumed = prior.sumOf { it.effectiveHydrationMl }
@@ -101,7 +112,7 @@ class ExportDrinkWindowUseCase(
                 )).roundToInt()
                 val paceX100 = if (expected > 0) consumed * 100 / expected else 100
                 val label =
-                    if (dayEntries.any { it.timestamp in (slotStart + 1)..(slotStart + horizonMs) }) 1
+                    if (windowEntries.any { it.timestamp in (slotStart + 1)..(slotStart + horizonMs) }) 1
                     else 0
 
                 sb.appendLine(

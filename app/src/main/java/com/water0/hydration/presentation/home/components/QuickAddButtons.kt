@@ -93,7 +93,8 @@ fun QuickAddButton(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
         blurOverride = 0.05f,
-        refraction = 0.3f,
+        refraction = 0.2f,
+        warpEdges = 0.12f,
         chromatic = 0f
     ) {
     Button(

@@ -128,7 +128,8 @@ fun LogScreen(
                 com.water0.hydration.ui.theme.LensCard(
                     shape = RoundedCornerShape(8.dp),
                     blurOverride = 0.05f,
-                    refraction = 0.3f,
+                    refraction = 0.2f,
+                    warpEdges = 0.12f,
                     chromatic = 0f
                 ) {
                 FilterChip(
@@ -191,7 +192,8 @@ fun LogScreen(
             com.water0.hydration.ui.theme.LensCard(
                 shape = RoundedCornerShape(8.dp),
                 blurOverride = 0.05f,
-                refraction = 0.3f,
+                refraction = 0.2f,
+                warpEdges = 0.12f,
                 chromatic = 0f
             ) {
             FilterChip(
@@ -263,7 +265,8 @@ fun LogScreen(
                         com.water0.hydration.ui.theme.LensCard(
                             shape = RoundedCornerShape(8.dp),
                             blurOverride = 0.05f,
-                            refraction = 0.3f,
+                            refraction = 0.2f,
+                            warpEdges = 0.12f,
                             chromatic = 0f
                         ) {
                         FilterChip(
@@ -339,7 +342,8 @@ private fun BackdateChip(
     com.water0.hydration.ui.theme.LensCard(
         shape = RoundedCornerShape(8.dp),
         blurOverride = 0.05f,
-        refraction = 0.3f,
+        refraction = 0.2f,
+        warpEdges = 0.12f,
         chromatic = 0f
     ) {
     FilterChip(

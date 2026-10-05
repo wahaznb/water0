@@ -47,6 +47,9 @@ fun LensCard(
     // Refraction strength multiplier (lens displacement + center
     // distortion): buttons and graphs bend harder than chrome.
     refraction: Float = 1f,
+    // Edge-warp band (0..1): small text chips keep a whisper so their
+    // own labels don't slide into neighbors. Null = config default.
+    warpEdges: Float? = null,
     // Diffraction (chromatic split) on/off per surface: graphs and
     // small buttons refract clean, chrome keeps the fringe.
     chromatic: Float = 1f,
@@ -65,7 +68,8 @@ fun LensCard(
     val params = base.copy(
         blur = (blurOverride ?: base.blur).coerceIn(0f, 1f),
         scale = (base.scale * refraction).coerceIn(0f, 1f),
-        centerDistortion = (base.centerDistortion * refraction).coerceIn(0f, 1f)
+        centerDistortion = (base.centerDistortion * refraction).coerceIn(0f, 1f),
+        warpEdges = (warpEdges ?: base.warpEdges).coerceIn(0f, 1f)
     )
     with(lens) {
         LiquidGlassBox(

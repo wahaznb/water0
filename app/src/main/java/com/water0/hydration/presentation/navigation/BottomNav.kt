@@ -246,14 +246,16 @@ fun GlassBoxScope.GlassBottomBar(
                 params = params.copy(
                     // Pink bubble tint, per request.
                     tint = Color(0xFFEE2689).copy(alpha = 0.28f),
-                    // Calmer rim than the bar: the bubble bends less, so its
-                    // fringe over bright text stays a whisper (0.35), not
-                    // rainbows. Bar and plate keep full strength.
-                    scale = params.scale * 0.7f,
-                    centerDistortion = params.centerDistortion * 0.7f
+                    // Press zoom: the lens magnifies what sits under the
+                    // finger instead of only growing the outline. Calmer
+                    // than the bar at rest so rims stay clean.
+                    scale = params.scale * 0.7f *
+                        (if (fingerDown && !calmMode) 1.8f else 1f),
+                    centerDistortion = params.centerDistortion * 0.7f *
+                        (if (fingerDown && !calmMode) 1.8f else 1f)
                 ),
                 shape = pillShape,
-                chromatic = 0.35f,
+                chromatic = 0f,
                 cornerRadiusPx = with(density) { pillCorner.toPx() },
                 content = { }
             )
@@ -384,12 +386,14 @@ fun GlassBoxScope.GlassBottomBar(
         this@GlassBottomBar.LiquidGlassBox(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 20.dp, top = 12.dp)
                 .onSizeChanged {
                     onHeight(with(density) { it.height.toDp() })
                 },
             params = params,
-            shape = dockShape
+            shape = dockShape,
+            chromatic = 0.6f
         ) {
             DockInner()
         }
@@ -398,7 +402,8 @@ fun GlassBoxScope.GlassBottomBar(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 20.dp, top = 12.dp)
                 .onSizeChanged {
                     onHeight(with(density) { it.height.toDp() })
                 }
