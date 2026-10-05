@@ -344,8 +344,12 @@ private fun PressableGlassChip(
     androidx.compose.runtime.LaunchedEffect(pressed) {
         if (pressed) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
+    // Update tab is frost, not glass (explicit call): no refractive
+    // element here, so labels can never bend or smear. Rim/border and
+    // fills carry the look; press glow + haptic still fire.
     com.water0.hydration.ui.theme.LensCard(
         shape = RoundedCornerShape(8.dp),
+        refract = false,
         blurOverride = 0.15f,
         refraction = if (pressed) 0.5f else 0.08f,
         warpEdges = 0.06f,
@@ -360,6 +364,9 @@ private fun PressableGlassChip(
             onClick = onClick,
             label = label,
             interactionSource = interaction,
+            colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ),
             border = if (lensed) null else FilterChipDefaults.filterChipBorder(
                 enabled = true,
                 selected = selected,

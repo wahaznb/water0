@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -61,6 +62,7 @@ fun QuickAddButtons(
                 com.water0.hydration.ui.theme.LensCard(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
+                    refract = false,
                     blurOverride = 0.15f,
                     refraction = 0.08f,
                     warpEdges = 0.06f,
@@ -72,6 +74,10 @@ fun QuickAddButtons(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(88.dp)
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                RoundedCornerShape(12.dp)
+                            )
                     ) {
                         IconButton(
                             onClick = onCustomClick,
@@ -127,8 +133,9 @@ fun QuickAddButton(
     com.water0.hydration.ui.theme.LensCard(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
+        refract = false,
         blurOverride = 0.15f,
-        refraction = if (pressed && enabled) 0.5f else 0.08f,
+        refraction = 0.08f,
         warpEdges = 0.06f,
         chromatic = if (pressed && enabled) 0.6f else 0.3f,
         elevation = 0.dp
