@@ -75,6 +75,9 @@ fun LensCard(
     // Visibility gate (pager): false renders frost with NO element
     // registered. Branch switch disposes any live lens, unregistering it.
     enabled: Boolean = true,
+    // Drop shadow. Flat controls pass 0dp: a shadow spreading past the
+    // rect reads as the glass being taller than the button.
+    elevation: androidx.compose.ui.unit.Dp? = null,
     // Diffraction (chromatic split) on/off per surface: graphs and
     // small buttons refract clean, chrome keeps the fringe.
     chromatic: Float = 1f,
@@ -97,7 +100,8 @@ fun LensCard(
         blur = (blurOverride ?: base.blur).coerceIn(0f, 1f),
         scale = (base.scale * refraction).coerceIn(0f, 1f),
         centerDistortion = (base.centerDistortion * refraction).coerceIn(0f, 1f),
-        warpEdges = (warpEdges ?: base.warpEdges).coerceIn(0f, 1f)
+        warpEdges = (warpEdges ?: base.warpEdges).coerceIn(0f, 1f),
+        elevation = elevation ?: base.elevation
     )
     with(lens) {
         LiquidGlassBox(

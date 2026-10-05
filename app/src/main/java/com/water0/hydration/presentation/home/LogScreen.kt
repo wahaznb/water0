@@ -350,6 +350,7 @@ private fun PressableGlassChip(
         refraction = if (pressed) 0.5f else 0.08f,
         warpEdges = 0.06f,
         chromatic = if (pressed) 0.6f else 0.3f,
+        elevation = 0.dp,
         modifier = modifier
     ) {
         FilterChip(

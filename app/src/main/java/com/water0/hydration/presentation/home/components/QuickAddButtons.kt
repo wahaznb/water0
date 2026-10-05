@@ -64,7 +64,8 @@ fun QuickAddButtons(
                     blurOverride = 0f,
                     refraction = 0.08f,
                     warpEdges = 0.06f,
-                    chromatic = 0.3f
+                    chromatic = 0.3f,
+                    elevation = 0.dp
                 ) {
                     androidx.compose.foundation.layout.Box(
                         contentAlignment = Alignment.Center,
@@ -129,7 +130,8 @@ fun QuickAddButton(
         blurOverride = 0f,
         refraction = if (pressed && enabled) 0.5f else 0.08f,
         warpEdges = 0.06f,
-        chromatic = if (pressed && enabled) 0.6f else 0.3f
+        chromatic = if (pressed && enabled) 0.6f else 0.3f,
+        elevation = 0.dp
     ) {
     Button(
         onClick = onClick,
