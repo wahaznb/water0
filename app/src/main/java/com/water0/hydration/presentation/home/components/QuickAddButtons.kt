@@ -61,7 +61,7 @@ fun QuickAddButtons(
                 com.water0.hydration.ui.theme.LensCard(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
-                    blurOverride = 0f,
+                    blurOverride = 0.15f,
                     refraction = 0.08f,
                     warpEdges = 0.06f,
                     chromatic = 0.3f,
@@ -127,7 +127,7 @@ fun QuickAddButton(
     com.water0.hydration.ui.theme.LensCard(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        blurOverride = 0f,
+        blurOverride = 0.15f,
         refraction = if (pressed && enabled) 0.5f else 0.08f,
         warpEdges = 0.06f,
         chromatic = if (pressed && enabled) 0.6f else 0.3f,

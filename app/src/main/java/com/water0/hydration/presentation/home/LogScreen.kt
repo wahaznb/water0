@@ -346,7 +346,7 @@ private fun PressableGlassChip(
     }
     com.water0.hydration.ui.theme.LensCard(
         shape = RoundedCornerShape(8.dp),
-        blurOverride = 0f,
+        blurOverride = 0.15f,
         refraction = if (pressed) 0.5f else 0.08f,
         warpEdges = 0.06f,
         chromatic = if (pressed) 0.6f else 0.3f,

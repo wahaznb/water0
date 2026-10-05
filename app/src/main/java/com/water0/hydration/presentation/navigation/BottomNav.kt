@@ -446,7 +446,9 @@ fun GlassBoxScope.GlassBottomBar(
     // Hairline border outlines the frost shell (explicitly requested);
     // it never bends, so it can't ghost.
     // (The dockLens kill-switch now gates the bubble, not the bar.)
-    val dockShape = RoundedCornerShape(50)
+    // Bar corners = band corners = bubble corners (29dp): one edge
+    // language, seamless merges everywhere.
+    val dockShape = RoundedCornerShape(29.dp)
     Box(
         modifier = Modifier
             .align(Alignment.BottomCenter)
