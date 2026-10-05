@@ -131,11 +131,11 @@ fun GlassBoxScope.GlassBottomBar(
     val density = LocalDensity.current
     // Compact dock: tabs sit in fixed cells; centers come off the
     // measured Row width. (Full-width dock: tabs share the measured CONTENT width equally. The
-    // Row's 8dp side padding is part of its measured width, so centers
+    // Row's 12dp side padding is part of its measured width, so centers
     // subtract it first — forgetting this sat edge tabs (Home/Settings)
     // a few dp off-center.
     var rowWidthPx by remember { mutableStateOf<Float?>(null) }
-    val rowPadPx = with(density) { 8.dp.toPx() }
+    val rowPadPx = with(density) { 12.dp.toPx() }
     fun contentWidthPx(): Float = (rowWidthPx ?: with(density) { 324.dp.toPx() }) - rowPadPx * 2
     fun tabCenterPx(i: Int): Float =
         rowPadPx + contentWidthPx() * (i + 0.5f) / TABS.size
@@ -208,11 +208,9 @@ fun GlassBoxScope.GlassBottomBar(
         animationSpec = pressSpec,
         label = "pillH"
     )
-    val pillCorner by animateDpAsState(
-        targetValue = if (fingerDown && !calmMode) 16.dp else 29.dp,
-        animationSpec = pressSpec,
-        label = "pillCorner"
-    )
+    // Constant stadium corner: the bubble never morphs shape, it only
+    // grows. Same radius as the bar edges so edge snaps read seamless.
+    val pillCorner = 29.dp
     val pillShape = RoundedCornerShape(pillCorner)
     val pressLiftY by animateDpAsState(
         targetValue = if (fingerDown && !calmMode) (-6).dp else 0.dp,
@@ -221,9 +219,20 @@ fun GlassBoxScope.GlassBottomBar(
     )
     val pillAnchorX = (touchX ?: fingerX)
         ?: tabCenterPx(selectedIndex)
+    // Edge snap: on the end tabs the bubble sits flush with the bar's
+    // inner edge (4dp breathing room) instead of floating mid-cell, so
+    // bar edge and bubble edge read as one continuous line.
+    val edgeMargin = 4.dp
+    fun clampPillX(xDp: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp {
+        val rowW = with(density) {
+            (rowWidthPx ?: 324.dp.toPx()).toDp()
+        }
+        val maxX = (rowW - pillW - edgeMargin).coerceAtLeast(edgeMargin)
+        return xDp.coerceIn(edgeMargin, maxX)
+    }
     val pillX by animateDpAsState(
         targetValue = with(density) {
-            pillAnchorX.toDp() - pillW / 2
+            clampPillX(pillAnchorX.toDp() - pillW / 2)
         },
         // Finger tracking is instant (snap); tab-to-tab glides spring.
         animationSpec = if (fingerDown) snap()
@@ -235,9 +244,9 @@ fun GlassBoxScope.GlassBottomBar(
     )
 
     // Inner bar height, fixed: taps grow the bubble, never the bar.
-    // 68dp gives the resting bubble headroom and the pressed bubble
-    // real overflow travel past both edges.
-    val barH = 68.dp
+    // 78dp fits the bigger icons with air; the pressed bubble still
+    // clears both edges.
+    val barH = 78.dp
     @Composable
     fun BoxScope.DockInner() {
     Box(
@@ -245,28 +254,28 @@ fun GlassBoxScope.GlassBottomBar(
             .fillMaxWidth()
             .height(barH)
     ) {
-        // Inner content plate (layer two): a lighter lens behind the tab
-        // row for depth. Sibling, not nested — explicit size, no wrapping
-        // surprises. Transparent to touch (lens boxes never consume).
-        with(this@GlassBottomBar) {
-            LiquidGlassBox(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth()
-                    .padding(horizontal = 5.dp)
-                    .height(60.dp),
-                params = params.copy(
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                ),
-                shape = RoundedCornerShape(24.dp),
-                chromatic = 0.4f,
-                content = { }
-            )
-        }
         // Selected bubble, drawn first so tabs sit on top of it. A real
         // lens with no children: pure backdrop refraction, like the
         // reference drag bubble. No shadow on chrome.
+        @Composable
+        fun BoxScope.FrostBubble() {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .offset(x = pillX, y = pressLiftY)
+                    .size(width = pillW, height = pillH)
+                    .clip(pillShape)
+                    .background(
+                        Color(0xFFEE2689).copy(alpha = 0.28f),
+                        pillShape
+                    )
+            )
+        }
+        if (!config.dockLens) {
+            FrostBubble()
+        }
         with(this@GlassBottomBar) {
+            if (config.dockLens) {
             LiquidGlassBox(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
@@ -280,7 +289,7 @@ fun GlassBoxScope.GlassBottomBar(
                     // this stays clean, not rainbow). Calm at rest.
                     scale = params.scale * 0.7f *
                         (if (fingerDown && !calmMode) 2.6f else 1f),
-                    centerDistortion = params.centerDistortion * 0.7f *
+                    centerDistortion = params.centerDistortion * 0.35f *
                         (if (fingerDown && !calmMode) 2.6f else 1f)
                 ),
                 shape = pillShape,
@@ -288,6 +297,7 @@ fun GlassBoxScope.GlassBottomBar(
                 cornerRadiusPx = with(density) { pillCorner.toPx() },
                 content = { }
             )
+            }
         }
         // Press glow: one solid white disc, softened by a blur
         // modifier (a convolution, not a gradient — nothing here can
@@ -313,6 +323,7 @@ fun GlassBoxScope.GlassBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .align(Alignment.Center)
                 .onSizeChanged { rowWidthPx = it.width.toFloat() }
                 .pointerInput(Unit) {
                     detectTapGestures(
@@ -397,7 +408,7 @@ fun GlassBoxScope.GlassBottomBar(
                         Icon(
                             tab.icon,
                             contentDescription = null,
-                            modifier = Modifier.size(26.dp)
+                            modifier = Modifier.size(30.dp)
                         )
                     },
                     label = tab.label
@@ -489,7 +500,7 @@ private fun GlassTab(
     // Wide short cells (reference language): icon over a small label,
     // the visible label announcing the tab. Tabs tint; press lifts.
     // Selected trait exposed for accessibility services.
-    val swell = if (animated) 1f + 0.18f * proximity.coerceIn(0f, 1f) else 1f
+    val swell = if (animated) 1f + 0.25f * proximity.coerceIn(0f, 1f) else 1f
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier

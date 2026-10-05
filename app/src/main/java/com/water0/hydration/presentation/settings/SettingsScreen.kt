@@ -643,11 +643,36 @@ private fun FitnessSection() {
         }
     }
     LaunchedEffect(Unit) { refresh() }
+    var triedAppSheet by remember { mutableStateOf(false) }
+    val legacyLauncher = rememberLauncherForActivityResult(
+        com.water0.hydration.data.fitness.FitnessDataSource.requestContractLegacy()
+    ) { granted ->
+        if (granted.isNotEmpty()) {
+            triedAppSheet = false
+            refresh()
+        } else {
+            statusLine = "Both sheets came back empty — allow Sleep + " +
+                "Exercise inside the Health Connect app, then Check again."
+        }
+    }
     val launcher = rememberLauncherForActivityResult(
         com.water0.hydration.data.fitness.FitnessDataSource.requestContract()
     ) { granted ->
         if (granted.isNotEmpty()) refresh()
-        else statusLine = "Permission sheet returned empty — allow Sleep " +
+        else if (!triedAppSheet) {
+            // Platform runtime sheet auto-denied (ROM without the
+            // platform Health module): try the provider app's own
+            // sheet once before giving manual instructions.
+            triedAppSheet = true
+            statusLine = "System sheet came back empty — opening the " +
+                "Health Connect app sheet instead…"
+            try {
+                legacyLauncher.launch(source.readPermissions())
+            } catch (e: Exception) {
+                statusLine = "No Health Connect app to ask — allow Sleep " +
+                    "+ Exercise inside Health Connect, then Check again."
+            }
+        } else statusLine = "Permission sheet returned empty — allow Sleep " +
             "+ Exercise inside Health Connect, then Check again."
     }
 

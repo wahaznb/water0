@@ -149,6 +149,13 @@ fun PaceCurveCard(
         modifier = modifier
             .fillMaxWidth()
             .glassCard()
+            // Calm backdrop coat: an extra veil of fill so a busy living
+            // background can't shout through the thin plot lines. Frost,
+            // not lens — zero bend, the graph stays pixel-still.
+            .background(
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+                RoundedCornerShape(com.water0.hydration.ui.theme.Radii.md)
+            )
             // iPhone-style top light: specular wash so the lens reads
             // bright, not just bent.
             .background(

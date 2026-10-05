@@ -144,5 +144,11 @@ class FitnessDataSource(private val context: Context) {
     companion object {
         fun requestContract() =
             PermissionController.createRequestPermissionResultContract()
+
+        /** Provider-app sheet (bypasses the platform runtime dialog).
+         * On ROMs without the platform Health module the default
+         * contract auto-denies; the HC app's own sheet still works. */
+        fun requestContractLegacy() =
+            PermissionController.createRequestPermissionResultContractLegacy()
     }
 }
