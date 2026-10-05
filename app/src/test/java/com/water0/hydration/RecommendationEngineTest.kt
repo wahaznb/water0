@@ -410,4 +410,38 @@ class RecommendationEngineTest {
         )
         assertTrue(recsAhead.none { it.reason == RecommendationEngine.Recommendation.Reason.EVENING_WIND_DOWN })
     }
+
+    @Test
+    fun `window helpers handle same-day windows`() {
+        val E = RecommendationEngine
+        assertEquals(14, E.windowSpanHours(9, 23))
+        assertTrue(E.isAwakeHour(12, 9, 23))
+        assertTrue(!E.isAwakeHour(8, 9, 23))
+        assertTrue(!E.isAwakeHour(23, 9, 23))
+        assertEquals(0, E.elapsedSinceWake(9, 9, 23))
+        assertEquals(5, E.elapsedSinceWake(14, 9, 23))
+        assertEquals(0, E.elapsedSinceWake(8, 9, 23)) // pre-wake reads 0
+        assertEquals(14, E.elapsedSinceWake(23, 9, 23)) // post-window full
+        // dayFraction keeps its +1 fudge and clamps.
+        assertEquals(1f / 14, engine.dayFraction(9, 9, 23), 0.001f)
+        assertEquals(1f, engine.dayFraction(23, 9, 23), 0.001f)
+        assertEquals(0f, engine.dayFraction(8, 9, 23), 0.001f)
+    }
+
+    @Test
+    fun `window helpers wrap overnight windows`() {
+        val E = RecommendationEngine
+        assertEquals(15, E.windowSpanHours(12, 3))
+        assertEquals(24, E.windowSpanHours(7, 7))
+        assertTrue(E.isAwakeHour(12, 12, 3))
+        assertTrue(E.isAwakeHour(1, 12, 3))
+        assertTrue(!E.isAwakeHour(8, 12, 3)) // gap reads as outside
+        assertEquals(0, E.elapsedSinceWake(12, 12, 3))
+        assertEquals(5, E.elapsedSinceWake(17, 12, 3))
+        assertEquals(13, E.elapsedSinceWake(1, 12, 3))
+        // Midnight maps 13h into a noon->3am window.
+        assertEquals((13 + 1) / 15f, engine.dayFraction(1, 12, 3), 0.001f)
+        assertEquals(1f, engine.dayFraction(3, 12, 3), 0.001f)
+    }
 }
+

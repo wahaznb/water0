@@ -39,6 +39,24 @@ import com.water0.hydration.ui.theme.SectionHeader
 import kotlin.math.roundToInt
 
 /**
+ * A drink counts as "by hour" when it happened after the current window
+ * started: normal windows compare clocks directly; overnight, a 1am drink
+ * belongs to yesterday's window, so elapsed-since-wake decides.
+ */
+internal fun inWindowPast(
+    drinkHour: Float,
+    hour: Float,
+    wakeHour: Int,
+    sleepHour: Int
+): Boolean {
+    if (sleepHour > wakeHour) return drinkHour <= hour
+    val span = RecommendationEngine.windowSpanHours(wakeHour, sleepHour).toFloat()
+    fun elapsed(h: Float) =
+        ((((h - wakeHour) % 24 + 24) % 24) / span).coerceIn(0f, 1f) * span
+    return elapsed(drinkHour) <= elapsed(hour) + 1e-6f
+}
+
+/**
  * Body-water absorption: each (hour, ml) drink contributes
  * ml * (1 - e^(-dt/tau)) with tau ~25 min (gastric emptying), summed
  * over drinks so far. Pure + unit-tested (AbsorbedMlTest): zero before
@@ -49,8 +67,12 @@ internal fun absorbedMl(
     hour: Float,
     tauMin: Float = 25f
 ): Float =
-    drinks.filter { it.first <= hour }.sumOf { (h, amt) ->
-        val dtMin = ((hour - h) * 60f).coerceAtLeast(0f)
+    drinks.sumOf { (h, amt) ->
+        // Overnight-aware elapsed time: a 16:41 drink read at 02:10 is
+        // 9.5h absorbed, not negative. Normal windows never go negative
+        // here, so their math is unchanged. (Callers pre-filter to the
+        // current window; no second filter here.)
+        val dtMin = ((((hour - h) % 24 + 24) % 24) * 60f).coerceAtLeast(0f)
         (amt * (1f - kotlin.math.exp(-dtMin / tauMin))).toDouble()
     }.toFloat()
 
@@ -99,8 +121,7 @@ fun PaceCurveCard(
     // A drink counts as "by hour" when it happened after the current
     // window started: overnight, 1am drinks belong to yesterday's window.
     fun inWindowPast(drinkHour: Float, hour: Float): Boolean =
-        if (sleepHour > wakeHour) drinkHour <= hour
-        else elapsedH(drinkHour) <= elapsedH(hour) + 1e-6f
+        inWindowPast(drinkHour, hour, wakeHour, sleepHour)
     val maxMl = maxOf(goalMl, steps.lastOrNull()?.second ?: 0, 1).toFloat()
     // Verdict doubles as the caption: behind/on/ahead in one line.
     val expectedNow =
@@ -166,8 +187,6 @@ fun PaceCurveCard(
         }
         fun expectedAt(hour: Float) =
             (goalMl * ((elapsedH(hour) + 1) / span).coerceIn(0f, 1f)).roundToInt()
-        fun drunkAt(hour: Float) =
-            steps.filter { inWindowPast(it.first, hour) }.lastOrNull()?.second ?: 0
         // Body water, shared with the caption: each drink absorbs
         // exponentially (tau ~25 min, gastric emptying), so the curve
         // rises like physiology, not stairs. Sampled densely it draws
@@ -337,7 +356,7 @@ fun PaceCurveCard(
         // Readout follows the finger; caption returns when untouched.
         // (touchFrac persists after release so the reading lingers.)
         val readout = touchFrac?.let { frac ->
-            val hour = wakeHour + frac * span
+            val hour = (wakeHour + frac * span) % 24
             val hh = hour.toInt().coerceIn(0, 23)
             val mm = ((hour - hh) * 60).toInt().coerceIn(0, 59)
             "%02d:%02d · %d in system / %d expected".format(hh, mm, absorbedAt(hour).roundToInt(), expectedAt(hour))
