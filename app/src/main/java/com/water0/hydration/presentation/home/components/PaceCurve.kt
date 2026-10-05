@@ -92,20 +92,27 @@ fun PaceCurveCard(
 ) {
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onVariant = MaterialTheme.colorScheme.onSurfaceVariant
-    // Cumulative steps, oldest first, clamped into the wake window.
-    val steps = remember(entries, wakeHour, sleepHour) {
+    fun hourOf(ts: Long): Float =
+        java.util.Calendar.getInstance().apply {
+            timeInMillis = ts
+        }.get(java.util.Calendar.HOUR_OF_DAY) +
+            java.util.Calendar.getInstance().apply {
+                timeInMillis = ts
+            }.get(java.util.Calendar.MINUTE) / 60f
+    // Cumulative steps, oldest first, for totals (drunkNow/caption).
+    val steps = remember(entries) {
         var acc = 0
         entries.sortedBy { it.timestamp }
             .map { e ->
-                val h = java.util.Calendar.getInstance().apply {
-                    timeInMillis = e.timestamp
-                }.get(java.util.Calendar.HOUR_OF_DAY) +
-                    java.util.Calendar.getInstance().apply {
-                        timeInMillis = e.timestamp
-                    }.get(java.util.Calendar.MINUTE) / 60f
                 acc += e.effectiveHydrationMl
-                h to acc
+                hourOf(e.timestamp) to acc
             }
+    }
+    // Individual drinks for absorption: summing running totals here
+    // overcounted 2-5x (4762 "in system" from 2500 logged).
+    val drinks = remember(entries) {
+        entries.sortedBy { it.timestamp }
+            .map { e -> hourOf(e.timestamp) to e.effectiveHydrationMl }
     }
     val nowHour = java.util.Calendar.getInstance()
         .get(java.util.Calendar.HOUR_OF_DAY) +
@@ -192,7 +199,7 @@ fun PaceCurveCard(
         // rises like physiology, not stairs. Sampled densely it draws
         // smooth — see absorbedMl + AbsorbedMlTest.
         fun absorbedAt(hour: Float): Float =
-            absorbedMl(steps.filter { inWindowPast(it.first, hour) }, hour)
+            absorbedMl(drinks.filter { inWindowPast(it.first, hour) }, hour)
         val dark = com.water0.hydration.ui.theme.isDarkScheme()
         val red = Color(0xFFEF5350)
         val green = Color(0xFF43A047)
@@ -306,7 +313,7 @@ fun PaceCurveCard(
                 // Drink dots sit on the curve where each landed, joining
                 // the reveal as it passes them.
                 val dotUpTo = displayFrac * reveal.value
-                for ((hour, _) in steps) {
+                for ((hour, _) in drinks) {
                     if (windowFrac(hour) > displayFrac || windowFrac(hour) > dotUpTo) continue
                     if (!inWindowPast(hour, hourAt(displayFrac))) continue
                     val dot = Offset(x(hour), y(absorbedAt(hour)))

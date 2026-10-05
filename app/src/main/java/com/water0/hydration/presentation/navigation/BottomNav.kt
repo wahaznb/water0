@@ -402,7 +402,7 @@ fun GlassBoxScope.GlassBottomBar(
                 },
             params = params,
             shape = dockShape,
-            chromatic = 0.6f
+            chromatic = 0.4f
         ) {
             DockInner()
         }

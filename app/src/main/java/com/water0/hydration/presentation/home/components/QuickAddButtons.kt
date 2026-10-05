@@ -92,9 +92,9 @@ fun QuickAddButton(
     com.water0.hydration.ui.theme.LensCard(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        blurOverride = 0.05f,
-        refraction = 0.2f,
-        warpEdges = 0.12f,
+        blurOverride = 0f,
+        refraction = 0.08f,
+        warpEdges = 0.06f,
         chromatic = 0f
     ) {
     Button(
