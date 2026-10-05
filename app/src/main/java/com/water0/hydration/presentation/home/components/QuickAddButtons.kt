@@ -19,7 +19,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import com.water0.hydration.ui.theme.prismalPress
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -86,6 +93,15 @@ fun QuickAddButton(
         else -> { name = "Custom"; dropDp = 20 }
     }
     val tint = MaterialTheme.colorScheme.primaryContainer
+    // Pressed glass: the lens bends harder and fringes stronger under
+    // the finger with a haptic tick. prismalPress adds the spring
+    // scale + white glow on top.
+    val pressInteraction = remember { MutableInteractionSource() }
+    val pressed by pressInteraction.collectIsPressedAsState()
+    val haptics = LocalHapticFeedback.current
+    LaunchedEffect(pressed) {
+        if (pressed) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
 
     // Prismal press feel (spec in PressGlass.kt): spring 0.96 + white
     // glow under the finger, replacing the old bounce.
@@ -93,12 +109,13 @@ fun QuickAddButton(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
         blurOverride = 0f,
-        refraction = 0.08f,
+        refraction = if (pressed && enabled) 0.5f else 0.08f,
         warpEdges = 0.06f,
-        chromatic = 0f
+        chromatic = if (pressed && enabled) 0.6f else 0.3f
     ) {
     Button(
         onClick = onClick,
+        interactionSource = pressInteraction,
         modifier = Modifier
             .fillMaxWidth()
             .height(88.dp)

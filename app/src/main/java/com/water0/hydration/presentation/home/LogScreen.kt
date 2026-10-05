@@ -13,6 +13,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,7 +28,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.water0.hydration.data.local.entity.HydrationEntry
 import com.water0.hydration.di.AppContainer
 import com.water0.hydration.presentation.home.components.AddWaterDialog
@@ -125,23 +129,14 @@ fun LogScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             HydrationEntry.DrinkType.entries.forEach { type ->
-                com.water0.hydration.ui.theme.LensCard(
-                    shape = RoundedCornerShape(8.dp),
-                    blurOverride = 0f,
-                    refraction = 0.08f,
-                    warpEdges = 0.06f,
-                    chromatic = 0f,
-                ) {
-                FilterChip(
+                PressableGlassChip(
                     selected = drinkType == type,
-                    onClick = { drinkType = type },
-                    label = {
-                        Text(
-                            type.name.lowercase().replaceFirstChar { it.uppercase() },
-                            fontSize = 13.sp
-                        )
-                    }
-                )
+                    onClick = { drinkType = type }
+                ) {
+                    Text(
+                        type.name.lowercase().replaceFirstChar { it.uppercase() },
+                        fontSize = 13.sp
+                    )
                 }
             }
         }
@@ -189,14 +184,7 @@ fun LogScreen(
                 selected = backdateChoice == 3,
                 onClick = { showTimePicker = true }
             )
-            com.water0.hydration.ui.theme.LensCard(
-                shape = RoundedCornerShape(8.dp),
-                blurOverride = 0f,
-                refraction = 0.08f,
-                warpEdges = 0.06f,
-                chromatic = 0f,
-            ) {
-            FilterChip(
+            PressableGlassChip(
                 selected = workoutBoost,
                 onClick = {
                     scope.launch {
@@ -205,16 +193,13 @@ fun LogScreen(
                         workoutBoost = repo.hasManualWorkoutBoost()
                         if (workoutBoost) notify("Workout noted — recovery nudge on")
                     }
-                },
-                label = {
-                    Text(
-                        "Just worked out",
-                        fontSize = 13.sp
-                    )
                 }
-            )
+            ) {
+                Text(
+                    "Just worked out",
+                    fontSize = 13.sp
+                )
             }
-            // (Lens-wrapped with its siblings above.)
         }
 
         if (showTimePicker) {
@@ -262,14 +247,7 @@ fun LogScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     recents.forEach { recent ->
-                        com.water0.hydration.ui.theme.LensCard(
-                            shape = RoundedCornerShape(8.dp),
-                            blurOverride = 0f,
-                            refraction = 0.08f,
-                            warpEdges = 0.06f,
-                            chromatic = 0f,
-                        ) {
-                        FilterChip(
+                        PressableGlassChip(
                             selected = false,
                             onClick = {
                                 viewModel.logWater(recent.amountMl, recent.type)
@@ -277,16 +255,14 @@ fun LogScreen(
                                     "Added ${recent.amountMl} ml " +
                                         recent.type.name.lowercase()
                                 )
-                            },
-                            label = {
-                                Text(
-                                    text = "${recent.type.name.lowercase()
-                                        .replaceFirstChar { it.uppercase() }} " +
-                                        "${recent.amountMl}ml",
-                                    fontSize = 13.sp
-                                )
                             }
-                        )
+                        ) {
+                            Text(
+                                text = "${recent.type.name.lowercase()
+                                    .replaceFirstChar { it.uppercase() }} " +
+                                    "${recent.amountMl}ml",
+                                fontSize = 13.sp
+                            )
                         }
                     }
                 }
@@ -339,18 +315,45 @@ private fun BackdateChip(
     selected: Boolean,
     onClick: () -> Unit
 ) {
+    PressableGlassChip(selected = selected, onClick = onClick) {
+        Text(label, fontSize = 13.sp)
+    }
+}
+
+/**
+ * One pressed-glass chip for every small control: at rest a whisper
+ * lens (rim + tint, sub-visible bend); pressed, the lens bends harder
+ * and fringes stronger under the finger with a haptic tick — the
+ * pressed-liquid-glass behavior. FilterChip keeps its own background
+ * so labels stay put while the backdrop warps.
+ */
+@Composable
+private fun PressableGlassChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    label: @Composable () -> Unit
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val haptics = LocalHapticFeedback.current
+    androidx.compose.runtime.LaunchedEffect(pressed) {
+        if (pressed) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
     com.water0.hydration.ui.theme.LensCard(
         shape = RoundedCornerShape(8.dp),
         blurOverride = 0f,
-        refraction = 0.08f,
+        refraction = if (pressed) 0.5f else 0.08f,
         warpEdges = 0.06f,
-        chromatic = 0f,
+        chromatic = if (pressed) 0.6f else 0.3f,
+        modifier = modifier
     ) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label, fontSize = 13.sp) }
-    )
+        FilterChip(
+            selected = selected,
+            onClick = onClick,
+            label = label,
+            interactionSource = interaction
+        )
     }
 }
 

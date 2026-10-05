@@ -808,18 +808,8 @@ private fun GlassLabSection(
             onValueChange = { onChange(config.copy(tintAlpha = it)) },
             valueRange = 0f..0.60f
         )
-        Text(
-            text = "Dock roundness: ${config.dockCorner.value.toInt()}dp",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Slider(
-            value = config.dockCorner.value,
-            onValueChange = { onChange(config.copy(dockCorner = it.dp)) },
-            valueRange = 8f..45f
-        )
         TextButton(onClick = { onChange(com.water0.hydration.ui.theme.GlassConfig()) }) {
-            Text("Reset defaults (6 / 27% / 42dp)")
+            Text("Reset defaults (6dp / 27%)")
         }
         // Show switches: calm mode kills motion for weak GPUs and low
         // battery without touching the tuned look (one tap restores).

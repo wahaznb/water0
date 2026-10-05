@@ -206,9 +206,10 @@ private fun WeekGraph(days: List<GetHistoryUseCase.DaySummary>) {
             com.water0.hydration.ui.theme.LensCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                blurOverride = 0.4f,
-                refraction = 0.6f,
-                chromatic = 0f
+                blurOverride = 0f,
+                refraction = 0.08f,
+                warpEdges = 0.06f,
+                chromatic = 0.3f
             ) {
             androidx.compose.foundation.Canvas(
                 modifier = Modifier

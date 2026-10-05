@@ -235,7 +235,9 @@ fun GlassBoxScope.GlassBottomBar(
     )
 
     // Inner bar height, fixed: taps grow the bubble, never the bar.
-    val barH = 56.dp
+    // 68dp gives the resting bubble headroom and the pressed bubble
+    // real overflow travel past both edges.
+    val barH = 68.dp
     @Composable
     fun BoxScope.DockInner() {
     Box(
@@ -243,6 +245,24 @@ fun GlassBoxScope.GlassBottomBar(
             .fillMaxWidth()
             .height(barH)
     ) {
+        // Inner content plate (layer two): a lighter lens behind the tab
+        // row for depth. Sibling, not nested — explicit size, no wrapping
+        // surprises. Transparent to touch (lens boxes never consume).
+        with(this@GlassBottomBar) {
+            LiquidGlassBox(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .padding(horizontal = 5.dp)
+                    .height(60.dp),
+                params = params.copy(
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                ),
+                shape = RoundedCornerShape(24.dp),
+                chromatic = 0.4f,
+                content = { }
+            )
+        }
         // Selected bubble, drawn first so tabs sit on top of it. A real
         // lens with no children: pure backdrop refraction, like the
         // reference drag bubble. No shadow on chrome.
@@ -293,7 +313,6 @@ fun GlassBoxScope.GlassBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.Center)
                 .onSizeChanged { rowWidthPx = it.width.toFloat() }
                 .pointerInput(Unit) {
                     detectTapGestures(
@@ -362,9 +381,16 @@ fun GlassBoxScope.GlassBottomBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             TABS.forEachIndexed { index, tab ->
+                val fingerAt = touchX ?: fingerX
+                val proximity = if (fingerAt == null || calmMode) 0f else {
+                    val dist = kotlin.math.abs(fingerAt - tabCenterPx(index))
+                    val reach = with(density) { 90.dp.toPx() }
+                    (1f - dist / reach).coerceIn(0f, 1f)
+                }
                 GlassTab(
                     selected = index == activeIndex,
                     animated = !calmMode,
+                    proximity = proximity,
                     onClick = { onSelect(tab.route) },
                     modifier = Modifier.weight(1f),
                     icon = {
@@ -441,6 +467,9 @@ private fun GlassTab(
     modifier: Modifier = Modifier,
     animated: Boolean = true,
     label: String,
+    // Finger proximity 0..1 (1 = finger on this tab): macOS-dock swell
+    // of the BAR under the finger. Transform-only; calm mode passes 0.
+    proximity: Float = 0f,
     icon: @Composable () -> Unit
 ) {
     val color = if (selected) MaterialTheme.colorScheme.primary
@@ -460,13 +489,14 @@ private fun GlassTab(
     // Wide short cells (reference language): icon over a small label,
     // the visible label announcing the tab. Tabs tint; press lifts.
     // Selected trait exposed for accessibility services.
+    val swell = if (animated) 1f + 0.18f * proximity.coerceIn(0f, 1f) else 1f
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .semantics { this.selected = selected }
             .graphicsLayer {
-                scaleX = lift
-                scaleY = lift
+                scaleX = lift * swell
+                scaleY = lift * swell
             }
             .clickable(
                 interactionSource = interaction,
