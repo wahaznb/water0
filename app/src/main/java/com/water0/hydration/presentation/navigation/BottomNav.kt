@@ -254,20 +254,21 @@ fun GlassBoxScope.GlassBottomBar(
             .fillMaxWidth()
             .height(barH)
     ) {
-        // Inner glass travel band: the white-traced loop the bubble
-        // roams in. Micro bend + fringe so it reads liquid against the
-        // frost shell, calm enough to sit under the bubble cleanly.
+        // Inner glass travel band: shares the bubble's exact edge
+        // geometry (58dp tall, 29dp corners, 4dp end stops) so at either
+        // end the two edges merge into one seamless line — no awkward
+        // gap, no step. Micro bend + fringe against the frost shell.
         with(this@GlassBottomBar) {
             LiquidGlassBox(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .fillMaxWidth()
-                    .padding(horizontal = 5.dp)
-                    .height(60.dp),
+                    .padding(horizontal = 4.dp)
+                    .height(58.dp),
                 params = params.copy(
                     tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
                 ),
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(29.dp),
                 chromatic = 0.5f,
                 content = { }
             )
