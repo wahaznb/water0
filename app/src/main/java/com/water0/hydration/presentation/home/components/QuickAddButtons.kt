@@ -58,15 +58,30 @@ fun QuickAddButtons(
             // Custom amount: exact glass sizes live behind one tap.
             // Equal weight with the drops so the row stays centered.
             if (onCustomClick != null) {
-                IconButton(
-                    onClick = onCustomClick,
-                    enabled = enabled,
-                    modifier = Modifier.weight(1f)
+                com.water0.hydration.ui.theme.LensCard(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    blurOverride = 0f,
+                    refraction = 0.08f,
+                    warpEdges = 0.06f,
+                    chromatic = 0.3f
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Edit,
-                        contentDescription = "Custom amount"
-                    )
+                    androidx.compose.foundation.layout.Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(88.dp)
+                    ) {
+                        IconButton(
+                            onClick = onCustomClick,
+                            enabled = enabled
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Edit,
+                                contentDescription = "Custom amount"
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -105,6 +120,9 @@ fun QuickAddButton(
 
     // Prismal press feel (spec in PressGlass.kt): spring 0.96 + white
     // glow under the finger, replacing the old bounce.
+    // The lens rim is the single outline (see PressableGlassChip):
+    // a Material border inside would bend apart from it when lensed.
+    val lensed = com.water0.hydration.ui.theme.isLensActive()
     com.water0.hydration.ui.theme.LensCard(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
@@ -126,7 +144,7 @@ fun QuickAddButton(
             containerColor = if (enabled) tint.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             contentColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
         ),
-        border = BorderStroke(
+        border = if (lensed) null else BorderStroke(
             1.dp,
             if (enabled) tint.copy(alpha = 0.45f)
             else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
@@ -140,11 +158,16 @@ fun QuickAddButton(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Icon(
-                imageVector = Icons.Filled.WaterDrop,
-                contentDescription = null,
-                modifier = Modifier.size(dropDp.dp)
-            )
+            androidx.compose.foundation.layout.Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.height(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.WaterDrop,
+                    contentDescription = null,
+                    modifier = Modifier.size(dropDp.dp)
+                )
+            }
             Text(
                 text = "${amount}ml",
                 fontSize = 13.sp,

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
@@ -337,6 +338,9 @@ private fun PressableGlassChip(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val haptics = LocalHapticFeedback.current
+    // The lens rim is the single outline: a Material border drawn
+    // inside would bend apart from it (doubled edges).
+    val lensed = com.water0.hydration.ui.theme.isLensActive()
     androidx.compose.runtime.LaunchedEffect(pressed) {
         if (pressed) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
@@ -352,7 +356,12 @@ private fun PressableGlassChip(
             selected = selected,
             onClick = onClick,
             label = label,
-            interactionSource = interaction
+            interactionSource = interaction,
+            border = if (lensed) null else FilterChipDefaults.filterChipBorder(
+                enabled = true,
+                selected = selected,
+                selectedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+            )
         )
     }
 }

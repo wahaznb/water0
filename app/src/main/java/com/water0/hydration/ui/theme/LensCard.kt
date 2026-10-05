@@ -25,6 +25,22 @@ val LocalLensConfig = compositionLocalOf { GlassConfig() }
 val LocalLensVisible = compositionLocalOf { true }
 
 /**
+ * Whether a LensCard with these flags will actually refract right now.
+ * Callers drop their OWN Material borders when true: a border drawn
+ * inside a lens bends with the content and separates from the shader
+ * rim (doubled outlines). The rim becomes the single outline, aligned
+ * by construction.
+ */
+@Composable
+fun isLensActive(refract: Boolean = true, enabled: Boolean = true): Boolean {
+    val lens =
+        com.water0.hydration.ui.theme.liquidglass.LocalGlassScope.current
+    val config = LocalLensConfig.current
+    return refract && lens != null && config.cardGlass &&
+        LocalLensVisible.current && enabled
+}
+
+/**
  * A card that genuinely refracts the living background through the
  * shell lens (technique ported from Mortd3kay/liquid-glass-android,
  * Apache-2.0; optical calibration follows styropyr0/PrismalAGSL, MIT —
@@ -64,14 +80,16 @@ fun LensCard(
     chromatic: Float = 1f,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val lens =
-        com.water0.hydration.ui.theme.liquidglass.LocalGlassScope.current
-    val config = LocalLensConfig.current
-    val visible = LocalLensVisible.current && enabled
-    if (!refract || lens == null || !config.cardGlass || !visible) {
+    if (!isLensActive(refract, enabled)) {
         Box(modifier = modifier) { content() }
         return
     }
+    val lens =
+        com.water0.hydration.ui.theme.liquidglass.LocalGlassScope.current ?: run {
+            Box(modifier = modifier) { content() }
+            return
+        }
+    val config = LocalLensConfig.current
     val base = remember(config) {
         config.toLiquidParams(Color.Transparent)
     }

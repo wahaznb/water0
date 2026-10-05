@@ -129,18 +129,15 @@ fun GlassBoxScope.GlassBottomBar(
     val activeIndex = dragIndex ?: selectedIndex
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
-    // Compact dock: tabs sit in fixed cells; centers come off the
-    // measured Row width. (Full-width dock: tabs share the measured CONTENT width equally. The
-    // Row's 12dp side padding is part of its measured width, so centers
-    // subtract it first — forgetting this sat edge tabs (Home/Settings)
-    // a few dp off-center.
+    // Tabs tile the full Row width edge to edge (no side padding): cell
+    // centers come straight off the measured width. The bubble is sized
+    // from the cell, so centered-on-tab and flush-with-track coincide.
     var rowWidthPx by remember { mutableStateOf<Float?>(null) }
-    val rowPadPx = with(density) { 12.dp.toPx() }
-    fun contentWidthPx(): Float = (rowWidthPx ?: with(density) { 324.dp.toPx() }) - rowPadPx * 2
+    fun contentWidthPx(): Float = rowWidthPx ?: with(density) { 324.dp.toPx() }
     fun tabCenterPx(i: Int): Float =
-        rowPadPx + contentWidthPx() * (i + 0.5f) / TABS.size
+        contentWidthPx() * (i + 0.5f) / TABS.size
     fun indexAt(xPx: Float): Int =
-        (((xPx - rowPadPx) / contentWidthPx()) * TABS.size).toInt()
+        ((xPx / contentWidthPx()) * TABS.size).toInt()
             .coerceIn(0, TABS.size - 1)
 
     // Touch glow fully removed (see DockInner): no glow state lives
@@ -197,8 +194,9 @@ fun GlassBoxScope.GlassBottomBar(
         (kotlin.math.abs(fingerVel) * 6f).coerceIn(0f, 26f).dp
     val pressSpec = if (fingerDown) tween<Dp>(durationMillis = 120)
     else spring<Dp>(dampingRatio = 0.75f, stiffness = 300f)
+    val cellWdp = with(density) { (contentWidthPx() / TABS.size).toDp() }
     val pillW by animateDpAsState(
-        targetValue = (if (fingerDown && !calmMode) 96.dp else 88.dp) + stretch,
+        targetValue = (if (fingerDown && !calmMode) 96.dp else (cellWdp - 12.dp).coerceAtLeast(56.dp)) + stretch,
         animationSpec = pressSpec,
         label = "pillW"
     )
@@ -222,7 +220,7 @@ fun GlassBoxScope.GlassBottomBar(
     // Edge snap: on the end tabs the bubble sits flush with the bar's
     // inner edge (4dp breathing room) instead of floating mid-cell, so
     // bar edge and bubble edge read as one continuous line.
-    val edgeMargin = 4.dp
+    val edgeMargin = 6.dp
     fun clampPillX(xDp: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp {
         val rowW = with(density) {
             (rowWidthPx ?: 324.dp.toPx()).toDp()
@@ -263,7 +261,7 @@ fun GlassBoxScope.GlassBottomBar(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp)
+                    .padding(horizontal = 6.dp)
                     .height(58.dp),
                 params = params.copy(
                     tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
@@ -343,6 +341,7 @@ fun GlassBoxScope.GlassBottomBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.Center)
+                .padding(vertical = 2.dp)
                 .onSizeChanged { rowWidthPx = it.width.toFloat() }
                 .pointerInput(Unit) {
                     detectTapGestures(
@@ -406,7 +405,7 @@ fun GlassBoxScope.GlassBottomBar(
                         }
                     )
                 }
-                .padding(horizontal = 12.dp, vertical = 5.dp),
+                .padding(vertical = 2.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -444,8 +443,8 @@ fun GlassBoxScope.GlassBottomBar(
     // Outer bar: pure frost track, never a lens. The bubble is the one
     // refractive element in the dock, gliding inside frost margins on
     // every side — no overlapping lenses, so no double-bend ghosts.
-    // No border on the frost: the edge stays quiet, the bubble's rim
-    // is the only bright outline in the bar.
+    // Hairline border outlines the frost shell (explicitly requested);
+    // it never bends, so it can't ghost.
     // (The dockLens kill-switch now gates the bubble, not the bar.)
     val dockShape = RoundedCornerShape(50)
     Box(
@@ -459,6 +458,13 @@ fun GlassBoxScope.GlassBottomBar(
             .clip(dockShape)
             .background(
                 MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
+                dockShape
+            )
+            .border(
+                1.dp,
+                MaterialTheme.colorScheme.outline.copy(
+                    alpha = com.water0.hydration.ui.theme.Glass.BORDER_ALPHA
+                ),
                 dockShape
             )
     ) {
