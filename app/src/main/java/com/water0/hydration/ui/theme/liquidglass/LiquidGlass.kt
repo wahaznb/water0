@@ -684,6 +684,7 @@ private val GLASS_DISPLACEMENT_SHADER = """
                         darknessEffect = max(darknessEffect, currentDarkness * intensity);
                     }
                 }
+            }
         }
 
         // Diffraction: where the lens bent the ray, split RGB along the
