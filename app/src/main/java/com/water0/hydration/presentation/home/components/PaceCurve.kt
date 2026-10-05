@@ -145,8 +145,19 @@ fun PaceCurveCard(
         else -> "${expectedNow - drunkNow} ml under the line — steady sips close it."
     }
 
+    // Whole-card liquid glass (not plot-only): a single calm lens so
+    // the backdrop bends behind the entire card while every child
+    // stays readable. One element, never nested.
+    com.water0.hydration.ui.theme.LensCard(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(com.water0.hydration.ui.theme.Radii.md),
+        blurOverride = 0.1f,
+        refraction = 0.2f,
+        warpEdges = 0.1f,
+        chromatic = 0.3f
+    ) {
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .glassCard()
             // Calm backdrop coat: an extra veil of fill so a busy living
@@ -212,16 +223,8 @@ fun PaceCurveCard(
         val green = Color(0xFF43A047)
         // Reference black: the goal line up top. Neutral in both modes.
         val refLine = Color.Black.copy(alpha = if (dark) 0.65f else 0.45f)
-        // Plot-only lens: the graph refracts, title/caption stay crisp
-        // frost above it. A full-card lens bends its own text.
-        com.water0.hydration.ui.theme.LensCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            blurOverride = 0f,
-            refraction = 0.08f,
-            warpEdges = 0.06f,
-            chromatic = 0.3f
-        ) {
+        // Bare plot Canvas inside the card lens: the curve draws crisp,
+        // the card element bends the backdrop behind it.
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
@@ -367,7 +370,6 @@ fun PaceCurveCard(
                 drawCircle(cur, 4.dp.toPx(), Offset(cx, cy))
             }
         }
-        }
         // Readout follows the finger; caption returns when untouched.
         // (touchFrac persists after release so the reading lingers.)
         val readout = touchFrac?.let { frac ->
@@ -398,4 +400,5 @@ fun PaceCurveCard(
             )
         }
     }
+    } // whole-card lens
 }

@@ -834,7 +834,7 @@ private fun GlassLabSection(
             onChange = { onChange(config.copy(backgroundOn = it)) }
         )
         ShowRow(
-            label = "Dock lens (off = frost dock)",
+            label = "Bubble lens (off = frost bubble)",
             checked = config.dockLens,
             onChange = { onChange(config.copy(dockLens = it)) }
         )

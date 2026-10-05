@@ -213,7 +213,7 @@ fun GlassBoxScope.GlassBottomBar(
     val pillCorner = 29.dp
     val pillShape = RoundedCornerShape(pillCorner)
     val pressLiftY by animateDpAsState(
-        targetValue = if (fingerDown && !calmMode) (-6).dp else 0.dp,
+        targetValue = if (fingerDown && !calmMode) (-3).dp else 0.dp,
         animationSpec = pressSpec,
         label = "pressLiftY"
     )
@@ -422,53 +422,29 @@ fun GlassBoxScope.GlassBottomBar(
     // full-screen wrapper. The old wrapper (fillMaxSize + BottomCenter)
     // parked the Row at the top, covering the screen; align is the
     // robust idiom and leaves content touches alone.
-    // Dock lens kill-switch: frost dock, no refraction. Doubles
-    // as the black-dot diagnostic — dots with this off are not
-    // the lens, the glow, or anything our code draws.
-    // Wide short pill (reference language): spans the screen with slim
-    // side margins, height from the labeled tabs. Stadium lens.
+    // Outer bar: pure frost track, never a lens. The bubble is the one
+    // refractive element in the dock, gliding inside frost margins on
+    // every side — no overlapping lenses, so no double-bend ghosts.
+    // No border on the frost: the edge stays quiet, the bubble's rim
+    // is the only bright outline in the bar.
+    // (The dockLens kill-switch now gates the bubble, not the bar.)
     val dockShape = RoundedCornerShape(50)
-    if (config.dockLens) {
-        this@GlassBottomBar.LiquidGlassBox(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(horizontal = 12.dp)
-                .padding(bottom = 20.dp, top = 12.dp)
-                .onSizeChanged {
-                    onHeight(with(density) { it.height.toDp() })
-                },
-            params = params,
-            shape = dockShape,
-            chromatic = 0.4f
-        ) {
-            DockInner()
-        }
-    } else {
-        val frostShape = RoundedCornerShape(50)
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(horizontal = 12.dp)
-                .padding(bottom = 20.dp, top = 12.dp)
-                .onSizeChanged {
-                    onHeight(with(density) { it.height.toDp() })
-                }
-                .clip(frostShape)
-                    .background(
-                        com.water0.hydration.ui.theme.glassCardContainer(),
-                        frostShape
-                    )
-                    .border(
-                        1.dp,
-                        MaterialTheme.colorScheme.outline.copy(
-                            alpha = com.water0.hydration.ui.theme.Glass.BORDER_ALPHA
-                        ),
-                        frostShape
-                    )
-            ) {
-                DockInner()
+    Box(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(horizontal = 12.dp)
+            .padding(bottom = 20.dp, top = 12.dp)
+            .onSizeChanged {
+                onHeight(with(density) { it.height.toDp() })
             }
-        }
+            .clip(dockShape)
+            .background(
+                com.water0.hydration.ui.theme.glassCardContainer(),
+                dockShape
+            )
+    ) {
+        DockInner()
+    }
 }
 
 @Composable
