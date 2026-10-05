@@ -20,6 +20,9 @@ import com.water0.hydration.ui.theme.liquidglass.toLiquidParams
  */
 val LocalLensScope = compositionLocalOf<GlassBoxScope?> { null }
 val LocalLensConfig = compositionLocalOf { GlassConfig() }
+/** False for offscreen pager pages: their lenses would register at
+ * onscreen positions and bend whatever tab is actually showing. */
+val LocalLensVisible = compositionLocalOf { true }
 
 /**
  * A card that genuinely refracts the living background through the
@@ -53,6 +56,9 @@ fun LensCard(
     // Refractive lens on/off. Off = plain frost box: guaranteed-crisp
     // labels where a lens provably smears text on real phones.
     refract: Boolean = true,
+    // Visibility gate (pager): false renders frost with NO element
+    // registered. Branch switch disposes any live lens, unregistering it.
+    enabled: Boolean = true,
     // Diffraction (chromatic split) on/off per surface: graphs and
     // small buttons refract clean, chrome keeps the fringe.
     chromatic: Float = 1f,
@@ -61,7 +67,8 @@ fun LensCard(
     val lens =
         com.water0.hydration.ui.theme.liquidglass.LocalGlassScope.current
     val config = LocalLensConfig.current
-    if (!refract || lens == null || !config.cardGlass) {
+    val visible = LocalLensVisible.current && enabled
+    if (!refract || lens == null || !config.cardGlass || !visible) {
         Box(modifier = modifier) { content() }
         return
     }

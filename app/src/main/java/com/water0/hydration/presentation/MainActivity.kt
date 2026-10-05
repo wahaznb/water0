@@ -336,6 +336,14 @@ class MainActivity : ComponentActivity() {
                                 alpha = 1f - (pageOffset * 0.3f).coerceIn(0f, 0.5f)
                                 translationX = -pagerState.currentPageOffsetFraction * 80f
                             }
+                            // Lens visibility follows the settled page: offscreen
+                            // pages must not register lenses (their rects
+                            // ignore the pager offset and haunt the visible
+                            // tab as bending ghosts).
+                            androidx.compose.runtime.CompositionLocalProvider(
+                                com.water0.hydration.ui.theme.LocalLensVisible provides
+                                    (platePage == page)
+                            ) {
                             Box(modifier = motionModifier.fillMaxSize()) {
                                 when (page) {
                                     0 -> HomeScreen(
@@ -378,6 +386,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 }
+                            }
                             }
                         }
                     }

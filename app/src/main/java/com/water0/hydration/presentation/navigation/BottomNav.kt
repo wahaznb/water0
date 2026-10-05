@@ -273,8 +273,8 @@ fun GlassBoxScope.GlassBottomBar(
                     .offset(x = pillX, y = pressLiftY)
                     .size(width = pillW, height = pillH),
                 params = params.copy(
-                    // Pink bubble tint, per request.
-                    tint = Color(0xFFEE2689).copy(alpha = 0.28f),
+                    // No tint on the bubble: clear glass, bend + rim only.
+                    tint = Color.Transparent,
                     // Press loupe: strong magnification of whatever sits
                     // under the finger (no color split on the bubble, so
                     // this stays clean, not rainbow). Calm at rest.
