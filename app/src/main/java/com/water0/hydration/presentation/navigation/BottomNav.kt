@@ -198,12 +198,12 @@ fun GlassBoxScope.GlassBottomBar(
     val pressSpec = if (fingerDown) tween<Dp>(durationMillis = 120)
     else spring<Dp>(dampingRatio = 0.75f, stiffness = 300f)
     val pillW by animateDpAsState(
-        targetValue = (if (fingerDown && !calmMode) 104.dp else 88.dp) + stretch,
+        targetValue = (if (fingerDown && !calmMode) 96.dp else 88.dp) + stretch,
         animationSpec = pressSpec,
         label = "pillW"
     )
     val pillH by animateDpAsState(
-        targetValue = ((if (fingerDown && !calmMode) 76.dp else 58.dp) -
+        targetValue = ((if (fingerDown && !calmMode) 84.dp else 58.dp) -
             stretch * 0.35f).coerceAtLeast(46.dp),
         animationSpec = pressSpec,
         label = "pillH"
@@ -215,7 +215,7 @@ fun GlassBoxScope.GlassBottomBar(
     )
     val pillShape = RoundedCornerShape(pillCorner)
     val pressLiftY by animateDpAsState(
-        targetValue = if (fingerDown && !calmMode) (-10).dp else 0.dp,
+        targetValue = if (fingerDown && !calmMode) (-12).dp else 0.dp,
         animationSpec = pressSpec,
         label = "pressLiftY"
     )
@@ -255,13 +255,13 @@ fun GlassBoxScope.GlassBottomBar(
                 params = params.copy(
                     // Pink bubble tint, per request.
                     tint = Color(0xFFEE2689).copy(alpha = 0.28f),
-                    // Press zoom: the lens magnifies what sits under the
-                    // finger instead of only growing the outline. Calmer
-                    // than the bar at rest so rims stay clean.
+                    // Press loupe: strong magnification of whatever sits
+                    // under the finger (no color split on the bubble, so
+                    // this stays clean, not rainbow). Calm at rest.
                     scale = params.scale * 0.7f *
-                        (if (fingerDown && !calmMode) 1.8f else 1f),
+                        (if (fingerDown && !calmMode) 2.6f else 1f),
                     centerDistortion = params.centerDistortion * 0.7f *
-                        (if (fingerDown && !calmMode) 1.8f else 1f)
+                        (if (fingerDown && !calmMode) 2.6f else 1f)
                 ),
                 shape = pillShape,
                 chromatic = 0f,
