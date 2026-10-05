@@ -152,7 +152,7 @@ fun PaceCurveCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(com.water0.hydration.ui.theme.Radii.md),
         blurOverride = 0.1f,
-        refraction = 0.2f,
+        refraction = 0.08f,
         warpEdges = 0.1f,
         chromatic = 0.3f
     ) {

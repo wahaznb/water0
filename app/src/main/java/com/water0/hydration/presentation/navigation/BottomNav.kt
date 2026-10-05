@@ -254,6 +254,24 @@ fun GlassBoxScope.GlassBottomBar(
             .fillMaxWidth()
             .height(barH)
     ) {
+        // Inner glass travel band: the white-traced loop the bubble
+        // roams in. Micro bend + fringe so it reads liquid against the
+        // frost shell, calm enough to sit under the bubble cleanly.
+        with(this@GlassBottomBar) {
+            LiquidGlassBox(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .padding(horizontal = 5.dp)
+                    .height(60.dp),
+                params = params.copy(
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                ),
+                shape = RoundedCornerShape(24.dp),
+                chromatic = 0.5f,
+                content = { }
+            )
+        }
         // Selected bubble, drawn first so tabs sit on top of it. A real
         // lens with no children: pure backdrop refraction, like the
         // reference drag bubble. No shadow on chrome.
@@ -293,7 +311,7 @@ fun GlassBoxScope.GlassBottomBar(
                         (if (fingerDown && !calmMode) 2.6f else 1f)
                 ),
                 shape = pillShape,
-                chromatic = 0f,
+                chromatic = 0.8f,
                 cornerRadiusPx = with(density) { pillCorner.toPx() },
                 content = { }
             )
@@ -439,7 +457,7 @@ fun GlassBoxScope.GlassBottomBar(
             }
             .clip(dockShape)
             .background(
-                com.water0.hydration.ui.theme.glassCardContainer(),
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
                 dockShape
             )
     ) {

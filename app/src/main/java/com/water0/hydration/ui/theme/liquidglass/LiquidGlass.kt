@@ -709,7 +709,8 @@ private val GLASS_DISPLACEMENT_SHADER = """
         // gathers in opposite directions keeps the fringe at any blur.
         float doChroma = (bendLen > 0.5 && wantChroma > 0.01) ? 1.0 : 0.0;
         float2 bendDir = doChroma > 0.5 ? bendVec / bendLen : float2(0.0);
-        float caPx = min(bendLen * 0.12, 2.5) * wantChroma;
+        float caPx = min(bendLen * 0.12, 2.5) * wantChroma +
+            (wantChroma > 0.01 ? 0.75 * wantChroma : 0.0);
         float4 color;
         if (blurRadius > 0.0) {
             float4 blurredColor = float4(0.0);
