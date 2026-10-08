@@ -266,7 +266,7 @@ fun GlassBoxScope.GlassBottomBar(
                     tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
                 ),
                 shape = RoundedCornerShape(29.dp),
-                chromatic = 0.5f,
+                chromatic = 0.8f,
                 content = { }
             )
         }
@@ -445,9 +445,10 @@ fun GlassBoxScope.GlassBottomBar(
     // Hairline border outlines the frost shell (explicitly requested);
     // it never bends, so it can't ghost.
     // (The dockLens kill-switch now gates the bubble, not the bar.)
-    // Bar corners = band corners = bubble corners (29dp): one edge
-    // language, seamless merges everywhere.
-    val dockShape = RoundedCornerShape(29.dp)
+    // Outer edge follows the inner edge: band/bubble run 29dp, the
+    // shell adds the 6dp frost gap concentrically (35dp), so both
+    // curves read as one family instead of two unrelated roundings.
+    val dockShape = RoundedCornerShape(35.dp)
     Box(
         modifier = Modifier
             .align(Alignment.BottomCenter)
@@ -458,7 +459,7 @@ fun GlassBoxScope.GlassBottomBar(
             }
             .clip(dockShape)
             .background(
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.28f),
                 dockShape
             )
             .border(
