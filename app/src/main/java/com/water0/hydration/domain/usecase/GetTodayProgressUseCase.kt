@@ -34,7 +34,9 @@ class GetTodayProgressUseCase(
         // The ghost: sip waypoints across today's window.
         val sipPlan: List<RecommendationEngine.Companion.SipSlot>,
         // Best lights-out for an 8h night before the wake hour.
-        val bedtimeHour: Float
+        val bedtimeHour: Float,
+        // How today actually started: measured/observed/learned/profile.
+        val wakeEstimate: RecommendationEngine.WakeEstimate
     )
 
     operator fun invoke(): Flow<ProgressResult> {
@@ -51,9 +53,16 @@ class GetTodayProgressUseCase(
         val pastWeekFlow = repository.getEntriesInRange(
             todayStart - 7 * DAY_MILLIS, todayStart - 1
         )
+        // Wake estimator history: 15 wake-anchored days of first-sips
+        // for the rolling median (fixed bounds at collection start,
+        // same pattern as pastWeekFlow above).
+        val estimatorFlow = repository.getEntriesInRange(
+            System.currentTimeMillis() - 15 * DAY_MILLIS,
+            System.currentTimeMillis()
+        )
 
-        return combine(profileFlow, entriesFlow, behaviorFlow, pastWeekFlow) {
-                profile, entries, behavior, pastWeek ->
+        return combine(profileFlow, entriesFlow, behaviorFlow, pastWeekFlow, estimatorFlow) {
+                profile, entries, behavior, pastWeek, estimatorEntries ->
             val goal = recommendationEngine.calculateDailyGoal(profile).totalMl
             // Wake-anchored day: the day starts at wake-up, so entries
             // before today's wake boundary belong to yesterday. Midnight
@@ -61,6 +70,45 @@ class GetTodayProgressUseCase(
             val nowMs = System.currentTimeMillis()
             val dayStart = RecommendationEngine.dayStartMillis(
                 profile.wakeUpHour, profile.sleepHour, nowMs
+            )
+            // Wake estimator: observed = first log after the previous
+            // evening's silence; learned = median first-sip clock time
+            // across past wake-anchored days; measured = Health Connect.
+            val span = RecommendationEngine.windowSpanHours(
+                profile.wakeUpHour, profile.sleepHour
+            )
+            val prevSleepMs = dayStart - (24 - span) * 3600_000L
+            val allTs = estimatorEntries.map { it.timestamp }
+            val observed = RecommendationEngine.firstLogAfterGap(
+                allTs, 4 * 3600_000L, prevSleepMs
+            )
+            val firstSips = (1..14).mapNotNull { back ->
+                val ds = dayStart - back * 24 * 3600_000L
+                estimatorEntries
+                    .filter { it.timestamp in ds until ds + 24 * 3600_000L }
+                    .minOfOrNull { it.timestamp }
+                    ?.let { RecommendationEngine.timeOfDayMs(it) }
+            }
+            val learnedDayMs = RecommendationEngine.medianWakeTime(firstSips)
+            // Median clock time -> nearest such wall clock at/before now.
+            val learned = learnedDayMs?.let { tod ->
+                val cal = java.util.Calendar.getInstance().apply {
+                    timeInMillis = nowMs
+                    set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    set(java.util.Calendar.MINUTE, 0)
+                    set(java.util.Calendar.SECOND, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                }
+                val base = cal.timeInMillis + tod
+                if (base <= nowMs) base else base - 24 * 3600_000L
+            }
+            val measured = try {
+                repository.getLastNightSleep()?.wakeTimeMs
+            } catch (_: Exception) {
+                null
+            }
+            val wakeEstimate = RecommendationEngine.estimateWake(
+                measured, observed, learned, dayStart, nowMs
             )
             val dayEntries = entries.filter { it.timestamp >= dayStart }
             val totalEffective = dayEntries.sumOf { it.effectiveHydrationMl }
@@ -105,7 +153,8 @@ class GetTodayProgressUseCase(
                 ),
                 bedtimeHour = RecommendationEngine.recommendedBedtime(
                     profile.wakeUpHour
-                )
+                ),
+                wakeEstimate = wakeEstimate
             )
         }
     }

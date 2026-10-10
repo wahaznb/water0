@@ -35,6 +35,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -338,7 +340,13 @@ fun OnboardingScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(text = "Gentle reminders", fontSize = 16.sp)
-                Switch(checked = remindersOn, onCheckedChange = { remindersOn = it })
+                Switch(
+                    checked = remindersOn,
+                    onCheckedChange = { remindersOn = it },
+                    modifier = Modifier.semantics {
+                        contentDescription = "Gentle reminders"
+                    }
+                )
             }
             Text(
                 text = "Notification permission is asked only if this is on.",
@@ -360,6 +368,9 @@ fun OnboardingScreen(
                 Text(text = "Connect Health Connect", fontSize = 16.sp)
                 Switch(
                     checked = hcOn,
+                    modifier = Modifier.semantics {
+                        contentDescription = "Connect Health Connect"
+                    },
                     onCheckedChange = { want ->
                         hcOn = want
                         if (!want) {

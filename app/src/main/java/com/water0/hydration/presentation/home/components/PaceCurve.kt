@@ -91,6 +91,8 @@ fun PaceCurveCard(
     // The ghost: sip waypoints across today's window + best lights-out.
     plan: List<RecommendationEngine.Companion.SipSlot> = emptyList(),
     bedtimeHour: Float = sleepHour.toFloat(),
+    // How today actually started; shown, never silently upgraded.
+    wakeEstimate: RecommendationEngine.WakeEstimate? = null,
     modifier: Modifier = Modifier
 ) {
     val onSurface = MaterialTheme.colorScheme.onSurface
@@ -160,17 +162,35 @@ fun PaceCurveCard(
     }
     val sleepH = (((wakeHour - bedtimeHour) % 24 + 24) % 24)
     val bedText = "lights-out ${clockOf(bedtimeHour)} (≈${sleepH.roundToInt()}h night)"
+    // Day-start honesty: when the start was observed rather than
+    // assumed, say so (tier-labeled, one short clause).
+    val wakeText = wakeEstimate?.takeIf {
+        it.confidence != RecommendationEngine.WakeConfidence.PROFILE
+    }?.let {
+        val tag = when (it.confidence) {
+            RecommendationEngine.WakeConfidence.MEASURED -> "measured"
+            RecommendationEngine.WakeConfidence.OBSERVED -> "first sip"
+            else -> "usual"
+        }
+        val wcal = java.util.Calendar.getInstance().apply { timeInMillis = it.wakeMs }
+        val wh = wcal.get(java.util.Calendar.HOUR_OF_DAY) +
+            wcal.get(java.util.Calendar.MINUTE) / 60f
+        "up ≈${clockOf(wh)} ($tag)"
+    }
     // Verdict doubles as the caption: behind/on/ahead in one line,
     // then the actionable next step and the night's boundary.
     val caption = when {
-        !awake -> "$drunkNow of $goalMl ml today. $bedText."
+        !awake -> listOfNotNull(
+            "$drunkNow of $goalMl ml today.",
+            bedText, wakeText
+        ).joinToString(" ")
         drunkNow >= ghostNow -> listOfNotNull(
             "On the ghost — $drunkNow of ${ghostNow.roundToInt()} ml by now.",
-            nextText, bedText
+            nextText, bedText, wakeText
         ).joinToString(" · ")
         else -> listOfNotNull(
             "${ghostNow.roundToInt() - drunkNow} ml under the ghost — steady sips close it.",
-            nextText, bedText
+            nextText, bedText, wakeText
         ).joinToString(" · ")
     }
 

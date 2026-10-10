@@ -46,6 +46,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -434,6 +436,9 @@ private fun RemindersSection(profile: UserProfile, viewModel: SettingsViewModel)
             Text(text = "Enable reminders", fontSize = 16.sp)
             Switch(
                 checked = profile.remindersEnabled,
+                modifier = Modifier.semantics {
+                    contentDescription = "Enable reminders"
+                },
                 onCheckedChange = {
                     viewModel.toggleReminders(it)
                     if (!it) {
@@ -878,6 +883,9 @@ private fun AppearanceSection(darkTheme: Boolean, onToggleTheme: (Boolean) -> Un
             Text(text = "Dark theme", fontSize = 16.sp)
             Switch(
                 checked = darkTheme,
+                modifier = Modifier.semantics {
+                    contentDescription = "Dark theme"
+                },
                 onCheckedChange = onToggleTheme
             )
         }
@@ -939,7 +947,13 @@ private fun ShowRow(
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurface
         )
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(
+            checked = checked,
+            modifier = Modifier.semantics {
+                contentDescription = label
+            },
+            onCheckedChange = onChange
+        )
     }
 }
 

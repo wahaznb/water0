@@ -124,8 +124,7 @@ class RecommendationEngine {
          * First plan slot strictly after [hour], or null when the day's
          * plan is done. Elapsed-since-wake comparison, so overnight
          * windows work: a 23:30 now still finds the 00:30 slot.
-         */
-        fun nextSip(
+         */        fun nextSip(
             plan: List<SipSlot>,
             wakeUpHour: Int,
             sleepHour: Int,
@@ -140,6 +139,80 @@ class RecommendationEngine {
             val nowElapsed = elapsed(hour)
             if (nowElapsed >= span) return null
             return plan.firstOrNull { elapsed(it.hour) > nowElapsed }
+        }
+
+        /**
+         * First log at/after [searchStartMs] preceded by at least
+         * [minGapMs] of silence — the "day starts with the first sip"
+         * signal. A midnight sip inside the sleep window can't qualify
+         * (gap too short); the morning log after real silence can. With
+         * no earlier timestamp on record, the search start itself is the
+         * silence baseline. Null when nothing qualifies. Pure + tested.
+         */
+        fun firstLogAfterGap(
+            timestampsMs: List<Long>,
+            minGapMs: Long,
+            searchStartMs: Long
+        ): Long? {
+            val sorted = timestampsMs.filter { it >= searchStartMs }.sorted()
+            // Baseline is the last log before the search start; with none,
+            // the search start itself (silence is assumed, not proven —
+            // the evening boundary is chosen so that assumption holds).
+            var prev = timestampsMs.filter { it < searchStartMs }.maxOrNull()
+                ?: searchStartMs
+            for (ts in sorted) {
+                if (ts - prev >= minGapMs) return ts
+                prev = ts
+            }
+            return null
+        }
+
+        /**
+         * Median time-of-day millis, null with fewer than 3 samples.
+         * Straightforward median (wakes cluster far from midnight; a
+         * circular median is out of scope until someone needs it).
+         */
+        fun medianWakeTime(timeOfDayMs: List<Long>): Long? {
+            if (timeOfDayMs.size < 3) return null
+            val s = timeOfDayMs.sorted()
+            return if (s.size % 2 == 1) s[s.size / 2]
+            else (s[s.size / 2 - 1] + s[s.size / 2]) / 2
+        }
+
+        /**
+         * Tiered wake: HC-measured > observed first-log > rolling median
+         * > profile fallback. A candidate dated after [nowMs] is treated
+         * as missing (clocks lie; tiers must not). Pure + tested.
+         */
+        fun estimateWake(
+            measuredWakeMs: Long?,
+            observedWakeMs: Long?,
+            learnedWakeMs: Long?,
+            fallbackWakeMs: Long,
+            nowMs: Long
+        ): WakeEstimate {
+            fun valid(v: Long?) = v != null && v <= nowMs
+            return when {
+                valid(measuredWakeMs) ->
+                    WakeEstimate(measuredWakeMs!!, WakeConfidence.MEASURED)
+                valid(observedWakeMs) ->
+                    WakeEstimate(observedWakeMs!!, WakeConfidence.OBSERVED)
+                valid(learnedWakeMs) ->
+                    WakeEstimate(learnedWakeMs!!, WakeConfidence.LEARNED)
+                else -> WakeEstimate(fallbackWakeMs, WakeConfidence.PROFILE)
+            }
+        }
+
+        /**
+         * Wall-clock time-of-day millis for grouping first-sips by clock
+         * time (device zone — matches what the user sees). Pure + tested.
+         */
+        fun timeOfDayMs(timestampMs: Long): Long {
+            val cal = java.util.Calendar.getInstance().apply { timeInMillis = timestampMs }
+            return ((cal.get(java.util.Calendar.HOUR_OF_DAY) * 60L +
+                cal.get(java.util.Calendar.MINUTE)) * 60 +
+                cal.get(java.util.Calendar.SECOND)) * 1000 +
+                cal.get(java.util.Calendar.MILLISECOND)
         }
 
         /** True when hour falls inside the wake window, overnight-aware. */
@@ -164,8 +237,13 @@ class RecommendationEngine {
         fun safeMaxMl(goalMl: Int): Int = (goalMl * 1.5f).roundToInt()
     }
 
-    data class Recommendation(
-        val message: String,
+    /** How a wake time was obtained — shown, never silently upgraded. */
+    enum class WakeConfidence { MEASURED, OBSERVED, LEARNED, PROFILE }
+
+    /** A wake time in millis + its tier. */
+    data class WakeEstimate(val wakeMs: Long, val confidence: WakeConfidence)
+
+    data class Recommendation(        val message: String,
         val priority: Priority,
         val suggestedAmountMl: Int,
         val reason: Reason,

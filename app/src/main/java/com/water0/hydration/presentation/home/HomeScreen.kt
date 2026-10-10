@@ -106,7 +106,8 @@ fun HomeScreen(
                 wakeHour = state.wakeHour,
                 sleepHour = state.sleepHour,
                 plan = state.sipPlan,
-                bedtimeHour = state.bedtimeHour
+                bedtimeHour = state.bedtimeHour,
+                wakeEstimate = state.wakeEstimate
             )
             Column(
                 modifier = Modifier
@@ -553,7 +554,11 @@ private fun SwipeDots(count: Int, current: Int, onSelect: (Int) -> Unit = {}) {
                         if (i == current) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                     )
-                    .clickable { onSelect(i) }
+                    .clickable(
+                        role = androidx.compose.ui.semantics.Role.Button,
+                        onClickLabel = "Show stats page ${i + 1} of $count",
+                        onClick = { onSelect(i) }
+                    )
                     .padding(6.dp)
             )
         }

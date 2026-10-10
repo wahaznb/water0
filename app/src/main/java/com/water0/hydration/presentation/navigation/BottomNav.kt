@@ -2,6 +2,7 @@ package com.water0.hydration.presentation.navigation
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
@@ -61,7 +62,8 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected as selectedTrait
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -508,7 +510,7 @@ private fun GlassTab(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .semantics { this.selected = selected }
+            .semantics { this.selectedTrait = selected }
             .graphicsLayer {
                 scaleX = lift * swell
                 scaleY = lift * swell
@@ -553,6 +555,9 @@ fun GlassBoxScope.LensPlate(
     modifier: Modifier = Modifier,
     // Home only: big centered brand title. Other tabs stay left-aligned.
     centeredTitle: Boolean = false,
+    // Scroll-minimize: tucked small while the list moves down, full on
+    // the way back up. Title + padding animate; options stay usable.
+    minimized: Boolean = false,
     options: (@Composable RowScope.() -> Unit)? = null
 ) {
     // TV Girl blue top lens: vivid blue #0351A3 from the Who Really Cares
@@ -563,6 +568,17 @@ fun GlassBoxScope.LensPlate(
     }
     // Title: TV Girl blue in dark, pure black in light.
     val titleColor = if (isDarkScheme()) Color(0xFF0351A3) else Color.Black
+    val fullSize = if (centeredTitle) 26f else 20f
+    val titleSp by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (minimized) 14f else fullSize,
+        animationSpec = androidx.compose.animation.core.tween(250),
+        label = "plateTitle"
+    )
+    val vPad by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (minimized) 6.dp else 12.dp,
+        animationSpec = androidx.compose.animation.core.tween(250),
+        label = "platePad"
+    )
     this@LensPlate.LiquidGlassBox(
         modifier = modifier.fillMaxWidth(),
         params = params,
@@ -571,26 +587,26 @@ fun GlassBoxScope.LensPlate(
         if (options == null) {
             Text(
                 text = title,
-                fontSize = if (centeredTitle) 26.sp else 20.sp,
+                fontSize = titleSp.sp,
                 fontWeight = FontWeight.Bold,
                 color = titleColor,
                 textAlign = if (centeredTitle) androidx.compose.ui.text.style.TextAlign.Center
                 else androidx.compose.ui.text.style.TextAlign.Start,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .padding(horizontal = 20.dp, vertical = vPad)
             )
         } else {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                    .padding(horizontal = 20.dp, vertical = vPad),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = title,
-                    fontSize = 20.sp,
+                    fontSize = titleSp.sp,
                     fontWeight = FontWeight.Bold,
                     color = titleColor
                 )
@@ -694,7 +710,18 @@ fun PlateRangeBar(
                 val isSel = i == previewIndex
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(width = segWdp, height = 30.dp)
+                    modifier = Modifier
+                        .size(width = segWdp, height = 30.dp)
+                        // TalkBack route: the swipe gestures below are
+                        // pointer-only, so each segment is also a radio.
+                        // (Aliased: the `selected` param shadows the
+                        // semantics import here.)
+                        .semantics { selectedTrait = isSel }
+                        .clickable(
+                            role = Role.RadioButton,
+                            onClickLabel = "Show last $option days",
+                            onClick = { onSelect(option) }
+                        )
                 ) {
                     Text(
                         text = "${option}d",

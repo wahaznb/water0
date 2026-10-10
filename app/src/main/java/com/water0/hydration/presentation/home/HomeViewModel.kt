@@ -49,7 +49,9 @@ class HomeViewModel(
             // Wake-anchored day + the ghost plan + best lights-out.
             val dayStartMs: Long,
             val sipPlan: List<RecommendationEngine.Companion.SipSlot>,
-            val bedtimeHour: Float
+            val bedtimeHour: Float,
+            // How today actually started (tier-labeled, never silent).
+            val wakeEstimate: RecommendationEngine.WakeEstimate
         ) : UiState
 
         object Loading : UiState
@@ -112,7 +114,8 @@ class HomeViewModel(
                     sleepHour = result.sleepHour,
                     dayStartMs = result.dayStartMs,
                     sipPlan = result.sipPlan,
-                    bedtimeHour = result.bedtimeHour
+                    bedtimeHour = result.bedtimeHour,
+                    wakeEstimate = result.wakeEstimate
                 )
             }
         }
