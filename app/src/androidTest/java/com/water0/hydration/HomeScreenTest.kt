@@ -74,6 +74,10 @@ private class TestRepository : HydrationRepository {
         behavior.value = behavior.value.updateOnLog(amountMl, drinkType)
     }
 
+    override suspend fun onReminderShown() {
+        behavior.value = behavior.value.onReminderShown()
+    }
+
     override suspend fun getLastNightSleep():
         com.water0.hydration.data.fitness.SleepWindow? = null
 
