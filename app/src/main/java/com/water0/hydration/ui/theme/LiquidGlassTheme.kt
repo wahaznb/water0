@@ -134,11 +134,14 @@ object DockMetrics {
     val frostGap = 6.dp
     val shellCorner = bubbleCorner + frostGap
     const val shellAlpha = 0.28f
-    val bandH = 66.dp
     val pressedW = 96.dp
     val pressedH = 96.dp
     val pressLift = (-3).dp
     const val contentBlur = 0.15f
+    val barH = 78.dp
+    val cellInset = 12.dp
+    val minBubbleW = 56.dp
+    val minBubbleH = 46.dp
 }
 
 /**

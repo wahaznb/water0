@@ -111,9 +111,8 @@ fun QuickAddButton(
         else -> { name = "Custom"; dropDp = 20 }
     }
     val tint = MaterialTheme.colorScheme.primaryContainer
-    // Pressed glass: the lens bends harder and fringes stronger under
-    // the finger with a haptic tick. prismalPress adds the spring
-    // scale + white glow on top.
+    // Frost button (refract=false): press glow + haptic tick carry the
+    // press feel; the LensCard wrapper stays as the frost seam.
     val pressInteraction = remember { MutableInteractionSource() }
     val pressed by pressInteraction.collectIsPressedAsState()
     val haptics = LocalHapticFeedback.current

@@ -322,11 +322,10 @@ private fun BackdateChip(
 }
 
 /**
- * One pressed-glass chip for every small control: at rest a whisper
- * lens (rim + tint, sub-visible bend); pressed, the lens bends harder
- * and fringes stronger under the finger with a haptic tick — the
- * pressed-liquid-glass behavior. FilterChip keeps its own background
- * so labels stay put while the backdrop warps.
+ * One frost chip for every small control (refract=false: labels can
+ * never bend). Rim/border + fills carry the look; press glow + haptic
+ * still fire. The LensCard wrapper stays as the explicit frost seam
+ * so lenses have one place to come back.
  */
 @Composable
 private fun PressableGlassChip(
