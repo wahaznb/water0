@@ -667,7 +667,17 @@ private fun FitnessSection() {
             statusLine = "System sheet came back empty — opening the " +
                 "Health Connect app sheet instead…"
             try {
-                legacyLauncher.launch(source.readPermissions())
+                // No HC app installed = no sheet to open (emulator,
+                // de-Googled ROMs): say so instead of firing blind.
+                val probe = com.water0.hydration.data.fitness.FitnessDataSource
+                    .requestContractLegacy()
+                    .createIntent(context, source.readPermissions())
+                if (probe.resolveActivity(context.packageManager) == null) {
+                    statusLine = "No Health Connect app to ask — allow Sleep " +
+                        "+ Exercise inside Health Connect, then Check again."
+                } else {
+                    legacyLauncher.launch(source.readPermissions())
+                }
             } catch (e: Exception) {
                 statusLine = "No Health Connect app to ask — allow Sleep " +
                     "+ Exercise inside Health Connect, then Check again."
