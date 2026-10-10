@@ -5,4 +5,6 @@
       request code asks for it. -->
     <permission name="android.permission.health.READ_SLEEP" />
     <permission name="android.permission.health.READ_EXERCISE" />
+    <permission name="android.permission.health.WRITE_HYDRATION" />
+    <permission name="android.permission.health.WRITE_NUTRITION" />
 </health-permissions>

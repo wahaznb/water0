@@ -28,6 +28,63 @@ class FitnessDataSourceTest {
     }
 
     @Test
+    fun writePermissions_exactSet() {
+        assertEquals(
+            setOf(
+                "android.permission.health.WRITE_HYDRATION",
+                "android.permission.health.WRITE_NUTRITION"
+            ),
+            FitnessDataSource.writePermissions()
+        )
+    }
+
+    @Test
+    fun allPermissions_isReadsPlusWrites() {
+        assertEquals(
+            FitnessDataSource.readPermissions() +
+                FitnessDataSource.writePermissions(),
+            FitnessDataSource.allPermissions()
+        )
+        assertEquals(4, FitnessDataSource.allPermissions().size)
+    }
+
+    @Test
+    fun caffeineEstimates_documentedAverages() {
+        // Brewed coffee ~95mg/240ml, black tea ~47mg/240ml. Estimates.
+        assertEquals(
+            95,
+            FitnessDataSource.caffeineMgFor(
+                com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.COFFEE,
+                240
+            )
+        )
+        assertEquals(
+            47,
+            FitnessDataSource.caffeineMgFor(
+                com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.TEA,
+                240
+            )
+        )
+        for (t in listOf(
+            com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.WATER,
+            com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.JUICE,
+            com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.SODA,
+            com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.ALCOHOL,
+            com.water0.hydration.data.local.entity.HydrationEntry.DrinkType.OTHER
+        )) {
+            assertEquals(0, FitnessDataSource.caffeineMgFor(t, 240))
+        }
+    }
+
+    @Test
+    fun recordIds_stablePerEntry() {
+        assertEquals("water0_entry_42", FitnessDataSource.drinkRecordId(42))
+        assertEquals(
+            "water0_entry_42_nutrition", FitnessDataSource.nutritionRecordId(42)
+        )
+    }
+
+    @Test
     fun readPermissions_allNewPrefix() {
         for (p in FitnessDataSource.readPermissions()) {
             assertTrue(
@@ -78,6 +135,6 @@ class FitnessDataSourceTest {
                 manifest.parent, "res/xml/health_permissions.xml"
             ).readText()
         ).map { it.groupValues[1] }.toSet()
-        assertEquals(FitnessDataSource.readPermissions(), declared)
+        assertEquals(FitnessDataSource.allPermissions(), declared)
     }
 }

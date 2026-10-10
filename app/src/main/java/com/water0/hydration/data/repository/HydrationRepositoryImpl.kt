@@ -10,6 +10,7 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class HydrationRepositoryImpl(
@@ -23,21 +24,74 @@ class HydrationRepositoryImpl(
         com.water0.hydration.data.fitness.FitnessDataSource(it.applicationContext)
     }
 
+    // Mirror scope: the HC write-back must never delay the log itself
+    // (provider IPC can stall). Fire-and-forget, best-effort.
+    private val mirrorScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
+    )
+
     override fun getTodayEntries(): Flow<List<HydrationEntry>> = entryDao.getTodayEntries()
 
     override fun getEntriesForDate(date: String): Flow<List<HydrationEntry>> = entryDao.getEntriesForDate(date)
 
     override fun getEntriesInRange(startTime: Long, endTime: Long): Flow<List<HydrationEntry>> = entryDao.getEntriesInRange(startTime, endTime)
 
-    override suspend fun insertEntry(entry: HydrationEntry): Long = entryDao.insert(entry)
+    override suspend fun insertEntry(entry: HydrationEntry): Long {
+        val id = entryDao.insert(entry)
+        // Write-back mirror: best-effort, never fails or delays the log.
+        // Bulk imports deliberately skip it (backfill storms +
+        // duplicates; a future syncAll can batch them if wanted).
+        mirrorScope.launch {
+            try {
+                fitness?.writeDrink(id, entry.amountMl, entry.type, entry.timestamp)
+            } catch (_: Exception) {
+            }
+        }
+        return id
+    }
 
     override suspend fun insertEntries(entries: List<HydrationEntry>) = entryDao.insertAll(entries)
 
-    override suspend fun updateEntry(entry: HydrationEntry) { entryDao.update(entry) }
+    override suspend fun updateEntry(entry: HydrationEntry) {
+        entryDao.update(entry)
+        // Mirror the write-back: same clientRecordIds, so the upsert
+        // overwrites instead of duplicating (edit amount/type/time).
+        mirrorScope.launch {
+            try {
+                fitness?.writeDrink(entry.id, entry.amountMl, entry.type, entry.timestamp)
+            } catch (_: Exception) {
+            }
+        }
+    }
 
-    override suspend fun deleteEntry(id: Long) { entryDao.delete(id) }
+    override suspend fun deleteEntry(id: Long) {
+        entryDao.delete(id)
+        // Mirror the write-back: our HC rows die with the local row.
+        mirrorScope.launch {
+            try {
+                fitness?.deleteDrink(id)
+            } catch (_: Exception) {
+            }
+        }
+    }
 
-    override suspend fun deleteAllEntries() { entryDao.deleteAll() }
+    override suspend fun deleteAllEntries() {
+        // IDs before the wipe, so no HC row is orphaned.
+        val ids = try {
+            entryDao.getRecentEntries(Int.MAX_VALUE).map { it.id }
+        } catch (_: Exception) {
+            emptyList()
+        }
+        entryDao.deleteAll()
+        mirrorScope.launch {
+            for (id in ids) {
+                try {
+                    fitness?.deleteDrink(id)
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
 
     override suspend fun getTodayTotalEffectiveMl(): Int = entryDao.getTodayTotalEffectiveMl() ?: 0
 

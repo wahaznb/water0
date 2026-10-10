@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -572,6 +573,13 @@ private fun RemindersSection(profile: UserProfile, viewModel: SettingsViewModel)
 
 @Composable
 private fun SleepSection(profile: UserProfile, viewModel: SettingsViewModel) {
+    val context = LocalContext.current
+    // Local drag state: onValueChangeFinished must reschedule with the
+    // value under the finger, not profile.wakeUpHour (the Flow echo may
+    // not have recomposed yet when the finger lifts — stale hour bug).
+    var wakeValue by remember(profile.wakeUpHour) {
+        mutableFloatStateOf(profile.wakeUpHour.toFloat())
+    }
     SectionCard(title = "Active hours") {
         Text(
             text = "Wake up: ${"%02d".format(profile.wakeUpHour)}:00",
@@ -579,8 +587,18 @@ private fun SleepSection(profile: UserProfile, viewModel: SettingsViewModel) {
             color = MaterialTheme.colorScheme.onSurface
         )
         Slider(
-            value = profile.wakeUpHour.toFloat(),
-            onValueChange = { viewModel.updateSleepWindow(it.roundToInt(), profile.sleepHour) },
+            value = wakeValue,
+            onValueChange = {
+                wakeValue = it
+                viewModel.updateSleepWindow(it.roundToInt(), profile.sleepHour)
+            },
+            // Wake hour moves the wake-up call too, otherwise tomorrow's
+            // ping fires at yesterday's time.
+            onValueChangeFinished = {
+                com.water0.hydration.di.AppContainer
+                    .getNotificationScheduler(context)
+                    .rescheduleWakePing(wakeValue.roundToInt().coerceIn(0, 23))
+            },
             valueRange = 0f..23f,
             steps = 22
         )
@@ -627,12 +645,19 @@ private fun FitnessSection() {
                 return@launch
             }
             if (!source.hasPermissions()) {
-                statusLine = "See workouts and last night's sleep here. " +
-                    "Reads stay on this phone, just like everything else."
+                statusLine = "Reads workouts + sleep; writes your logged " +
+                    "drinks (coffee/tea caffeine is estimated) so other " +
+                    "apps you allow can see them. Everything else stays " +
+                    "on this phone."
                 showConnect = true
                 return@launch
             }
-            statusLine = "Connected — workouts shape recs from now on."
+            statusLine = if (source.hasWritePermissions()) {
+                "Connected — workouts shape recs, drinks sync out."
+            } else {
+                "Connected for reads — Hydration write denied, so " +
+                    "drinks stay in Water0 only."
+            }
             sleepLine = source.lastNightSleep()?.let {
                 val fmt = java.text.SimpleDateFormat(
                     "HH:mm", java.util.Locale.getDefault()
@@ -656,7 +681,8 @@ private fun FitnessSection() {
             refresh()
         } else {
             statusLine = "Health Connect sheet came back empty — allow Sleep " +
-                "+ Exercise inside the Health Connect app, then Check again."
+                "+ Exercise + Hydration inside the Health Connect app, " +
+                "then Check again."
         }
     }
     val launcher = rememberLauncherForActivityResult(
@@ -673,19 +699,21 @@ private fun FitnessSection() {
             try {
                 val probe = com.water0.hydration.data.fitness.FitnessDataSource
                     .requestContractApp()
-                    .createIntent(context, source.readPermissions())
+                    .createIntent(context, source.allPermissions())
                 if (probe.resolveActivity(context.packageManager) == null) {
                     statusLine = "No Health Connect app to ask — allow Sleep " +
-                        "+ Exercise inside Health Connect, then Check again."
+                        "+ Exercise + Hydration inside Health Connect, " +
+                        "then Check again."
                 } else {
-                    appLauncher.launch(source.readPermissions())
+                    appLauncher.launch(source.allPermissions())
                 }
             } catch (e: Exception) {
                 statusLine = "No Health Connect app to ask — allow Sleep " +
-                    "+ Exercise inside Health Connect, then Check again."
+                    "+ Exercise + Hydration inside Health Connect, " +
+                    "then Check again."
             }
         } else statusLine = "Permission sheet returned empty — allow Sleep " +
-            "+ Exercise inside Health Connect, then Check again."
+            "+ Exercise + Hydration inside Health Connect, then Check again."
     }
 
     SectionCard(title = "Fitness") {
@@ -718,7 +746,7 @@ private fun FitnessSection() {
         if (showConnect) {
             OutlinedButton(onClick = {
                 try {
-                    launcher.launch(source.readPermissions())
+                    launcher.launch(source.allPermissions())
                 } catch (e: Exception) {
                     statusLine = "Couldn't open the permission sheet " +
                         "(${e.javaClass.simpleName}) — try Open Health " +
@@ -739,11 +767,15 @@ private fun FitnessSection() {
                     Text("Check again")
                 }
                 TextButton(onClick = {
-                    // API 34+: jump straight to OUR app's permission page
-                    // (one tap to grant); older: the HC settings screens.
-                    try {
+                    // Every candidate is resolve-checked first: on ROMs
+                    // where nothing answers, the old code swallowed three
+                    // exceptions in a row and the button looked dead.
+                    // Now the miss reports itself with manual steps.
+                    val pm = context.packageManager
+                    val candidates = buildList {
                         if (android.os.Build.VERSION.SDK_INT >= 34) {
-                            context.startActivity(
+                            // API 34+: straight to OUR app's permission page.
+                            add(
                                 Intent(
                                     "android.health.connect.action.MANAGE_HEALTH_PERMISSIONS"
                                 ).putExtra(
@@ -751,23 +783,44 @@ private fun FitnessSection() {
                                     context.packageName
                                 )
                             )
-                            return@TextButton
                         }
-                        throw UnsupportedOperationException("pre-34")
-                    } catch (_: Exception) {
-                    }
-                    try {
-                        context.startActivity(
+                        // System-routed settings (platform or provider).
+                        add(Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS"))
+                        add(
                             Intent(
                                 "androidx.health.ACTION_HEALTH_CONNECT_SETTINGS"
-                            ).setPackage("com.google.android.apps.healthdata")
-                        )
-                    } catch (_: Exception) {
-                        try {
-                            context.startActivity(
-                                Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS")
+                            ).setPackage(
+                                "com.google.android.apps.healthdata"
                             )
+                        )
+                        pm.getLaunchIntentForPackage(
+                            "com.google.android.apps.healthdata"
+                        )?.let { add(it) }
+                    }
+                    val target = candidates.firstOrNull {
+                        try {
+                            it.resolveActivity(pm) != null
                         } catch (_: Exception) {
+                            false
+                        }
+                    }
+                    if (target == null) {
+                        statusLine = "Couldn't find Health Connect settings " +
+                            "on this phone — open the Health Connect app, " +
+                            "go to App permissions → Water0, allow Sleep " +
+                            "+ Exercise + Hydration, then Check again."
+                    } else {
+                        try {
+                            target.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(target)
+                            statusLine = "Opened Health Connect — allow " +
+                                "Sleep + Exercise + Hydration, then Check again."
+                        } catch (e: Exception) {
+                            statusLine = "Couldn't open it " +
+                                "(${e.javaClass.simpleName}) — open the " +
+                                "Health Connect app → App permissions → " +
+                                "Water0, allow Sleep + Exercise + Hydration, " +
+                                "then Check again."
                         }
                     }
                 }) {
@@ -966,7 +1019,7 @@ private fun PermissionsSection() {
         )
         PermissionRow(
             name = "Health Connect — sleep & exercise (optional)",
-            why = "Workouts shape recommendations, last night's sleep shows in Fitness. Read on this phone only, never uploaded."
+            why = "Reads workouts + sleep; writes logged drinks (coffee/tea caffeine estimated) so apps you allow can see them. Everything else stays on this phone, never uploaded."
         )
         PermissionRow(
             name = "Network",

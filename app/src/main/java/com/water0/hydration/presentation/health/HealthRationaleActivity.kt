@@ -28,9 +28,10 @@ class HealthRationaleActivity : ComponentActivity() {
                     text = "Water0 reads your sleep windows and recent " +
                         "workouts from Health Connect, only on this phone, " +
                         "only to tune hydration goals and reminders. " +
-                        "Nothing is uploaded, shared, or stored anywhere " +
-                        "else. Turn it off anytime in Health Connect > " +
-                        "App permissions.",
+                        "It also writes your logged drinks there " +
+                        "(coffee/tea caffeine is estimated), so other " +
+                        "apps you allow can see them. Turn it off anytime " +
+                        "in Health Connect > App permissions.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(24.dp)

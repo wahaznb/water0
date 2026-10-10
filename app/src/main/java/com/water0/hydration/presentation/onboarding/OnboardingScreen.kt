@@ -373,7 +373,7 @@ fun OnboardingScreen(
                         }
                         hcStatus = null
                         try {
-                            hcLauncher.launch(hcSource.readPermissions())
+                            hcLauncher.launch(hcSource.allPermissions())
                         } catch (_: Exception) {
                             hcStatus = "Couldn't open the sheet — connect " +
                                 "anytime later in Settings → Fitness."
@@ -382,8 +382,8 @@ fun OnboardingScreen(
                 )
             }
             Text(
-                text = hcStatus ?: "Workouts shape recommendations, last " +
-                    "night's sleep shows in Fitness. Off by default.",
+                text = hcStatus ?: "Reads workouts + sleep, writes logged " +
+                    "drinks out (coffee/tea caffeine estimated). Off by default.",
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

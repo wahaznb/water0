@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import com.water0.hydration.presentation.notification.NotificationWorker
+import com.water0.hydration.presentation.notification.WakeWorker
 
 class Water0Application : Application() {
 
@@ -48,5 +49,34 @@ class Water0Application : Application() {
                 description = "Gentle nudges to drink water during the day."
             }
         )
+        // Third job, third channel: the wake-up call must sound
+        // different from everything else, and sound is per-channel and
+        // immutable once created — so it gets its own channel with an
+        // alarm-type tone (no audio file shipped; system sound).
+        val wakeChannel = NotificationChannel(
+            WakeWorker.WAKE_CHANNEL_ID,
+            "Wake-up call",
+            NotificationManager.IMPORTANCE_HIGH
+        )
+        wakeChannel.description =
+            "One ping at your usual wake time to start the day with water."
+        // getDefaultUri is nullable (no tone set): fall down the ladder
+        // so the channel is never born silent — sound is immutable after.
+        val wakeSound =
+            android.media.RingtoneManager.getDefaultUri(
+                android.media.RingtoneManager.TYPE_ALARM
+            )
+                ?: android.media.RingtoneManager.getDefaultUri(
+                    android.media.RingtoneManager.TYPE_NOTIFICATION
+                )
+                ?: android.provider.Settings.System.DEFAULT_ALARM_ALERT_URI
+        wakeChannel.setSound(
+            wakeSound,
+            android.media.AudioAttributes.Builder()
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                .build()
+        )
+        manager.createNotificationChannel(wakeChannel)
     }
 }

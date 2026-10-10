@@ -3,13 +3,22 @@ package com.water0.hydration.presentation.notification
 import android.content.Context
 import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkManager
+import com.water0.hydration.di.AppContainer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 // Entry points for (re)starting the reminder chain. The chain itself is
 // self-perpetuating (see NotificationWorker); these just make sure one
 // exists after app launch or device boot.
-class NotificationScheduler(private val context: Context) {
+class NotificationScheduler(context: Context) {
 
-    private val workManager = WorkManager.getInstance(context)
+    // Application context only: callers pass Activities, and the
+    // profile read can outlive them. One shared scope, not one per call.
+    private val appContext = context.applicationContext
+    private val workManager = WorkManager.getInstance(appContext)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun ensureScheduled() {
         // Primer run: shows the persistent status line within minutes of
@@ -38,6 +47,37 @@ class NotificationScheduler(private val context: Context) {
 
     fun cancel() {
         workManager.cancelUniqueWork(NotificationWorker.UNIQUE_WORK)
+        workManager.cancelUniqueWork(WakeWorker.UNIQUE_WORK)
+    }
+
+    /**
+     * Wake-up call chain: one ping at the next wake o'clock. Async
+     * profile read (scheduler callers are sync); KEEP policy so launches
+     * never reset tomorrow's ping. Disabled or profileless -> cancel.
+     */
+    fun ensureWakePing() {
+        scope.launch {
+            try {
+                val profile = AppContainer
+                    .getRepository(appContext).getUserProfileSuspend()
+                if (profile == null || !profile.remindersEnabled) {
+                    workManager.cancelUniqueWork(WakeWorker.UNIQUE_WORK)
+                    return@launch
+                }
+                workManager.enqueueUniqueWork(
+                    WakeWorker.UNIQUE_WORK,
+                    ExistingWorkPolicy.KEEP,
+                    WakeWorker.wakeRequest(profile.wakeUpHour)
+                )
+            } catch (e: Exception) {
+                android.util.Log.w("WakePing", "ensureWakePing failed", e)
+            }
+        }
+    }
+
+    /** Wake hour changed: drop tomorrow's ping and recompute now. */
+    fun rescheduleWakePing(wakeHour: Int) {
+        WakeWorker.scheduleWakePing(appContext, wakeHour)
     }
 
     companion object {

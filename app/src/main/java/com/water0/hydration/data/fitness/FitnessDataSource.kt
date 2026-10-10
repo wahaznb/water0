@@ -5,11 +5,20 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.HydrationRecord
+import androidx.health.connect.client.records.NutritionRecord
+import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.SleepSessionRecord
+import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import androidx.health.connect.client.units.Mass
+import androidx.health.connect.client.units.Volume
+import com.water0.hydration.data.local.entity.HydrationEntry
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
+import kotlin.math.roundToInt
 
 /** Last night's sleep window, epoch millis. Display + training use. */
 data class SleepWindow(val bedTimeMs: Long, val wakeTimeMs: Long)
@@ -57,9 +66,10 @@ class FitnessDataSource(private val context: Context) {
     }
 
     /** Which permission road the 1.1.x contract takes on this phone:
-     * platform runtime-permissions sheet vs provider-app sheet. */
+     * platform runtime-permissions sheet vs provider-app sheet. Built
+     * from the full sheet set, matching what the button launches. */
     fun requestIntentLine(): String = try {
-        val intent = requestContract().createIntent(context, readPermissions())
+        val intent = requestContract().createIntent(context, allPermissions())
         "sheet: action=${intent.action} pkg=${intent.`package`}"
     } catch (e: Exception) {
         "sheet failed: ${e.javaClass.simpleName}"
@@ -79,6 +89,12 @@ class FitnessDataSource(private val context: Context) {
      * strings crash it with IllegalArgumentException.
      * Companion: needs no Context, unit-testable on plain JVM. */
     fun readPermissions(): Set<String> = Companion.readPermissions()
+
+    /** Write-back set (hydration + nutrition). Instance delegate. */
+    fun writePermissions(): Set<String> = Companion.writePermissions()
+
+    /** Full sheet set: reads + writes in one user gesture. */
+    fun allPermissions(): Set<String> = Companion.allPermissions()
 
     suspend fun hasPermissions(): Boolean = try {
         clientOrNull()?.permissionController?.getGrantedPermissions()
@@ -130,6 +146,85 @@ class FitnessDataSource(private val context: Context) {
         }
     }
 
+    /**
+     * Write-back: one logged drink -> Health Connect. Every drink becomes
+     * a HydrationRecord (actual volume); coffee/tea additionally become a
+     * NutritionRecord carrying estimated caffeine (see caffeineMgFor —
+     * standard averages, not lab values). Alcohol is skipped: it
+     * dehydrates, and a hydration record for it would be a lie.
+     * Idempotent upserts via clientRecordId, so retries and reinstalls
+     * can't duplicate. Best-effort Boolean, never throws.
+     */
+    suspend fun writeDrink(
+        entryId: Long,
+        amountMl: Int,
+        type: HydrationEntry.DrinkType,
+        timestampMs: Long
+    ): Boolean {
+        val client = clientOrNull() ?: return false
+        return try {
+            if (!hasWritePermissions()) return false
+            if (amountMl <= 0) return false
+            if (type == HydrationEntry.DrinkType.ALCOHOL) return false
+            val zoneId = ZoneId.systemDefault()
+            val start = Instant.ofEpochMilli(timestampMs)
+            val end = start.plusSeconds(60)
+            val records = mutableListOf<Record>(
+                HydrationRecord(
+                    startTime = start,
+                    startZoneOffset = zoneId.rules.getOffset(start),
+                    endTime = end,
+                    endZoneOffset = zoneId.rules.getOffset(end),
+                    volume = Volume.liters(amountMl / 1000.0),
+                    metadata = Metadata.manualEntry(
+                        clientRecordId = drinkRecordId(entryId)
+                    )
+                )
+            )
+            val caffeineMg = caffeineMgFor(type, amountMl)
+            if (caffeineMg > 0) {
+                records += NutritionRecord(
+                    startTime = start,
+                    startZoneOffset = zoneId.rules.getOffset(start),
+                    endTime = end,
+                    endZoneOffset = zoneId.rules.getOffset(end),
+                    caffeine = Mass.milligrams(caffeineMg.toDouble()),
+                    // Estimated, not measured — says so on the record.
+                    name = type.name.lowercase(java.util.Locale.ROOT) + " (est.)",
+                    metadata = Metadata.manualEntry(
+                        clientRecordId = nutritionRecordId(entryId)
+                    )
+                )
+            }
+            client.insertRecords(records)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** Best-effort mirror of [writeDrink]: removes our records by the
+     * same clientRecordIds. Silent when the provider is gone. */
+    suspend fun deleteDrink(entryId: Long) {
+        try {
+            val client = clientOrNull() ?: return
+            client.deleteRecords(
+                HydrationRecord::class, emptyList(), listOf(drinkRecordId(entryId))
+            )
+            client.deleteRecords(
+                NutritionRecord::class, emptyList(), listOf(nutritionRecordId(entryId))
+            )
+        } catch (_: Exception) {
+        }
+    }
+
+    suspend fun hasWritePermissions(): Boolean = try {
+        clientOrNull()?.permissionController?.getGrantedPermissions()
+            ?.containsAll(Companion.writePermissions()) == true
+    } catch (_: Exception) {
+        false
+    }
+
     /** Central guard: getOrCreate throws with no provider on board
      * (custom ROMs), so every caller goes through here instead of
      * remembering its own try/catch. */
@@ -164,5 +259,34 @@ class FitnessDataSource(private val context: Context) {
             HealthPermission.getReadPermission(SleepSessionRecord::class),
             HealthPermission.getReadPermission(ExerciseSessionRecord::class)
         )
+
+        /** Write-back set: hydration for every drink, nutrition for the
+         * caffeine carriers. Requested together with reads in one sheet. */
+        fun writePermissions(): Set<String> = setOf(
+            HealthPermission.getWritePermission(HydrationRecord::class),
+            HealthPermission.getWritePermission(NutritionRecord::class)
+        )
+
+        /** Everything the Connect sheet asks for in one go. */
+        fun allPermissions(): Set<String> = readPermissions() + writePermissions()
+
+        fun drinkRecordId(entryId: Long): String = "water0_entry_$entryId"
+
+        fun nutritionRecordId(entryId: Long): String = "water0_entry_${entryId}_nutrition"
+
+        /**
+         * Estimated caffeine, mg: brewed coffee ~95mg/240ml, black tea
+         * ~47mg/240ml (USDA averages). Estimates, not measurements —
+         * the record carries no provenance flag, so this mapping (and
+         * only this) decides. Pure + unit-tested.
+         */
+        fun caffeineMgFor(
+            type: HydrationEntry.DrinkType,
+            amountMl: Int
+        ): Int = when (type) {
+            HydrationEntry.DrinkType.COFFEE -> (amountMl * 0.396f).roundToInt()
+            HydrationEntry.DrinkType.TEA -> (amountMl * 0.196f).roundToInt()
+            else -> 0
+        }
     }
 }

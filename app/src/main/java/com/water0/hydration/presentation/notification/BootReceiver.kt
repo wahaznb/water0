@@ -20,6 +20,7 @@ class BootReceiver : BroadcastReceiver() {
             val scheduler = AppContainer.getNotificationScheduler(context)
             scheduler.ensureScheduled()
             scheduler.poke()
+            scheduler.ensureWakePing()
         }
     }
 }

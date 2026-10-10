@@ -114,6 +114,9 @@ class MainActivity : ComponentActivity() {
         // (killed app, update, reboot race) instead of next tick.
         AppContainer.getNotificationScheduler(this).ensureScheduled()
         AppContainer.getNotificationScheduler(this).poke()
+        // Wake-up call chain asserts itself the same way (KEEP: a launch
+        // never moves tomorrow's ping; disabled/profileless cancels).
+        AppContainer.getNotificationScheduler(this).ensureWakePing()
         // Belt and braces: post the status line directly on every launch
         // instead of trusting the worker chain delay alone. Still gated
         // on opt-in + permission + quiet hours inside.
@@ -175,6 +178,7 @@ class MainActivity : ComponentActivity() {
                                     scheduler.ensureScheduled()
                                     // Wanted + granted: visible within seconds.
                                     scheduler.poke()
+                                    scheduler.ensureWakePing()
                                 }
                             }
                         }

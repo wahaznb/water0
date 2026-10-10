@@ -15,6 +15,10 @@
       Mirrors health_permissions.xml + readPermissions(). -->
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
     <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+    <!-- Write-back: every drink -> HydrationRecord, coffee/tea caffeine
+      -> NutritionRecord. Requested in the same sheet as the reads. -->
+    <uses-permission android:name="android.permission.health.WRITE_HYDRATION" />
+    <uses-permission android:name="android.permission.health.WRITE_NUTRITION" />
 
     <!-- Health Connect (optional, API 34+) -->
     <queries>
