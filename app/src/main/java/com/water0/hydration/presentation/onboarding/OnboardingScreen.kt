@@ -25,9 +25,11 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.water0.hydration.data.local.entity.UserProfile
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 /**
  * First-run setup: asks for the numbers instead of assuming them.
@@ -66,6 +69,30 @@ fun OnboardingScreen(
     var wake by remember { mutableStateOf(7f) }
     var sleep by remember { mutableStateOf(23f) }
     var remindersOn by remember { mutableStateOf(true) }
+    var hcOn by remember { mutableStateOf(false) }
+    var hcStatus by remember { mutableStateOf<String?>(null) }
+    var hcAvailable by remember { mutableStateOf<Boolean?>(null) }
+    val hcScope = rememberCoroutineScope()
+    val hcSource = remember(context) {
+        com.water0.hydration.data.fitness.FitnessDataSource(context)
+    }
+    fun hcRefresh() {
+        hcScope.launch {
+            hcAvailable = hcSource.isAvailable()
+            hcStatus = if (hcSource.hasPermissions()) {
+                "Connected — workouts will shape recommendations."
+            } else null
+            if (hcStatus != null) hcOn = true
+        }
+    }
+    LaunchedEffect(Unit) { hcRefresh() }
+    val hcLauncher = rememberLauncherForActivityResult(
+        com.water0.hydration.data.fitness.FitnessDataSource.requestContract()
+    ) { granted ->
+        if (granted.isNotEmpty()) hcRefresh()
+        else hcStatus = "Sheet came back empty — you can connect " +
+            "anytime later in Settings → Fitness."
+    }
 
     fun weightKg(): Float? {
         val parsed = weightText.toFloatOrNull() ?: return null
@@ -315,6 +342,48 @@ fun OnboardingScreen(
             }
             Text(
                 text = "Notification permission is asked only if this is on.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Text(
+                text = "4 · Fitness (optional, skippable)",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "Connect Health Connect", fontSize = 16.sp)
+                Switch(
+                    checked = hcOn,
+                    onCheckedChange = { want ->
+                        hcOn = want
+                        if (!want) {
+                            hcStatus = null
+                            return@Switch
+                        }
+                        if (hcAvailable == false) {
+                            hcStatus = "Health Connect isn't on this " +
+                                "phone — workouts and sleep stay manual."
+                            return@Switch
+                        }
+                        hcStatus = null
+                        try {
+                            hcLauncher.launch(hcSource.readPermissions())
+                        } catch (_: Exception) {
+                            hcStatus = "Couldn't open the sheet — connect " +
+                                "anytime later in Settings → Fitness."
+                        }
+                    }
+                )
+            }
+            Text(
+                text = hcStatus ?: "Workouts shape recommendations, last " +
+                    "night's sleep shows in Fitness. Off by default.",
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

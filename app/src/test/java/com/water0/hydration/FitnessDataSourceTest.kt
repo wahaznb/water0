@@ -63,6 +63,14 @@ class FitnessDataSourceTest {
         assertTrue(xml.contains("HealthRationaleActivity"))
         assertTrue(xml.contains("VIEW_PERMISSION_USAGE"))
         assertTrue(xml.contains("ACTION_SHOW_PERMISSIONS_RATIONALE"))
+        // The controller drops requests it can't resolve to a usage
+        // screen: exact platform category + START_VIEW_PERMISSION_USAGE
+        // are required (a wrong category = empty sheet, no UI).
+        assertTrue(
+            "wrong/missing usage category",
+            xml.contains("android.intent.category.HEALTH_PERMISSIONS")
+        )
+        assertTrue(xml.contains("START_VIEW_PERMISSION_USAGE"))
         val declared = Regex(
             """<permission name="(android\.permission\.health\.[A-Z_]+)""""
         ).findAll(
