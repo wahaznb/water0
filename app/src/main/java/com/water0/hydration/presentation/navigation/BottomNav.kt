@@ -196,22 +196,22 @@ fun GlassBoxScope.GlassBottomBar(
     else spring<Dp>(dampingRatio = 0.75f, stiffness = 300f)
     val cellWdp = with(density) { (contentWidthPx() / TABS.size).toDp() }
     val pillW by animateDpAsState(
-        targetValue = (if (fingerDown && !calmMode) 96.dp else (cellWdp - 12.dp).coerceAtLeast(56.dp)) + stretch,
+        targetValue = (if (fingerDown && !calmMode) com.water0.hydration.ui.theme.DockMetrics.pressedW else (cellWdp - 12.dp).coerceAtLeast(56.dp)) + stretch,
         animationSpec = pressSpec,
         label = "pillW"
     )
     val pillH by animateDpAsState(
-        targetValue = ((if (fingerDown && !calmMode) 96.dp else 58.dp) -
+        targetValue = ((if (fingerDown && !calmMode) com.water0.hydration.ui.theme.DockMetrics.pressedH else com.water0.hydration.ui.theme.DockMetrics.bubbleH) -
             stretch * 0.35f).coerceAtLeast(46.dp),
         animationSpec = pressSpec,
         label = "pillH"
     )
     // Constant stadium corner: the bubble never morphs shape, it only
     // grows. Same radius as the bar edges so edge snaps read seamless.
-    val pillCorner = 29.dp
+    val pillCorner = com.water0.hydration.ui.theme.DockMetrics.bubbleCorner
     val pillShape = RoundedCornerShape(pillCorner)
     val pressLiftY by animateDpAsState(
-        targetValue = if (fingerDown && !calmMode) (-3).dp else 0.dp,
+        targetValue = if (fingerDown && !calmMode) com.water0.hydration.ui.theme.DockMetrics.pressLift else 0.dp,
         animationSpec = pressSpec,
         label = "pressLiftY"
     )
@@ -220,7 +220,7 @@ fun GlassBoxScope.GlassBottomBar(
     // Edge snap: on the end tabs the bubble sits flush with the bar's
     // inner edge (4dp breathing room) instead of floating mid-cell, so
     // bar edge and bubble edge read as one continuous line.
-    val edgeMargin = 6.dp
+    val edgeMargin = com.water0.hydration.ui.theme.DockMetrics.frostGap
     fun clampPillX(xDp: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp {
         val rowW = with(density) {
             (rowWidthPx ?: 324.dp.toPx()).toDp()
@@ -260,12 +260,12 @@ fun GlassBoxScope.GlassBottomBar(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp)
-                    .height(58.dp),
+                    .padding(horizontal = com.water0.hydration.ui.theme.DockMetrics.frostGap)
+                    .height(com.water0.hydration.ui.theme.DockMetrics.bubbleH),
                 params = params.copy(
                     tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
                 ),
-                shape = RoundedCornerShape(29.dp),
+                shape = RoundedCornerShape(com.water0.hydration.ui.theme.DockMetrics.bubbleCorner),
                 chromatic = 0.8f,
                 content = { }
             )
@@ -448,7 +448,7 @@ fun GlassBoxScope.GlassBottomBar(
     // Outer edge follows the inner edge: band/bubble run 29dp, the
     // shell adds the 6dp frost gap concentrically (35dp), so both
     // curves read as one family instead of two unrelated roundings.
-    val dockShape = RoundedCornerShape(35.dp)
+    val dockShape = RoundedCornerShape(com.water0.hydration.ui.theme.DockMetrics.shellCorner)
     Box(
         modifier = Modifier
             .align(Alignment.BottomCenter)
@@ -459,7 +459,7 @@ fun GlassBoxScope.GlassBottomBar(
             }
             .clip(dockShape)
             .background(
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.28f),
+                MaterialTheme.colorScheme.surface.copy(alpha = com.water0.hydration.ui.theme.DockMetrics.shellAlpha),
                 dockShape
             )
             .border(

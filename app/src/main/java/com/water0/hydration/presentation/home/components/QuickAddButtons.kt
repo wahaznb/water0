@@ -63,10 +63,6 @@ fun QuickAddButtons(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
                     refract = false,
-                    blurOverride = 0.15f,
-                    refraction = 0.08f,
-                    warpEdges = 0.06f,
-                    chromatic = 0.3f,
                     elevation = 0.dp
                 ) {
                     androidx.compose.foundation.layout.Box(
@@ -134,10 +130,6 @@ fun QuickAddButton(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
         refract = false,
-        blurOverride = 0.15f,
-        refraction = 0.08f,
-        warpEdges = 0.06f,
-        chromatic = if (pressed && enabled) 0.6f else 0.3f,
         elevation = 0.dp
     ) {
     Button(

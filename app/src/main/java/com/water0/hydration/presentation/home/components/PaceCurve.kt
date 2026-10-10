@@ -151,7 +151,7 @@ fun PaceCurveCard(
     com.water0.hydration.ui.theme.LensCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(com.water0.hydration.ui.theme.Radii.md),
-        blurOverride = 0.15f,
+        blurOverride = com.water0.hydration.ui.theme.DockMetrics.contentBlur,
         refraction = 0.08f,
         warpEdges = 0.1f,
         chromatic = 0.3f

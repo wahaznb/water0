@@ -124,6 +124,24 @@ object Glass {
 }
 
 /**
+ * Dock geometry, one source of truth. The shell stays concentric over
+ * the band (shellCorner = bubbleCorner + frostGap); the bubble merges
+ * with the band ends because all three share the same corner.
+ */
+object DockMetrics {
+    val bubbleH = 58.dp
+    val bubbleCorner = 29.dp
+    val frostGap = 6.dp
+    val shellCorner = bubbleCorner + frostGap
+    const val shellAlpha = 0.28f
+    val bandH = 66.dp
+    val pressedW = 96.dp
+    val pressedH = 96.dp
+    val pressLift = (-3).dp
+    const val contentBlur = 0.15f
+}
+
+/**
  * Card look (Glass Lab, live): frost vs liquid glass + how clear the
  * glass goes. Provided once in MainActivity from the saved config;
  * previews default to frost.

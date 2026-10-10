@@ -350,10 +350,6 @@ private fun PressableGlassChip(
     com.water0.hydration.ui.theme.LensCard(
         shape = RoundedCornerShape(8.dp),
         refract = false,
-        blurOverride = 0.15f,
-        refraction = if (pressed) 0.5f else 0.08f,
-        warpEdges = 0.06f,
-        chromatic = if (pressed) 0.6f else 0.3f,
         elevation = 0.dp,
         // Locked height: selected and unselected chips can never sit
         // at different heights on any device, font scale, or state.
