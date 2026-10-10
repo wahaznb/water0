@@ -74,3 +74,5 @@ session-*.md
 
 # ...except the Gradle wrapper jar, which CI needs to run ./gradlew
 !gradle-wrapper.jar
+# Agent skills live with the project but are never shipped or tracked.
+/skills/
