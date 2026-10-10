@@ -45,6 +45,24 @@
             </intent-filter>
         </activity>
         
+        <!-- Health Connect integration screens (documented, required by
+             newer providers for grants to succeed): permission-usage
+             screen + rationale screen. Static offline text. -->
+        <activity
+            android:name=".presentation.health.HealthRationaleActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Water0">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.health.connect.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name=".presentation.notification.BootReceiver"
             android:exported="false">

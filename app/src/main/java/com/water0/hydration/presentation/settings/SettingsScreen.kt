@@ -643,16 +643,20 @@ private fun FitnessSection() {
         }
     }
     LaunchedEffect(Unit) { refresh() }
+    // 1.1.0: single platform contract — the library itself routes to
+    // the provider app's sheet on ROMs without the platform Health
+    // module. Empty result = user dismissed or system denied: point
+    // at the manual grant path, no second firing.
     var triedAppSheet by remember { mutableStateOf(false) }
-    val legacyLauncher = rememberLauncherForActivityResult(
-        com.water0.hydration.data.fitness.FitnessDataSource.requestContractLegacy()
+    val appLauncher = rememberLauncherForActivityResult(
+        com.water0.hydration.data.fitness.FitnessDataSource.requestContractApp()
     ) { granted ->
         if (granted.isNotEmpty()) {
             triedAppSheet = false
             refresh()
         } else {
-            statusLine = "Both sheets came back empty — allow Sleep + " +
-                "Exercise inside the Health Connect app, then Check again."
+            statusLine = "Health Connect sheet came back empty — allow Sleep " +
+                "+ Exercise inside the Health Connect app, then Check again."
         }
     }
     val launcher = rememberLauncherForActivityResult(
@@ -660,23 +664,21 @@ private fun FitnessSection() {
     ) { granted ->
         if (granted.isNotEmpty()) refresh()
         else if (!triedAppSheet) {
-            // Platform runtime sheet auto-denied (ROM without the
-            // platform Health module): try the provider app's own
-            // sheet once before giving manual instructions.
+            // Platform sheet auto-denied (no platform Health module
+            // on this ROM): fall through to the provider app's own
+            // sheet before giving manual instructions.
             triedAppSheet = true
             statusLine = "System sheet came back empty — opening the " +
                 "Health Connect app sheet instead…"
             try {
-                // No HC app installed = no sheet to open (emulator,
-                // de-Googled ROMs): say so instead of firing blind.
                 val probe = com.water0.hydration.data.fitness.FitnessDataSource
-                    .requestContractLegacy()
+                    .requestContractApp()
                     .createIntent(context, source.readPermissions())
                 if (probe.resolveActivity(context.packageManager) == null) {
                     statusLine = "No Health Connect app to ask — allow Sleep " +
                         "+ Exercise inside Health Connect, then Check again."
                 } else {
-                    legacyLauncher.launch(source.readPermissions())
+                    appLauncher.launch(source.readPermissions())
                 }
             } catch (e: Exception) {
                 statusLine = "No Health Connect app to ask — allow Sleep " +
@@ -737,6 +739,23 @@ private fun FitnessSection() {
                     Text("Check again")
                 }
                 TextButton(onClick = {
+                    // API 34+: jump straight to OUR app's permission page
+                    // (one tap to grant); older: the HC settings screens.
+                    try {
+                        if (android.os.Build.VERSION.SDK_INT >= 34) {
+                            context.startActivity(
+                                Intent(
+                                    "android.health.connect.action.MANAGE_HEALTH_PERMISSIONS"
+                                ).putExtra(
+                                    Intent.EXTRA_PACKAGE_NAME,
+                                    context.packageName
+                                )
+                            )
+                            return@TextButton
+                        }
+                        throw UnsupportedOperationException("pre-34")
+                    } catch (_: Exception) {
+                    }
                     try {
                         context.startActivity(
                             Intent(

@@ -15,7 +15,7 @@ import java.time.Instant
 data class SleepWindow(val bedTimeMs: Long, val wakeTimeMs: Long)
 
 /**
- * Fitness plugin (Health Connect 1.0.0-alpha11 API, optional). Every call
+ * Fitness plugin (Health Connect 1.1.0 API, optional). Every call
  * is total-failure safe: no provider, no permission, airplane-mode
  * weirdness — all collapse to null/false and the app carries on with
  * its own data. Callers never branch on availability; they branch on
@@ -76,11 +76,9 @@ class FitnessDataSource(private val context: Context) {
     /** Raw permission strings, built by the library so the prefix
      * (`android.permission.health.*` since 1.1.x) always matches what
      * the permission contract validates — hardcoded old-prefix
-     * strings crash it with IllegalArgumentException. */
-    fun readPermissions(): Set<String> = setOf(
-        HealthPermission.getReadPermission(SleepSessionRecord::class),
-        HealthPermission.getReadPermission(ExerciseSessionRecord::class)
-    )
+     * strings crash it with IllegalArgumentException.
+     * Companion: needs no Context, unit-testable on plain JVM. */
+    fun readPermissions(): Set<String> = Companion.readPermissions()
 
     suspend fun hasPermissions(): Boolean = try {
         clientOrNull()?.permissionController?.getGrantedPermissions()
@@ -145,10 +143,26 @@ class FitnessDataSource(private val context: Context) {
         fun requestContract() =
             PermissionController.createRequestPermissionResultContract()
 
-        /** Provider-app sheet (bypasses the platform runtime dialog).
-         * On ROMs without the platform Health module the default
-         * contract auto-denies; the HC app's own sheet still works. */
-        fun requestContractLegacy() =
-            PermissionController.createRequestPermissionResultContractLegacy()
+        /** Fallback package for the provider-app sheet (ROMs without
+         * the platform Health module, where the platform contract
+         * auto-denies with an empty result). */
+        const val PROVIDER_PACKAGE = "com.google.android.apps.healthdata"
+
+        /** Provider-app sheet, built via the Java shim (the class is
+         * Kotlin-internal in 1.1.x but public bytecode — same current
+         * provider protocol the old `...Legacy()` factory spoke). */
+        fun requestContractApp(
+            providerPackage: String = PROVIDER_PACKAGE
+        ): androidx.activity.result.contract.ActivityResultContract<
+            Set<out String>, Set<out String>
+            > = HcAppContract.create(providerPackage)
+
+        /** Static so plain-JVM unit tests can assert the exact set
+         * (contract validates the `android.permission.health.*`
+         * prefix; a stale hardcoded string crashes at runtime). */
+        fun readPermissions(): Set<String> = setOf(
+            HealthPermission.getReadPermission(SleepSessionRecord::class),
+            HealthPermission.getReadPermission(ExerciseSessionRecord::class)
+        )
     }
 }
