@@ -36,6 +36,112 @@ class RecommendationEngine {
             return if (s <= 0) s + 24 else s
         }
 
+        /**
+         * One waypoint on the day's drinking plan (the graph's ghost):
+         * clock time as hour-of-day float + running target at that time.
+         */
+        data class SipSlot(val hour: Float, val cumulativeMl: Int)
+
+        /**
+         * Wake-anchored day start: most recent wake boundary at/before
+         * [nowMs] (millis). Pre-wake small hours belong to yesterday's
+         * day — the day starts when the user wakes, not at midnight.
+         * Overnight windows need no special case: the boundary is always
+         * the last wake o'clock. [sleepHour] is context only.
+         */
+        fun dayStartMillis(wakeUpHour: Int, sleepHour: Int, nowMs: Long): Long {
+            val cal = java.util.Calendar.getInstance().apply {
+                timeInMillis = nowMs
+                set(java.util.Calendar.HOUR_OF_DAY, wakeUpHour)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            if (cal.timeInMillis > nowMs) {
+                cal.add(java.util.Calendar.DAY_OF_YEAR, -1)
+            }
+            return cal.timeInMillis
+        }
+
+        /**
+         * Best lights-out for a target night: [targetSleepHours] before
+         * the wake hour, as hour-of-day float (22.5 = 22:30). A duration
+         * target, not a schedule guess — the awake window stays fixed.
+         */
+        fun recommendedBedtime(wakeUpHour: Int, targetSleepHours: Float = 8f): Float =
+            (((wakeUpHour - targetSleepHours) % 24 + 24) % 24)
+
+        /**
+         * Drinking plan across the wake window: [slotMl]-sized waypoints
+         * from 30 min after wake to 60 min before sleep (wind-down —
+         * no big glass right at lights-out). Evenly spaced in time,
+         * cumulative targets summing to [goalMl]. Pure + tested.
+         */
+        fun sipPlan(
+            goalMl: Int,
+            wakeUpHour: Int,
+            sleepHour: Int,
+            slotMl: Int = 250
+        ): List<SipSlot> {
+            val span = windowSpanHours(wakeUpHour, sleepHour).toFloat()
+            val n = (goalMl + slotMl - 1) / slotMl.coerceAtLeast(1)
+            if (n <= 1) {
+                return listOf(SipSlot((wakeUpHour + 0.5f) % 24, goalMl))
+            }
+            val firstElapsed = 0.5f
+            val lastElapsed = (span - 1f).coerceAtLeast(firstElapsed)
+            return (1..n).map { i ->
+                val elapsed = firstElapsed +
+                    (lastElapsed - firstElapsed) * (i - 1) / (n - 1)
+                val cumulative = if (i == n) goalMl else goalMl * i / n
+                SipSlot((wakeUpHour + elapsed) % 24, cumulative)
+            }
+        }
+
+        /**
+         * Ghost value at a clock hour: straight plan line from (wake, 0)
+         * to (sleep, goal), clamped outside the window. The slots mark
+         * interval ticks along it; the line itself stays linear so the
+         * eye can read behind/ahead at a glance.
+         */
+        fun ghostMlAt(
+            plan: List<SipSlot>,
+            goalMl: Int,
+            wakeUpHour: Int,
+            sleepHour: Int,
+            hour: Float
+        ): Float {
+            val span = windowSpanHours(wakeUpHour, sleepHour).toFloat()
+            val elapsed = if (sleepHour > wakeUpHour) {
+                (hour - wakeUpHour).coerceIn(0f, span)
+            } else {
+                ((((hour - wakeUpHour) % 24 + 24) % 24)).coerceIn(0f, span)
+            }
+            return goalMl * elapsed / span
+        }
+
+        /**
+         * First plan slot strictly after [hour], or null when the day's
+         * plan is done. Elapsed-since-wake comparison, so overnight
+         * windows work: a 23:30 now still finds the 00:30 slot.
+         */
+        fun nextSip(
+            plan: List<SipSlot>,
+            wakeUpHour: Int,
+            sleepHour: Int,
+            hour: Float
+        ): SipSlot? {
+            val span = windowSpanHours(wakeUpHour, sleepHour).toFloat()
+            fun elapsed(h: Float) = if (sleepHour > wakeUpHour) {
+                h - wakeUpHour
+            } else {
+                (((h - wakeUpHour) % 24 + 24) % 24)
+            }
+            val nowElapsed = elapsed(hour)
+            if (nowElapsed >= span) return null
+            return plan.firstOrNull { elapsed(it.hour) > nowElapsed }
+        }
+
         /** True when hour falls inside the wake window, overnight-aware. */
         fun isAwakeHour(hour: Int, wakeUpHour: Int, sleepHour: Int): Boolean =
             if (sleepHour > wakeUpHour) hour in wakeUpHour until sleepHour

@@ -76,3 +76,6 @@ session-*.md
 !gradle-wrapper.jar
 # Agent skills live with the project but are never shipped or tracked.
 /skills/
+
+# Agent working instructions: local-only, like skills.
+/AGENTS.md

@@ -88,6 +88,9 @@ fun PaceCurveCard(
     goalMl: Int,
     wakeHour: Int,
     sleepHour: Int,
+    // The ghost: sip waypoints across today's window + best lights-out.
+    plan: List<RecommendationEngine.Companion.SipSlot> = emptyList(),
+    bedtimeHour: Float = sleepHour.toFloat(),
     modifier: Modifier = Modifier
 ) {
     val onSurface = MaterialTheme.colorScheme.onSurface
@@ -130,19 +133,45 @@ fun PaceCurveCard(
     fun inWindowPast(drinkHour: Float, hour: Float): Boolean =
         inWindowPast(drinkHour, hour, wakeHour, sleepHour)
     val maxMl = maxOf(goalMl, steps.lastOrNull()?.second ?: 0, 1).toFloat()
-    // Verdict doubles as the caption: behind/on/ahead in one line.
-    val expectedNow =
-        (goalMl * ((elapsedH(nowHour) + 1) / span).coerceIn(0f, 1f)).roundToInt()
-    val drunkNow = steps.filter { inWindowPast(it.first, nowHour) }
-        .lastOrNull()?.second ?: 0
-    // Outside the wake window there is no "by now" — show the day.
+    // Standing reads against the ghost (the plan), not a bare diagonal:
+    // one calm comparison instead of per-segment color noise.
+    fun ghostAt(hour: Float): Float =
+        RecommendationEngine.ghostMlAt(plan, goalMl, wakeHour, sleepHour, hour)
+    fun absorbedAt(hour: Float): Float =
+        absorbedMl(drinks.filter { inWindowPast(it.first, hour) }, hour)
+    // Body water, shared with the caption: each drink absorbs
+    // exponentially (tau ~25 min, gastric emptying), so the curve
+    // rises like physiology, not stairs. Sampled densely it draws
+    // smooth — see absorbedMl + AbsorbedMlTest.
     val awake = RecommendationEngine.isAwakeHour(
         nowHour.toInt(), wakeHour, sleepHour
     )
+    val ghostNow = ghostAt(nowHour)
+    val drunkNow = absorbedAt(nowHour).roundToInt()
+    fun clockOf(hour: Float): String {
+        val h = ((hour % 24 + 24) % 24)
+        return "%02d:%02d".format(h.toInt(), ((h - h.toInt()) * 60).toInt())
+    }
+    val nextSlot = RecommendationEngine.nextSip(plan, wakeHour, sleepHour, nowHour)
+    val nextText = nextSlot?.let { slot ->
+        val idx = plan.indexOf(slot)
+        val prev = if (idx > 0) plan[idx - 1].cumulativeMl else 0
+        "Next ~${slot.cumulativeMl - prev} ml by ${clockOf(slot.hour)}"
+    }
+    val sleepH = (((wakeHour - bedtimeHour) % 24 + 24) % 24)
+    val bedText = "lights-out ${clockOf(bedtimeHour)} (≈${sleepH.roundToInt()}h night)"
+    // Verdict doubles as the caption: behind/on/ahead in one line,
+    // then the actionable next step and the night's boundary.
     val caption = when {
-        !awake -> "$drunkNow of $goalMl ml today."
-        drunkNow >= expectedNow -> "On pace — $drunkNow of $expectedNow ml by now."
-        else -> "${expectedNow - drunkNow} ml under the line — steady sips close it."
+        !awake -> "$drunkNow of $goalMl ml today. $bedText."
+        drunkNow >= ghostNow -> listOfNotNull(
+            "On the ghost — $drunkNow of ${ghostNow.roundToInt()} ml by now.",
+            nextText, bedText
+        ).joinToString(" · ")
+        else -> listOfNotNull(
+            "${ghostNow.roundToInt() - drunkNow} ml under the ghost — steady sips close it.",
+            nextText, bedText
+        ).joinToString(" · ")
     }
 
     // Whole-card liquid glass (not plot-only): a single calm lens so
@@ -210,15 +239,13 @@ fun PaceCurveCard(
                 androidx.compose.animation.core.tween(durationMillis = 800)
             )
         }
-        fun expectedAt(hour: Float) =
-            (goalMl * ((elapsedH(hour) + 1) / span).coerceIn(0f, 1f)).roundToInt()
         // Body water, shared with the caption: each drink absorbs
         // exponentially (tau ~25 min, gastric emptying), so the curve
         // rises like physiology, not stairs. Sampled densely it draws
-        // smooth — see absorbedMl + AbsorbedMlTest.
-        fun absorbedAt(hour: Float): Float =
-            absorbedMl(drinks.filter { inWindowPast(it.first, hour) }, hour)
+        // smooth — see absorbedMl + AbsorbedMlTest. (absorbedAt lives
+        // with the caption above; the Canvas shares it.)
         val dark = com.water0.hydration.ui.theme.isDarkScheme()
+        val primary = MaterialTheme.colorScheme.primary
         val red = Color(0xFFEF5350)
         val green = Color(0xFF43A047)
         // Reference black: the goal line up top. Neutral in both modes.
@@ -260,13 +287,42 @@ fun PaceCurveCard(
                     floatArrayOf(6.dp.toPx(), 4.dp.toPx())
                 )
             )
-            // Expected: straight wake→sleep line, faint.
-            drawLine(
-                color = onVariant.copy(alpha = 0.65f),
-                start = Offset(x(wakeHour.toFloat()), y(0f)),
-                end = Offset(x(sleepHour.toFloat()), y(goalMl.toFloat())),
-                strokeWidth = 1.5.dp.toPx()
+            // Wind-down band: the last hour before sleep, muted — the
+            // plan deliberately holds no big glass here.
+            val bandX = (1f - 1f / span).coerceIn(0f, 1f) * w
+            drawRect(
+                color = onVariant.copy(alpha = 0.08f),
+                topLeft = Offset(bandX, 0f),
+                size = androidx.compose.ui.geometry.Size(w - bandX, h)
             )
+            // Ghost: the day's drinking plan, dashed wake→slots→sleep.
+            // The hero reference: brighter than the old faint diagonal,
+            // with waypoint ticks where each sip lands.
+            val ghostPath = Path().apply {
+                moveTo(x(wakeHour.toFloat()), y(0f))
+                for (slot in plan) lineTo(x(slot.hour), y(slot.cumulativeMl.toFloat()))
+                lineTo(x(sleepHour.toFloat()), y(goalMl.toFloat()))
+            }
+            drawPath(
+                ghostPath,
+                color = onVariant.copy(alpha = 0.85f),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = 2.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(
+                        floatArrayOf(7.dp.toPx(), 5.dp.toPx())
+                    )
+                )
+            )
+            for (slot in plan) {
+                drawCircle(
+                    onVariant.copy(alpha = 0.9f), 2.5.dp.toPx(),
+                    Offset(x(slot.hour), y(slot.cumulativeMl.toFloat()))
+                )
+            }
+            // Day-start marker: the day begins at wake, so wake gets the
+            // one prominent dot — white-ringed, impossible to miss.
+            drawCircle(Color.White.copy(alpha = 0.9f), 6.dp.toPx(), Offset(x(wakeHour.toFloat()), y(0f)))
+            drawCircle(primary, 4.dp.toPx(), Offset(x(wakeHour.toFloat()), y(0f)))
             // Actual as physiology: 140 absorption samples from wake
             // to now, colored per sample by the target at that hour.
             // Dense samples draw a smooth curve, not stairs.
@@ -283,8 +339,9 @@ fun PaceCurveCard(
                 val samples = 140
                 val drawUpTo =
                     (samples * reveal.value).toInt().coerceIn(0, samples)
-                // Area fill under the curve (CaffeineHealth language):
-                // standing color washing out downward, line drawn over it.
+                // Area fill under the curve: the plan color washing out
+                // downward, line drawn over it. One calm hue — standing
+                // reads from position vs ghost, not from color flips.
                 if (drawUpTo > 0) {
                     val lastHour = hourAt(displayFrac * drawUpTo / samples)
                     val fillPath = Path().apply {
@@ -297,14 +354,12 @@ fun PaceCurveCard(
                         lineTo(x(lastHour), h)
                         close()
                     }
-                    val fillCol =
-                        if (absorbedAt(lastHour) >= expectedAt(lastHour)) green else red
                     drawPath(
                         fillPath,
                         Brush.verticalGradient(
                             listOf(
-                                fillCol.copy(alpha = 0.28f),
-                                fillCol.copy(alpha = 0f)
+                                primary.copy(alpha = 0.28f),
+                                primary.copy(alpha = 0f)
                             )
                         )
                     )
@@ -315,9 +370,7 @@ fun PaceCurveCard(
                     val hour = hourAt(displayFrac * i / samples)
                     val cx = x(hour)
                     val cy = y(absorbedAt(hour))
-                    val mid = hourAt(displayFrac * (i - 0.5f) / samples)
-                    val seg = if (absorbedAt(mid) >= expectedAt(mid)) green else red
-                    drawLine(seg, Offset(px, py), Offset(cx, cy), 3.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    drawLine(primary, Offset(px, py), Offset(cx, cy), 3.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
                     px = cx
                     py = cy
                 }
@@ -328,15 +381,14 @@ fun PaceCurveCard(
                     if (windowFrac(hour) > displayFrac || windowFrac(hour) > dotUpTo) continue
                     if (!inWindowPast(hour, hourAt(displayFrac))) continue
                     val dot = Offset(x(hour), y(absorbedAt(hour)))
-                    val dotCol = if (absorbedAt(hour) >= expectedAt(hour)) green else red
-                    drawCircle(dotCol, 4.5.dp.toPx(), dot)
+                    drawCircle(primary, 4.5.dp.toPx(), dot)
                     drawCircle(Color.White.copy(alpha = 0.85f), 2.dp.toPx(), dot)
                 }
             }
-            // Now marker: green while under the diagonal (in the safe
-            // zone), red once past it — the vertical reads the standing.
-            val nowBehind = absorbedAt(nowHour) < expectedAt(nowHour)
-            val nowColor = if (nowBehind) green else red
+            // Now marker: red while under the ghost (needs attention),
+            // green on-or-ahead — the vertical reads the standing, so
+            // the curve itself never has to shout.
+            val nowColor = if (absorbedAt(nowHour) < ghostAt(nowHour)) red else green
             // Now marker, only inside the wake window: parked at an
             // edge overnight it reads as a glitch, not information.
             if (awake) {
@@ -353,13 +405,13 @@ fun PaceCurveCard(
             drawCircle(nowColor, 3.5.dp.toPx(), Offset(nx, 0f))
             }
             // Scrub cursor: vertical line + dot on the actual curve.
-            // Same standing rule: green under the diagonal, red past it.
+            // Same standing rule as the now marker.
             touchFrac?.let { frac ->
                 val hour = (wakeHour + frac * span) % 24
                 val drunk = absorbedAt(hour).roundToInt()
                 val cx = frac * w
                 val cy = y(drunk.toFloat())
-                val cur = if (drunk < expectedAt(hour)) green else red
+                val cur = if (drunk < ghostAt(hour)) red else green
                 drawLine(
                     color = cur.copy(alpha = 0.8f),
                     start = Offset(cx, 0f),
@@ -376,25 +428,42 @@ fun PaceCurveCard(
             val hour = (wakeHour + frac * span) % 24
             val hh = hour.toInt().coerceIn(0, 23)
             val mm = ((hour - hh) * 60).toInt().coerceIn(0, 59)
-            "%02d:%02d · %d in system / %d expected".format(hh, mm, absorbedAt(hour).roundToInt(), expectedAt(hour))
+            "%02d:%02d · %d in system / %d plan".format(hh, mm, absorbedAt(hour).roundToInt(), ghostAt(hour).roundToInt())
         }
         Text(
             text = readout ?: caption,
             fontSize = 13.sp,
             color = onVariant
         )
-        // Wake/sleep feet.
+        // Legend: ghost = plan, solid = you, dot = drink. One minute
+        // of instruction, then the graph reads itself (Few).
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            androidx.compose.foundation.Canvas(modifier = Modifier.height(2.dp).fillMaxWidth(0.08f)) {
+                drawLine(onVariant.copy(alpha = 0.85f), Offset(0f, 1.dp.toPx()), Offset(size.width, 1.dp.toPx()), 2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx(), 5.dp.toPx())))
+            }
+            Text(text = "plan", fontSize = 11.sp, color = onVariant)
+            androidx.compose.foundation.Canvas(modifier = Modifier.height(4.dp).fillMaxWidth(0.08f)) {
+                drawLine(primary, Offset(0f, 2.dp.toPx()), Offset(size.width, 2.dp.toPx()), 3.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            }
+            Text(text = "you", fontSize = 11.sp, color = onVariant)
+        }
+        // Wake/sleep feet: the day starts at wake, ends lights-out.
         androidx.compose.foundation.layout.Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "%02d:00".format(wakeHour),
+                text = "wake %02d:00".format(wakeHour),
                 fontSize = 11.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                 color = onVariant
             )
             Text(
-                text = "%02d:00".format(sleepHour),
+                text = "in bed ≈ ${clockOf(bedtimeHour)}",
                 fontSize = 11.sp,
                 color = onVariant
             )

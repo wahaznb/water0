@@ -27,7 +27,14 @@ class GetTodayProgressUseCase(
         val expectedMl: Int,
         // Wake→sleep window the pace curve draws against.
         val wakeHour: Int,
-        val sleepHour: Int
+        val sleepHour: Int,
+        // Wake-anchored day: most recent wake boundary (pre-wake small
+        // hours belong to yesterday). Entries below are already scoped.
+        val dayStartMs: Long,
+        // The ghost: sip waypoints across today's window.
+        val sipPlan: List<RecommendationEngine.Companion.SipSlot>,
+        // Best lights-out for an 8h night before the wake hour.
+        val bedtimeHour: Float
     )
 
     operator fun invoke(): Flow<ProgressResult> {
@@ -48,7 +55,15 @@ class GetTodayProgressUseCase(
         return combine(profileFlow, entriesFlow, behaviorFlow, pastWeekFlow) {
                 profile, entries, behavior, pastWeek ->
             val goal = recommendationEngine.calculateDailyGoal(profile).totalMl
-            val totalEffective = entries.sumOf { it.effectiveHydrationMl }
+            // Wake-anchored day: the day starts at wake-up, so entries
+            // before today's wake boundary belong to yesterday. Midnight
+            // query stays (streaks/history read it); Home scopes to wake.
+            val nowMs = System.currentTimeMillis()
+            val dayStart = RecommendationEngine.dayStartMillis(
+                profile.wakeUpHour, profile.sleepHour, nowMs
+            )
+            val dayEntries = entries.filter { it.timestamp >= dayStart }
+            val totalEffective = dayEntries.sumOf { it.effectiveHydrationMl }
             // Time-aware judgment: the same total at 1am vs 9pm means very
             // different things (chug vs finish).
             val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
@@ -60,7 +75,7 @@ class GetTodayProgressUseCase(
                 sleepHour = profile.sleepHour
             )
             val recommendations = recommendationEngine.generateRecommendations(
-                profile, behavior, status, entries, currentHour, pastWeek,
+                profile, behavior, status, dayEntries, currentHour, pastWeek,
                 // Measured workouts (Health Connect) or the manual
                 // "just worked out" tap (degoogled / no provider).
                 // False when unwired — the nudge simply stays silent.
@@ -74,7 +89,7 @@ class GetTodayProgressUseCase(
             )).roundToInt()
 
             ProgressResult(
-                entries = entries,
+                entries = dayEntries,
                 totalEffectiveMl = totalEffective,
                 goalMl = goal,
                 percentage = status.percentage,
@@ -83,7 +98,14 @@ class GetTodayProgressUseCase(
                 recommendations = recommendations,
                 expectedMl = expectedMl,
                 wakeHour = profile.wakeUpHour,
-                sleepHour = profile.sleepHour
+                sleepHour = profile.sleepHour,
+                dayStartMs = dayStart,
+                sipPlan = RecommendationEngine.sipPlan(
+                    goal, profile.wakeUpHour, profile.sleepHour
+                ),
+                bedtimeHour = RecommendationEngine.recommendedBedtime(
+                    profile.wakeUpHour
+                )
             )
         }
     }

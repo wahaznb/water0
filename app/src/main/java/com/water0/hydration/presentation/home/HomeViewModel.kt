@@ -45,7 +45,11 @@ class HomeViewModel(
             val expectedMl: Int,
             // Wake→sleep window the pace curve draws against.
             val wakeHour: Int,
-            val sleepHour: Int
+            val sleepHour: Int,
+            // Wake-anchored day + the ghost plan + best lights-out.
+            val dayStartMs: Long,
+            val sipPlan: List<RecommendationEngine.Companion.SipSlot>,
+            val bedtimeHour: Float
         ) : UiState
 
         object Loading : UiState
@@ -105,7 +109,10 @@ class HomeViewModel(
                     recommendations = result.recommendations,
                     expectedMl = result.expectedMl,
                     wakeHour = result.wakeHour,
-                    sleepHour = result.sleepHour
+                    sleepHour = result.sleepHour,
+                    dayStartMs = result.dayStartMs,
+                    sipPlan = result.sipPlan,
+                    bedtimeHour = result.bedtimeHour
                 )
             }
         }
