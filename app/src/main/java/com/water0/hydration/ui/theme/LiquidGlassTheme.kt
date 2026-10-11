@@ -345,20 +345,23 @@ fun AuroraBackground(
     // rolls every time, so no field ever repeats. The state writes
     // recompose; per-frame motion comes from the wall clock in draw, so
     // nothing here costs a frame.
+    // One unhurried swim: 75s of drifting with slow 15s materialize
+    // and dissolve at each end. No popping in and out.
+    val jellyLifeMs = 75_000L
     fun newJelly(rng: kotlin.random.Random, now: Long, stagger: Boolean): JellySpawn {
-        val life = 26_000L
+        // Long slow life: a jelly materializes, lingers, dissolves.
+        // Tilt stays near its heading (bells lead, trailers follow).
         return JellySpawn(
             xFrac = rng.nextFloat(),
             yFrac = 0.15f + rng.nextFloat() * 0.5f,
             angleRad = rng.nextFloat() * 6.28f,
-            tiltDeg = (rng.nextFloat() * 2f - 1f) * 35f,
-            travelFrac = 0.12f + rng.nextFloat() * 0.10f,
+            tiltDeg = (rng.nextFloat() * 2f - 1f) * 15f,
+            travelFrac = 0.10f + rng.nextFloat() * 0.10f,
             // Wide spread, never bigger: minis to showpieces.
             sizeDp = 22f + rng.nextFloat() * 64f,
-            birthUptimeMs = if (stagger) now - rng.nextLong(life) else now
+            birthUptimeMs = if (stagger) now - rng.nextLong(jellyLifeMs) else now
         )
     }
-    val jellyLifeMs = 26_000L
     // A small bloom, not one animal: three concurrent jellies at mixed
     // sizes, each on its own life.
     val jellies = remember(bgSeed) {
@@ -471,7 +474,7 @@ fun AuroraBackground(
             drawCircle(
                 // Dark: bright blue risers on black. Light: white drops
                 // on the blue field.
-                color = if (dark) primary.copy(alpha = (0.065f + energy * 0.065f) * fade * b.alphaPeak)
+                color = if (dark) primary.copy(alpha = (0.032f + energy * 0.032f) * fade * b.alphaPeak)
                 else Color.White.copy(alpha = (0.35f + energy * 0.25f) * fade * b.alphaPeak),
                 b.sizeDp.dp.toPx() * 0.5f,
                 androidx.compose.ui.geometry.Offset(x, y)
@@ -487,7 +490,7 @@ fun AuroraBackground(
             drawCircle(
                 // Dark: cool white pinpoints. Light: white pinpoints on
                 // the blue field.
-                color = if (dark) Color.White.copy(alpha = (0.020f + energy * 0.040f) * twinkle)
+                color = if (dark) Color.White.copy(alpha = (0.010f + energy * 0.020f) * twinkle)
                 else Color.White.copy(alpha = (0.30f + energy * 0.25f) * twinkle),
                 (1f + (i % 2)).dp.toPx() * 0.5f,
                 androidx.compose.ui.geometry.Offset(x, y)
@@ -506,7 +509,7 @@ fun AuroraBackground(
             val core = envelope * envelope
             // Dark halo stays dim on navy; light halo is white glow on
             // the blue field.
-            val intensity = core * if (dark) (0.08f + energy * 0.06f)
+            val intensity = core * if (dark) (0.045f + energy * 0.035f)
             else (0.16f + energy * 0.12f)
             val haloColor = if (dark) secondary.copy(alpha = intensity)
             else Color.White.copy(alpha = intensity)
@@ -537,17 +540,17 @@ fun AuroraBackground(
             // Star core: tight bright glow + hot pinpoint + 4-point
             // sparkle, all breathing on the same envelope as its halo.
             drawCircle(
-                color = starlight.copy(alpha = 0.30f * core),
+                color = starlight.copy(alpha = 0.19f * core),
                 radius = 4.5.dp.toPx(),
                 center = center
             )
             drawCircle(
-                color = starlight.copy(alpha = (0.70f + energy * 0.25f) * core),
+                color = starlight.copy(alpha = (0.45f + energy * 0.15f) * core),
                 radius = 1.6.dp.toPx(),
                 center = center
             )
             val sparkLen = 6.dp.toPx() * (0.4f + 0.6f * core)
-            val sparkAlpha = 0.45f * core
+            val sparkAlpha = 0.28f * core
             drawLine(
                 color = starlight.copy(alpha = sparkAlpha),
                 start = center - androidx.compose.ui.geometry.Offset(sparkLen, 0f),
@@ -561,24 +564,36 @@ fun AuroraBackground(
                 strokeWidth = 0.75.dp.toPx()
             )
         }
-        // Jellyfish draw: random spawn, random heading, one 26s life —
+        // Jellyfish draw: random spawn, random heading, one long life —
         // nothing scripted, never the same swim twice (see reaper).
-        // Dome breathes, six tentacles sway, all fading in/out of zero.
+        // Dome breathes slow, tentacles trail with lag, all fading
+        // through a smooth envelope instead of blinking.
         if (hydrationTint != Color.Transparent) {
             drawRect(color = hydrationTint, size = size)
+        }
+        fun sstep(a: Float, b: Float, x: Float): Float {
+            val t = ((x - a) / (b - a)).coerceIn(0f, 1f)
+            return t * t * (3f - 2f * t)
         }
         for (j in jellies) {
             val now = android.os.SystemClock.uptimeMillis()
             val progress = ((now - j.birthUptimeMs).toFloat() / jellyLifeMs)
                 .coerceIn(0f, 1f)
             if (progress < 1f) {
-                val fade = kotlin.math.sin(progress * kotlin.math.PI).toFloat()
+                // Slow materialize, long linger, slow dissolve.
+                val fade = sstep(0f, 0.18f, progress) *
+                    (1f - sstep(0.82f, 1f, progress))
                 val tSway = now / 1000f
                 val jx = ((j.xFrac + kotlin.math.cos(j.angleRad) * j.travelFrac * progress) * w)
                     .coerceIn(0f, w)
-                val jy = ((j.yFrac + kotlin.math.sin(j.angleRad) * j.travelFrac * progress) * h)
+                // Gentle bob on top of the heading drift: bells ride,
+                // trailers follow.
+                val jy = ((j.yFrac + kotlin.math.sin(j.angleRad) * j.travelFrac * progress) * h +
+                    kotlin.math.sin(tSway * 0.5f + j.xFrac * 6.28f).toFloat() * 8.dp.toPx())
                     .coerceIn(0f, h)
-                val pulse = 1f + 0.07f * kotlin.math.sin(tSway * 1.1f).toFloat()
+                // Deep pulse: the bell contracts to jet, exactly how the
+                // animal moves. Slow (~8s), unmissable.
+                val pulse = 1f + 0.11f * kotlin.math.sin(tSway * 0.8f).toFloat()
                 val r = j.sizeDp.dp.toPx() * pulse
                 // Pink bloom; paler pink-white on the light field, cyan crown.
                 val ink = if (dark) Color(0xFFFF8FB3) else Color(0xFFFF5C8A)
@@ -594,7 +609,7 @@ fun AuroraBackground(
                     drawCircle(
                         brush = Brush.radialGradient(
                             listOf(
-                                ink.copy(alpha = 0.20f * fade),
+                                ink.copy(alpha = 0.13f * fade),
                                 ink.copy(alpha = 0f)
                             ),
                             center = androidx.compose.ui.geometry.Offset(jx, jy - r * 0.4f),
@@ -609,8 +624,8 @@ fun AuroraBackground(
                         val fx = (i - 5.5f) / 5.5f
                         val sx = jx + fx * r * 0.9f
                         val len = (130f + (1f - kotlin.math.abs(fx)) * 80f).dp.toPx()
-                        val sway = kotlin.math.sin(tSway * 1.3f + i * 0.9f).toFloat() * 10.dp.toPx()
-                        val sway2 = kotlin.math.sin(tSway * 1.3f + i * 0.9f + 0.9f).toFloat() * 15.dp.toPx()
+                        val sway = kotlin.math.sin(tSway * 0.9f + i * 0.9f).toFloat() * 10.dp.toPx()
+                        val sway2 = kotlin.math.sin(tSway * 0.9f + i * 0.9f + 0.9f).toFloat() * 15.dp.toPx()
                         val tent = androidx.compose.ui.graphics.Path().apply {
                             moveTo(sx, jy)
                             quadraticBezierTo(
@@ -620,14 +635,14 @@ fun AuroraBackground(
                         }
                         drawPath(
                             path = tent,
-                            color = ink.copy(alpha = (0.13f + energy * 0.05f) * (1f - 0.25f * kotlin.math.abs(fx)) * fade),
+                            color = ink.copy(alpha = (0.08f + energy * 0.03f) * (1f - 0.25f * kotlin.math.abs(fx)) * fade),
                             style = androidx.compose.ui.graphics.drawscope.Stroke(
                                 width = (1.5f + (1f - kotlin.math.abs(fx))).dp.toPx(),
                                 cap = androidx.compose.ui.graphics.StrokeCap.Round
                             )
                         )
                         drawCircle(
-                            color = ink.copy(alpha = 0.16f * fade),
+                            color = ink.copy(alpha = 0.10f * fade),
                             radius = 2.dp.toPx(),
                             center = androidx.compose.ui.geometry.Offset(sx + sway2, jy + len)
                         )
@@ -638,7 +653,7 @@ fun AuroraBackground(
                     for (k in -1..1) {
                         val bx = jx + k * r * 0.22f
                         val armLen = r * (1.6f + 0.15f * kotlin.math.abs(k.toFloat()))
-                        val aSway = kotlin.math.sin(tSway * 1.6f + k * 2.1f).toFloat() * 8.dp.toPx()
+                        val aSway = kotlin.math.sin(tSway * 1.15f + k * 2.1f).toFloat() * 8.dp.toPx()
                         val arm = androidx.compose.ui.graphics.Path().apply {
                             moveTo(bx, jy + r * 0.05f)
                             quadraticBezierTo(
@@ -648,7 +663,7 @@ fun AuroraBackground(
                         }
                         drawPath(
                             path = arm,
-                            color = ink.copy(alpha = 0.38f * fade),
+                            color = ink.copy(alpha = 0.25f * fade),
                             style = androidx.compose.ui.graphics.drawscope.Stroke(
                                 width = 5.dp.toPx(),
                                 cap = androidx.compose.ui.graphics.StrokeCap.Round
@@ -690,15 +705,15 @@ fun AuroraBackground(
                         path = dome,
                         brush = Brush.verticalGradient(
                             listOf(
-                                ink.copy(alpha = (0.38f + energy * 0.10f) * fade),
-                                ink.copy(alpha = (0.08f + energy * 0.03f) * fade)
+                                ink.copy(alpha = (0.24f + energy * 0.06f) * fade),
+                                ink.copy(alpha = (0.05f + energy * 0.02f) * fade)
                             ),
                             startY = jy - r * 1.18f,
                             endY = jy + r * 0.2f
                         )
                     )
                     // Mottling: soft dark clouds inside the bell for depth.
-                    val blot = Color.Black.copy(alpha = 0.16f * fade)
+                    val blot = Color.Black.copy(alpha = 0.10f * fade)
                     drawCircle(blot, r * 0.28f, androidx.compose.ui.geometry.Offset(jx - r * 0.30f, jy - r * 0.52f))
                     drawCircle(blot, r * 0.22f, androidx.compose.ui.geometry.Offset(jx + r * 0.34f, jy - r * 0.38f))
                     // Radial canals fanning from the crown, moon-jelly style.
@@ -718,7 +733,7 @@ fun AuroraBackground(
                         }
                         drawPath(
                             path = canal,
-                            color = ink.copy(alpha = 0.28f * fade),
+                            color = ink.copy(alpha = 0.18f * fade),
                             style = androidx.compose.ui.graphics.drawscope.Stroke(
                                 width = 1.5.dp.toPx(),
                                 cap = androidx.compose.ui.graphics.StrokeCap.Round
@@ -744,7 +759,7 @@ fun AuroraBackground(
                         }
                         drawPath(
                             path = rib,
-                            color = Color.White.copy(alpha = 0.16f * fade),
+                            color = Color.White.copy(alpha = 0.10f * fade),
                             style = androidx.compose.ui.graphics.drawscope.Stroke(
                                 width = 1.25.dp.toPx(),
                                 cap = androidx.compose.ui.graphics.StrokeCap.Round
@@ -757,7 +772,7 @@ fun AuroraBackground(
                     drawCircle(
                         brush = Brush.radialGradient(
                             listOf(
-                                ink2.copy(alpha = 0.55f * fade),
+                                ink2.copy(alpha = 0.35f * fade),
                                 ink2.copy(alpha = 0f)
                             ),
                             center = cloverC,
@@ -766,7 +781,7 @@ fun AuroraBackground(
                         radius = r * 0.42f,
                         center = cloverC
                     )
-                    val petal = ink2.copy(alpha = 0.85f * fade)
+                    val petal = ink2.copy(alpha = 0.55f * fade)
                     drawOval(petal, androidx.compose.ui.geometry.Offset(cloverC.x - petalR * 0.8f, cloverC.y - petalD - petalR * 1.3f),
                         androidx.compose.ui.geometry.Size(petalR * 1.6f, petalR * 2.6f))
                     drawOval(petal, androidx.compose.ui.geometry.Offset(cloverC.x - petalR * 0.8f, cloverC.y + petalD - petalR * 1.3f),
@@ -775,23 +790,23 @@ fun AuroraBackground(
                         androidx.compose.ui.geometry.Size(petalR * 2.6f, petalR * 1.6f))
                     drawOval(petal, androidx.compose.ui.geometry.Offset(cloverC.x + petalD - petalR * 1.3f, cloverC.y - petalR * 0.8f),
                         androidx.compose.ui.geometry.Size(petalR * 2.6f, petalR * 1.6f))
-                    drawCircle(Color.White.copy(alpha = 0.9f * fade), r * 0.045f, cloverC)
+                    drawCircle(Color.White.copy(alpha = 0.6f * fade), r * 0.045f, cloverC)
                     // Cel rim: bright outline over the whole bell, plus a
                     // soft outer glow band so the edge burns like the
                     // reference rim light.
                     drawPath(
                         path = dome,
-                        color = ink.copy(alpha = 0.30f * fade),
+                        color = ink.copy(alpha = 0.19f * fade),
                         style = androidx.compose.ui.graphics.drawscope.Stroke(width = 5.dp.toPx())
                     )
                     drawPath(
                         path = dome,
-                        color = ink.copy(alpha = 0.65f * fade),
+                        color = ink.copy(alpha = 0.42f * fade),
                         style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5.dp.toPx())
                     )
                     // Clover mark: the glowing signature at the dome crown.
                     // Anime speculars: two curved streaks + shine blob, upper left.
-                    val spec = Color.White.copy(alpha = 0.55f * fade)
+                    val spec = Color.White.copy(alpha = 0.22f * fade)
                     val specPath = androidx.compose.ui.graphics.Path().apply {
                         moveTo(jx - r * 0.78f, jy - r * 0.42f)
                         quadraticBezierTo(jx - r * 0.72f, jy - r * 0.85f, jx - r * 0.38f, jy - r * 1.0f)
@@ -802,11 +817,11 @@ fun AuroraBackground(
                         moveTo(jx - r * 0.60f, jy - r * 0.38f)
                         quadraticBezierTo(jx - r * 0.55f, jy - r * 0.62f, jx - r * 0.34f, jy - r * 0.72f)
                     }
-                    drawPath(specPath2, Color.White.copy(alpha = 0.35f * fade),
+                    drawPath(specPath2, Color.White.copy(alpha = 0.22f * fade),
                         style = androidx.compose.ui.graphics.drawscope.Stroke(
                             width = 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round))
                     drawOval(
-                        Color.White.copy(alpha = 0.50f * fade),
+                        Color.White.copy(alpha = 0.32f * fade),
                         androidx.compose.ui.geometry.Offset(jx - r * 0.52f, jy - r * 0.78f),
                         androidx.compose.ui.geometry.Size(r * 0.20f, r * 0.11f)
                     )
@@ -817,7 +832,7 @@ fun AuroraBackground(
                         val spy = (jy - r * 0.5f) + kotlin.math.sin(ang).toFloat() * r * 1.4f
                         val tw = 0.5f + 0.5f * kotlin.math.sin(tSway * 2f + s * 1.7f).toFloat()
                         val sLen = 4.5.dp.toPx() * (0.6f + 0.4f * tw)
-                        val sCol = Color.White.copy(alpha = 0.45f * tw * fade)
+                        val sCol = Color.White.copy(alpha = 0.28f * tw * fade)
                         drawLine(sCol, androidx.compose.ui.geometry.Offset(spx - sLen, spy), androidx.compose.ui.geometry.Offset(spx + sLen, spy),
                             strokeWidth = 1.dp.toPx())
                         drawLine(sCol, androidx.compose.ui.geometry.Offset(spx, spy - sLen), androidx.compose.ui.geometry.Offset(spx, spy + sLen),

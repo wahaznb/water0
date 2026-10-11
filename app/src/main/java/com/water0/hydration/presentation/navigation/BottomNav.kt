@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import com.water0.hydration.ui.theme.glassCard
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -567,13 +568,8 @@ fun GlassBoxScope.LensPlate(
     brandCycle: Boolean = false,
     options: (@Composable RowScope.() -> Unit)? = null
 ) {
-    // TV Girl blue top lens: vivid blue #0351A3 from the Who Really Cares
-    // palette, at the Glass Lab tint strength. No elevation shadow on
-    // chrome (plate or dock); diffraction stays on (chromatic default).
-    val params = remember(config) {
-        config.toLiquidParams(Color(0xFF0351A3)).copy(elevation = 0.dp)
-    }
-    // Title: TV Girl blue in dark, pure black in light.
+    // Frost plate, no lens: the top bar never bends, blurs, or refracts.
+    // Title + options sit on plain frost so they read instantly.
     val titleColor = if (isDarkScheme()) Color(0xFF0351A3) else Color.Black
     val brandForms = remember { listOf("hy2ox1", "hy²ox¹", "H²O") }
     var brandIdx by remember { mutableIntStateOf(0) }
@@ -606,10 +602,10 @@ fun GlassBoxScope.LensPlate(
     // the bar stays the same, always).
     val titleSp = if (centeredTitle) 26f else 20f
     val vPad = 12.dp
-    this@LensPlate.LiquidGlassBox(
-        modifier = modifier.fillMaxWidth(),
-        params = params,
-        shape = RoundedCornerShape(20.dp)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .glassCard()
     ) {
         if (options == null) {
             PlateTitle(

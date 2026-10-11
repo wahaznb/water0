@@ -27,8 +27,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.onSizeChanged
 import com.water0.hydration.ui.theme.glassCard
-import com.water0.hydration.ui.theme.liquidglass.LiquidGlassBox
-import com.water0.hydration.ui.theme.liquidglass.toLiquidParams
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -574,51 +572,21 @@ fun PaceCurveCard(
 }
 
 /**
- * Graph card shell, built to the top tab plate's recipe: the same blue
- * refractive box (nothing behind it stays legible), elevation flat.
- * Falls back to strong frost with no lens element where no scope is
- * provided (tests, previews) — callers never branch.
+ * Graph card shell: plain frost, never a lens. Data-dense surfaces
+ * don't refract — the plot veil inside does the readability work.
+ * Same signature as before so callers never branch.
  */
 @Composable
 private fun PacePlate(
     modifier: Modifier = Modifier,
     content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit
 ) {
-    val lens =
-        com.water0.hydration.ui.theme.liquidglass.LocalGlassScope.current
-    val config = com.water0.hydration.ui.theme.LocalLensConfig.current
-    val visible = com.water0.hydration.ui.theme.LocalLensVisible.current
-    if (lens == null || !config.cardGlass || !visible) {
-        androidx.compose.foundation.layout.Box(
-            modifier = modifier
-                .glassCard()
-                .background(
-                    MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
-                    RoundedCornerShape(com.water0.hydration.ui.theme.Radii.md)
-                )
-        ) { content() }
-        return
-    }
-    // Same blue recipe as the plate, dialed down for data density:
-    // a title survives full-strength bend; thin plot lines don't.
-    // Distortion stays on the backdrop (nothing behind stays legible)
-    // while the veil keeps the data crisp.
-    val base = remember(config) {
-        config.toLiquidParams(Color(0xFF0351A3))
-    }
-    with(lens) {
-        LiquidGlassBox(
-            modifier = modifier,
-            params = base.copy(
-                scale = (base.scale * 0.35f).coerceIn(0f, 1f),
-                centerDistortion = (base.centerDistortion * 0.35f).coerceIn(0f, 1f),
-                // Text-dense card: keep edge-warp a whisper so headers
-                // and captions can't slide (the old calm-lens value).
-                warpEdges = 0.1f,
-                elevation = 0.dp
-            ),
-            shape = RoundedCornerShape(com.water0.hydration.ui.theme.Radii.md),
-            chromatic = 0.3f
-        ) { content() }
-    }
+    androidx.compose.foundation.layout.Box(
+        modifier = modifier
+            .glassCard()
+            .background(
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+                RoundedCornerShape(com.water0.hydration.ui.theme.Radii.md)
+            )
+    ) { content() }
 }
