@@ -156,9 +156,11 @@ fun GlassBoxScope.GlassBottomBar(
     val params = remember(config) {
         // No darkness/shadow on the dock: the shader's center-darkening
         // reads as black blobs on small lenses. Refraction + rim stay.
+        // Blur cut to zero like the top plate: bend, don't smear.
         config.toLiquidParams(Color(0xFFEE2689)).copy(
             darkness = 0f,
-            elevation = 0.dp
+            elevation = 0.dp,
+            blur = 0f
         )
     }
     // Selected-tab capsule (iOS 26 language): fixed stadium pill that
@@ -568,8 +570,16 @@ fun GlassBoxScope.LensPlate(
     brandCycle: Boolean = false,
     options: (@Composable RowScope.() -> Unit)? = null
 ) {
-    // Frost plate, no lens: the top bar never bends, blurs, or refracts.
-    // Title + options sit on plain frost so they read instantly.
+    // Plate lens, blur cut: the top bar keeps its bend and rim (it
+    // reads as glass because it distorts), but zero blur — text over
+    // a bent-sharp backdrop instead of a smeared one.
+    val params = remember(config) {
+        config.toLiquidParams(Color(0xFF0351A3)).copy(
+            elevation = 0.dp,
+            blur = 0f
+        )
+    }
+    // Title: TV Girl blue in dark, pure black in light.
     val titleColor = if (isDarkScheme()) Color(0xFF0351A3) else Color.Black
     val brandForms = remember { listOf("hy2ox1", "hy²ox¹", "H²O") }
     var brandIdx by remember { mutableIntStateOf(0) }
@@ -602,10 +612,10 @@ fun GlassBoxScope.LensPlate(
     // the bar stays the same, always).
     val titleSp = if (centeredTitle) 26f else 20f
     val vPad = 12.dp
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .glassCard()
+    this@LensPlate.LiquidGlassBox(
+        modifier = modifier.fillMaxWidth(),
+        params = params,
+        shape = RoundedCornerShape(20.dp)
     ) {
         if (options == null) {
             PlateTitle(

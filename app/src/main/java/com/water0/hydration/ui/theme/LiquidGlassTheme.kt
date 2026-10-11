@@ -183,12 +183,15 @@ fun glassCardBorder(): BorderStroke {
     } else {
         0.16f
     }
+    // Light field washes edges out: outline runs stronger there so
+    // cards keep a visible rim in both modes.
+    val edgeAlpha = if (isDarkScheme()) Glass.BORDER_ALPHA else 0.38f
     return BorderStroke(
         1.dp,
         Brush.verticalGradient(
             listOf(
                 Color.White.copy(alpha = topLight),
-                MaterialTheme.colorScheme.outline.copy(alpha = Glass.BORDER_ALPHA)
+                MaterialTheme.colorScheme.outline.copy(alpha = edgeAlpha)
             )
         )
     )
@@ -433,9 +436,9 @@ fun AuroraBackground(
             drawRect(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        primary.copy(alpha = 0.10f),
                         primary.copy(alpha = 0.06f),
-                        primary.copy(alpha = 0.02f),
+                        primary.copy(alpha = 0.035f),
+                        primary.copy(alpha = 0.012f),
                         Color.Transparent
                     ),
                     center = orbit(0.12f, 0.06f, 0.05f, 0f),
@@ -446,9 +449,9 @@ fun AuroraBackground(
             drawRect(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        secondary.copy(alpha = 0.08f),
                         secondary.copy(alpha = 0.05f),
-                        secondary.copy(alpha = 0.02f),
+                        secondary.copy(alpha = 0.03f),
+                        secondary.copy(alpha = 0.012f),
                         Color.Transparent
                     ),
                     center = orbit(0.92f, 0.94f, 0.04f, 2.1f),
@@ -475,7 +478,7 @@ fun AuroraBackground(
                 // Dark: bright blue risers on black. Light: white drops
                 // on the blue field.
                 color = if (dark) primary.copy(alpha = (0.032f + energy * 0.032f) * fade * b.alphaPeak)
-                else Color.White.copy(alpha = (0.35f + energy * 0.25f) * fade * b.alphaPeak),
+                else Color.White.copy(alpha = (0.22f + energy * 0.15f) * fade * b.alphaPeak),
                 b.sizeDp.dp.toPx() * 0.5f,
                 androidx.compose.ui.geometry.Offset(x, y)
             )
@@ -491,7 +494,7 @@ fun AuroraBackground(
                 // Dark: cool white pinpoints. Light: white pinpoints on
                 // the blue field.
                 color = if (dark) Color.White.copy(alpha = (0.010f + energy * 0.020f) * twinkle)
-                else Color.White.copy(alpha = (0.30f + energy * 0.25f) * twinkle),
+                else Color.White.copy(alpha = (0.18f + energy * 0.15f) * twinkle),
                 (1f + (i % 2)).dp.toPx() * 0.5f,
                 androidx.compose.ui.geometry.Offset(x, y)
             )
@@ -510,7 +513,7 @@ fun AuroraBackground(
             // Dark halo stays dim on navy; light halo is white glow on
             // the blue field.
             val intensity = core * if (dark) (0.045f + energy * 0.035f)
-            else (0.16f + energy * 0.12f)
+            else (0.10f + energy * 0.07f)
             val haloColor = if (dark) secondary.copy(alpha = intensity)
             else Color.White.copy(alpha = intensity)
             if (intensity <= 0.004f) continue
@@ -849,7 +852,7 @@ fun AuroraBackground(
             val gy = (((i * 97) % 100) / 100f) * h
             drawCircle(
                 (if (i % 2 == 0) Color.White else Color.Black).copy(
-                    alpha = if (i % 2 == 0) (if (dark) 0.010f else 0.020f) else 0.03f
+                    alpha = if (i % 2 == 0) (if (dark) 0.010f else 0.012f) else 0.03f
                 ),
                 1.dp.toPx() * 0.5f,
                 androidx.compose.ui.geometry.Offset(gx, gy)
