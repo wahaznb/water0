@@ -1,11 +1,15 @@
 package com.water0.hydration.presentation.navigation
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -59,10 +63,13 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected as selectedTrait
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -558,6 +565,10 @@ fun GlassBoxScope.LensPlate(
     // Scroll-minimize: tucked small while the list moves down, full on
     // the way back up. Title + padding animate; options stay usable.
     minimized: Boolean = false,
+    // Home brand cycle: hy2ox1 → hy²ox¹ → H²O every ~3s. Minimized
+    // plate holds the plain ASCII form (room + calm). TalkBack always
+    // hears "hy2ox1", never the chase.
+    brandCycle: Boolean = false,
     options: (@Composable RowScope.() -> Unit)? = null
 ) {
     // TV Girl blue top lens: vivid blue #0351A3 from the Who Really Cares
@@ -568,6 +579,33 @@ fun GlassBoxScope.LensPlate(
     }
     // Title: TV Girl blue in dark, pure black in light.
     val titleColor = if (isDarkScheme()) Color(0xFF0351A3) else Color.Black
+    val brandForms = remember { listOf("hy2ox1", "hy²ox¹", "H²O") }
+    var brandIdx by remember { mutableIntStateOf(0) }
+    // Calm mode (animations off system-wide): hold the plain ASCII
+    // form instead of cycling.
+    val calmResolver = androidx.compose.ui.platform.LocalContext.current.contentResolver
+    val calmBrand = try {
+        android.provider.Settings.Global.getFloat(
+            calmResolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f
+        ) == 0f
+    } catch (_: Exception) {
+        false
+    }
+    LaunchedEffect(brandCycle, calmBrand) {
+        if (!brandCycle || calmBrand) {
+            brandIdx = 0
+            return@LaunchedEffect
+        }
+        while (true) {
+            kotlinx.coroutines.delay(2800)
+            brandIdx = (brandIdx + 1) % brandForms.size
+        }
+    }
+    // Static brand when cycling is off or the plate is tucked; the
+    // cycling wordmark only when full-size on Home.
+    val shownTitle = if (brandCycle && !minimized) brandForms[brandIdx] else title
     val fullSize = if (centeredTitle) 26f else 20f
     val titleSp by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (minimized) 14f else fullSize,
@@ -585,13 +623,12 @@ fun GlassBoxScope.LensPlate(
         shape = RoundedCornerShape(20.dp)
     ) {
         if (options == null) {
-            Text(
-                text = title,
-                fontSize = titleSp.sp,
-                fontWeight = FontWeight.Bold,
+            PlateTitle(
+                text = shownTitle,
+                fontSizeSp = titleSp,
                 color = titleColor,
-                textAlign = if (centeredTitle) androidx.compose.ui.text.style.TextAlign.Center
-                else androidx.compose.ui.text.style.TextAlign.Start,
+                centered = centeredTitle,
+                staticLabel = brandCycle,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = vPad)
@@ -617,6 +654,58 @@ fun GlassBoxScope.LensPlate(
                     options()
                 }
             }
+        }
+    }
+}
+
+/**
+ * Plate title with the cycling brand wordmark: hy2ox1 → hy²ox¹ → H²O,
+ * crossfading every cycle. Screen readers get one stable "hy2ox1"
+ * heading — never the chase.
+ */
+@Composable
+private fun PlateTitle(
+    text: String,
+    fontSizeSp: Float,
+    color: Color,
+    centered: Boolean,
+    staticLabel: Boolean,
+    modifier: Modifier = Modifier
+) {
+    if (!staticLabel) {
+        Text(
+            text = text,
+            fontSize = fontSizeSp.sp,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            textAlign = if (centered) androidx.compose.ui.text.style.TextAlign.Center
+            else androidx.compose.ui.text.style.TextAlign.Start,
+            modifier = modifier
+        )
+        return
+    }
+    androidx.compose.foundation.layout.Box(
+        modifier = modifier.semantics(mergeDescendants = true) {
+            contentDescription = "hy2ox1"
+            heading()
+        },
+        contentAlignment = if (centered) Alignment.Center else Alignment.CenterStart
+    ) {
+        AnimatedContent(
+            targetState = text,
+            transitionSpec = {
+                fadeIn(tween(600)) togetherWith fadeOut(tween(600))
+            },
+            label = "brandCycle"
+        ) { form ->
+            Text(
+                text = form,
+                fontSize = fontSizeSp.sp,
+                fontWeight = FontWeight.Bold,
+                color = color,
+                textAlign = if (centered) androidx.compose.ui.text.style.TextAlign.Center
+                else androidx.compose.ui.text.style.TextAlign.Start
+            )
         }
     }
 }

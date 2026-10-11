@@ -108,10 +108,13 @@ class WakeEstimatorTest {
         )
         val now = System.currentTimeMillis()
         val dayStart = RecommendationEngine.dayStartMillis(7, 23, now)
+        // half an hour ago (never in the future: the range query ends
+        // at now, and a future stamp would silently drop out of it).
+        val entryTs = maxOf(dayStart, now - 30 * 60_000L)
         repo.insertEntry(
             HydrationEntry(
                 amountMl = 250,
-                timestamp = dayStart + 3600_000L,
+                timestamp = entryTs,
                 type = HydrationEntry.DrinkType.WATER
             )
         )

@@ -1,4 +1,4 @@
-# Water0 Glass Design Language
+# hy2ox1 Glass Design Language
 
 Single source of truth for every glass surface, current and future.
 Read this before adding any widget with transparency, blur, or shine.

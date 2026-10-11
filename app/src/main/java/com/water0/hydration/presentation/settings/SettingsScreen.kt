@@ -661,7 +661,7 @@ private fun FitnessSection() {
                 "Connected — workouts shape recs, drinks sync out."
             } else {
                 "Connected for reads — Hydration write denied, so " +
-                    "drinks stay in Water0 only."
+                    "drinks stay in hy2ox1 only."
             }
             sleepLine = source.lastNightSleep()?.let {
                 val fmt = java.text.SimpleDateFormat(
@@ -812,7 +812,7 @@ private fun FitnessSection() {
                     if (target == null) {
                         statusLine = "Couldn't find Health Connect settings " +
                             "on this phone — open the Health Connect app, " +
-                            "go to App permissions → Water0, allow Sleep " +
+                            "go to App permissions → hy2ox1, allow Sleep " +
                             "+ Exercise + Hydration, then Check again."
                     } else {
                         try {
@@ -824,7 +824,7 @@ private fun FitnessSection() {
                             statusLine = "Couldn't open it " +
                                 "(${e.javaClass.simpleName}) — open the " +
                                 "Health Connect app → App permissions → " +
-                                "Water0, allow Sleep + Exercise + Hydration, " +
+                                "hy2ox1, allow Sleep + Exercise + Hydration, " +
                                 "then Check again."
                         }
                     }
@@ -1067,7 +1067,7 @@ private fun AboutSection() {
     val context = LocalContext.current
     SectionCard(title = "About") {
         Text(
-            text = "Water0 ${com.water0.hydration.BuildConfig.VERSION_NAME} " +
+            text = "hy2ox1 ${com.water0.hydration.BuildConfig.VERSION_NAME} " +
                 "(${com.water0.hydration.BuildConfig.VERSION_CODE}) · " +
                 "build ${com.water0.hydration.BuildConfig.BUILD_NUMBER} " +
                 "(${com.water0.hydration.BuildConfig.BUILD_STAMP})",

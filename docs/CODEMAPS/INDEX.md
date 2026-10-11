@@ -1,4 +1,4 @@
-# Water0 Codemaps — Index
+# hy2ox1 Codemaps — Index
 
 **Last Updated:** 2026-10-11
 **Entry Points:** `app/src/main/java/com/water0/hydration/Water0Application.kt`, `app/src/main/java/com/water0/hydration/presentation/MainActivity.kt`

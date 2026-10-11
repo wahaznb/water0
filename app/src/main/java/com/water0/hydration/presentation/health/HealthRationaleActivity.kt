@@ -25,7 +25,7 @@ class HealthRationaleActivity : ComponentActivity() {
         setContent {
             LiquidGlassTheme {
                 Text(
-                    text = "Water0 reads your sleep windows and recent " +
+                    text = "hy2ox1 reads your sleep windows and recent " +
                         "workouts from Health Connect, only on this phone, " +
                         "only to tune hydration goals and reminders. " +
                         "It also writes your logged drinks there " +

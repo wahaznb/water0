@@ -437,7 +437,7 @@ class MainActivity : ComponentActivity() {
                             androidx.compose.foundation.LocalOverscrollConfiguration provides null
                         ) {
                         // Floating top lens on EVERY tab (Home wears
-                        // "Water0"). Pager-driven so titles never disagree
+                        // "hy2ox1"). Pager-driven so titles never disagree
                         // with what's displayed. Logs carries its range
                         // options in the plate. Content flows beneath it.
                         Box(
@@ -450,7 +450,10 @@ class MainActivity : ComponentActivity() {
                         ) {
                             this@scope.LensPlate(
                                 title = when (platePage) {
-                                    0 -> "Water0"
+                                    // Home wears the cycling wordmark
+                                    // (hy2ox1 → hy²ox¹ → H²O); the string
+                                    // here is only the minimized fallback.
+                                    0 -> "hy2ox1"
                                     1 -> "Update"
                                     2 -> "Logs"
                                     else -> "Settings"
@@ -459,6 +462,7 @@ class MainActivity : ComponentActivity() {
                                 // Home only: big centered brand. Other tabs
                                 // stay left-aligned.
                                 centeredTitle = platePage == 0,
+                                brandCycle = platePage == 0,
                                 minimized = plateMinimized,
                                     modifier = Modifier.onSizeChanged {
                                         plateHeightDp = with(density) { it.height.toDp() } + 12.dp

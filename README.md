@@ -1,4 +1,4 @@
-# Water0 - Hydration Tracker
+# hy2ox1 - Hydration Tracker
 
 **Know your water. Stay ahead of thirst.**
 
@@ -8,7 +8,7 @@
 
 ---
 
-Water0 is an offline-first Android hydration tracker with a liquid-glass UI.
+hy2ox1 (hy²ox¹) is an offline-first Android hydration tracker with a liquid-glass UI.
 Log what you drink, watch the day fill a tumbler, get nudged only when it
 matters. No account, no tracking, no ads — your data never leaves the phone
 unless you export it yourself.
@@ -158,7 +158,7 @@ python train_model.py --data data/hydration_logs.csv --out-dir model
 
 ## Design
 
-Water0 speaks liquid glass, not flat Material:
+hy2ox1 speaks liquid glass, not flat Material:
 
 - **Lenses, not bars** — top plates and bottom dock refract living content
 - **Living background** — glow orbs and bubbles spawn, drift, and die on
