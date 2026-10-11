@@ -562,12 +562,8 @@ fun GlassBoxScope.LensPlate(
     modifier: Modifier = Modifier,
     // Home only: big centered brand title. Other tabs stay left-aligned.
     centeredTitle: Boolean = false,
-    // Scroll-minimize: tucked small while the list moves down, full on
-    // the way back up. Title + padding animate; options stay usable.
-    minimized: Boolean = false,
-    // Home brand cycle: hy2ox1 → hy²ox¹ → H²O every ~3s. Minimized
-    // plate holds the plain ASCII form (room + calm). TalkBack always
-    // hears "hy2ox1", never the chase.
+    // Home brand cycle: hy2ox1 → hy²ox¹ → H²O every ~3s.
+    // TalkBack always hears "hy2ox1", never the chase.
     brandCycle: Boolean = false,
     options: (@Composable RowScope.() -> Unit)? = null
 ) {
@@ -605,18 +601,11 @@ fun GlassBoxScope.LensPlate(
     }
     // Static brand when cycling is off or the plate is tucked; the
     // cycling wordmark only when full-size on Home.
-    val shownTitle = if (brandCycle && !minimized) brandForms[brandIdx] else title
-    val fullSize = if (centeredTitle) 26f else 20f
-    val titleSp by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (minimized) 14f else fullSize,
-        animationSpec = androidx.compose.animation.core.tween(250),
-        label = "plateTitle"
-    )
-    val vPad by androidx.compose.animation.core.animateDpAsState(
-        targetValue = if (minimized) 6.dp else 12.dp,
-        animationSpec = androidx.compose.animation.core.tween(250),
-        label = "platePad"
-    )
+    val shownTitle = if (brandCycle) brandForms[brandIdx] else title
+    // Fixed chrome: the plate never resizes (scroll-minimize removed —
+    // the bar stays the same, always).
+    val titleSp = if (centeredTitle) 26f else 20f
+    val vPad = 12.dp
     this@LensPlate.LiquidGlassBox(
         modifier = modifier.fillMaxWidth(),
         params = params,

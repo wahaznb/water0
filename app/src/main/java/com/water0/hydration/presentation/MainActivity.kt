@@ -16,10 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -250,28 +246,8 @@ class MainActivity : ComponentActivity() {
                 // behind the lens like the bottom dock. Starts estimated so
                 // the first frame already clears.
                 var plateHeightDp by remember { mutableStateOf(68.dp) }
-                // Scroll-minimize: scrolling a tab's list down tucks the
-                // top plate small; scrolling up (or switching tabs) brings
-                // it back. Directional with a dead zone so jitter can't
-                // flutter it mid-fling.
-                var plateMinimized by remember { mutableStateOf(false) }
-                val plateScroll = remember {
-                    object : NestedScrollConnection {
-                        override fun onPreScroll(
-                            available: Offset,
-                            source: NestedScrollSource
-                        ): Offset {
-                            if (available.y < -8) plateMinimized = true
-                            else if (available.y > 8) plateMinimized = false
-                            return Offset.Zero
-                        }
-                    }
-                }
                 val density = LocalDensity.current
                 val platePage = pagerState.currentPage
-                androidx.compose.runtime.LaunchedEffect(platePage) {
-                    plateMinimized = false
-                }
                 val topInsetTarget = plateHeightDp
                 val topInset by animateDpAsState(
                     targetValue = topInsetTarget,
@@ -343,7 +319,6 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(paddingValues)
-                            .nestedScroll(plateScroll)
                     ) {
                         HorizontalPager(
                             state = pagerState,
@@ -451,8 +426,7 @@ class MainActivity : ComponentActivity() {
                             this@scope.LensPlate(
                                 title = when (platePage) {
                                     // Home wears the cycling wordmark
-                                    // (hy2ox1 → hy²ox¹ → H²O); the string
-                                    // here is only the minimized fallback.
+                                    // (hy2ox1 → hy²ox¹ → H²O).
                                     0 -> "hy2ox1"
                                     1 -> "Update"
                                     2 -> "Logs"
@@ -463,7 +437,6 @@ class MainActivity : ComponentActivity() {
                                 // stay left-aligned.
                                 centeredTitle = platePage == 0,
                                 brandCycle = platePage == 0,
-                                minimized = plateMinimized,
                                     modifier = Modifier.onSizeChanged {
                                         plateHeightDp = with(density) { it.height.toDp() } + 12.dp
                                     },
