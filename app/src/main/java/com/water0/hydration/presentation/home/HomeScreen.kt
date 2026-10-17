@@ -100,8 +100,9 @@ fun HomeScreen(
             // right below it; the numbers card follows full width.
             // No tumbler anywhere — a status ring circles the %.
             HeroHeader(status = state.status)
-            com.water0.hydration.presentation.home.components.PaceCurveCard(
-                entries = state.entries,
+            com.water0.hydration.presentation.home.components.PaceTimelineCard(
+                recentEntries = state.recentEntries,
+                dayStartMs = state.dayStartMs,
                 goalMl = state.goalMl,
                 wakeHour = state.wakeHour,
                 sleepHour = state.sleepHour,
