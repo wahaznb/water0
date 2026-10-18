@@ -87,6 +87,25 @@ import com.water0.hydration.ui.theme.liquidglass.GlassBoxScope
 import com.water0.hydration.ui.theme.liquidglass.LiquidGlassBox
 import com.water0.hydration.ui.theme.liquidglass.toLiquidParams
 
+/** Brand wordmark cycle cadence: forms swap every 2.8 s. */
+internal const val BRAND_CYCLE_DELAY_MS = 2800
+/** One focus-pull beat: blur and alpha finish together. */
+internal const val BRAND_CYCLE_DURATION_MS = 600
+/** Mid-swap softness, in dp — big enough to read as "defocus", small
+ *  enough that the incoming form is still recognisable at 600 ms. */
+internal const val BRAND_BLUR_RADIUS_DP = 10f
+
+/** System-wide calm mode (animator duration scale is zero). */
+internal fun isCalmMode(context: android.content.Context): Boolean = try {
+    android.provider.Settings.Global.getFloat(
+        context.contentResolver,
+        android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+        1f
+    ) == 0f
+} catch (_: Exception) {
+    false
+}
+
 object Routes {
     const val HOME = "home"
     const val UPDATE = "update"
@@ -193,16 +212,7 @@ fun GlassBoxScope.GlassBottomBar(
         label = "pressGlowIn"
     )
     // Calm mode (system animator off): static pill, no glow, no bounce.
-    val contentResolver = LocalContext.current.contentResolver
-    val calmMode = try {
-        android.provider.Settings.Global.getFloat(
-            contentResolver,
-            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
-            1f
-        ) == 0f
-    } catch (_: Exception) {
-        false
-    }
+    val calmMode = isCalmMode(LocalContext.current)
     // Selected bubble: a lens in its own right (reference behavior) —
     // follows the finger 1:1 while pressed/scrubbing, grows and goes
     // more rectangular under the finger, glides home on release.
@@ -589,23 +599,14 @@ fun GlassBoxScope.LensPlate(
     var brandIdx by remember { mutableIntStateOf(0) }
     // Calm mode (animations off system-wide): hold the plain ASCII
     // form instead of cycling.
-    val calmResolver = androidx.compose.ui.platform.LocalContext.current.contentResolver
-    val calmBrand = try {
-        android.provider.Settings.Global.getFloat(
-            calmResolver,
-            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
-            1f
-        ) == 0f
-    } catch (_: Exception) {
-        false
-    }
+    val calmBrand = isCalmMode(LocalContext.current)
     LaunchedEffect(brandCycle, calmBrand) {
         if (!brandCycle || calmBrand) {
             brandIdx = 0
             return@LaunchedEffect
         }
         while (true) {
-            kotlinx.coroutines.delay(2800)
+            kotlinx.coroutines.delay(BRAND_CYCLE_DELAY_MS.toLong())
             brandIdx = (brandIdx + 1) % brandForms.size
         }
     }
@@ -694,7 +695,9 @@ private fun PlateTitle(
         AnimatedContent(
             targetState = text,
             transitionSpec = {
-                (fadeIn(tween(600)) togetherWith fadeOut(tween(600)))
+                (fadeIn(tween(BRAND_CYCLE_DURATION_MS)) togetherWith fadeOut(
+                    tween(BRAND_CYCLE_DURATION_MS)
+                ))
                     // The soft blur must not be cut by the container's
                     // size animation — clip off, fade carries the swap.
                     .using(SizeTransform(clip = false))
@@ -702,19 +705,12 @@ private fun PlateTitle(
             label = "brandCycle"
         ) { form ->
             // Focus pull between forms: the outgoing name softens as
-            // it fades, the incoming name sharpens in — same 600 ms beat
-            // as the fade so blur and alpha move as one gesture. Blur
-            // only bites on API 31+; older devices keep the plain fade.
+            // it fades, the incoming name sharpens in — same beat as
+            // the fade so blur and alpha move as one gesture.
             val blurDp by transition.animateFloat(
-                transitionSpec = { tween(600) },
+                transitionSpec = { tween(BRAND_CYCLE_DURATION_MS) },
                 label = "brandBlur"
-            ) { state ->
-                when (state) {
-                    EnterExitState.PreEnter -> 10f
-                    EnterExitState.Visible -> 0f
-                    EnterExitState.PostExit -> 10f
-                }
-            }
+            ) { blurRadiusForState(it) }
             Text(
                 text = form,
                 fontSize = fontSizeSp.sp,
@@ -722,15 +718,35 @@ private fun PlateTitle(
                 color = color,
                 textAlign = if (centered) androidx.compose.ui.text.style.TextAlign.Center
                 else androidx.compose.ui.text.style.TextAlign.Start,
-                modifier = Modifier.blur(
-                    radius = blurDp.dp,
-                    // Let the halo bleed past the glyph bounds; a
-                    // rectangle edge would slice the soft frames.
-                    edgeTreatment = BlurredEdgeTreatment.Unbounded
+                modifier = Modifier.then(
+                    // RenderEffect blur is API 31+ only; on older
+                    // devices the crossfade runs without blur.
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                        Modifier.blur(
+                            radius = blurDp.dp,
+                            // Let the halo bleed past the glyph bounds; a
+                            // rectangle edge would slice the soft frames.
+                            edgeTreatment = BlurredEdgeTreatment.Unbounded
+                        )
+                    } else {
+                        Modifier
+                    }
                 )
             )
         }
     }
+}
+
+/**
+ * Blur radius for one wordmark form during its enter/exit transition:
+ * soft at the edges (PreEnter / PostExit), sharp when settled
+ * (Visible). Pure so it can be unit-tested without composing anything.
+ */
+@OptIn(ExperimentalAnimationApi::class)
+internal fun blurRadiusForState(state: EnterExitState): Float = when (state) {
+    EnterExitState.PreEnter -> BRAND_BLUR_RADIUS_DP
+    EnterExitState.Visible -> 0f
+    EnterExitState.PostExit -> BRAND_BLUR_RADIUS_DP
 }
 
 /** Segmented glass range switch for the Logs plate: one frosted track
