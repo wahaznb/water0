@@ -1,8 +1,12 @@
 package com.water0.hydration.presentation.navigation
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.snap
@@ -48,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -654,9 +659,10 @@ fun GlassBoxScope.LensPlate(
 
 /**
  * Plate title with the cycling brand wordmark: hy2ox1 → hy²ox¹ → H²O,
- * crossfading every cycle. Screen readers get one stable "hy2ox1"
+ * blur-crossfading every cycle. Screen readers get one stable "hy2ox1"
  * heading — never the chase.
  */
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 private fun PlateTitle(
     text: String,
@@ -688,17 +694,40 @@ private fun PlateTitle(
         AnimatedContent(
             targetState = text,
             transitionSpec = {
-                fadeIn(tween(600)) togetherWith fadeOut(tween(600))
+                (fadeIn(tween(600)) togetherWith fadeOut(tween(600)))
+                    // The soft blur must not be cut by the container's
+                    // size animation — clip off, fade carries the swap.
+                    .using(SizeTransform(clip = false))
             },
             label = "brandCycle"
         ) { form ->
+            // Focus pull between forms: the outgoing name softens as
+            // it fades, the incoming name sharpens in — same 600 ms beat
+            // as the fade so blur and alpha move as one gesture. Blur
+            // only bites on API 31+; older devices keep the plain fade.
+            val blurDp by transition.animateFloat(
+                transitionSpec = { tween(600) },
+                label = "brandBlur"
+            ) { state ->
+                when (state) {
+                    EnterExitState.PreEnter -> 10f
+                    EnterExitState.Visible -> 0f
+                    EnterExitState.PostExit -> 10f
+                }
+            }
             Text(
                 text = form,
                 fontSize = fontSizeSp.sp,
                 fontWeight = FontWeight.Bold,
                 color = color,
                 textAlign = if (centered) androidx.compose.ui.text.style.TextAlign.Center
-                else androidx.compose.ui.text.style.TextAlign.Start
+                else androidx.compose.ui.text.style.TextAlign.Start,
+                modifier = Modifier.blur(
+                    radius = blurDp.dp,
+                    // Let the halo bleed past the glyph bounds; a
+                    // rectangle edge would slice the soft frames.
+                    edgeTreatment = BlurredEdgeTreatment.Unbounded
+                )
             )
         }
     }

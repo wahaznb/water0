@@ -36,6 +36,8 @@ All notable changes to Water0 are documented here. Format follows
 - Pace card says "guide" everywhere (was "plan"/"ghost"); the
   wake→sleep→wake feet row is gone — the cursor readout names the day
   and time instead
+- Home wordmark blur-crossfades between forms: outgoing name softens
+  out, incoming sharpens in, same 600 ms beat as the fade
 
 ### Fixed
 - Fullscreen dock bug (tab row parked at the top covering the screen)
