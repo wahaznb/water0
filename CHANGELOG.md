@@ -38,6 +38,10 @@ All notable changes to Water0 are documented here. Format follows
   and time instead
 - Home wordmark blur-crossfades between forms: outgoing name softens
   out, incoming sharpens in, same 600 ms beat as the fade
+- Home pace graph reworked (Option 1): today's cumulative curve is the
+  hero at full size against its guide, night band, goal line and now
+  marker; below it a seven-day totals strip compares the week instead
+  of stacking three identical curves. No new deps — canvas only.
 
 ### Fixed
 - Fullscreen dock bug (tab row parked at the top covering the screen)

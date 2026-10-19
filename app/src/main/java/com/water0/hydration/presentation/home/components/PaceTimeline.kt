@@ -4,9 +4,11 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -17,18 +19,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +48,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import com.water0.hydration.data.local.entity.HydrationEntry
 import com.water0.hydration.domain.engine.RecommendationEngine
 import com.water0.hydration.ui.theme.Radii
@@ -60,25 +59,22 @@ import com.water0.hydration.ui.theme.isDarkScheme
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-/** Zoom = how many hours of timeline fill the viewport. */
-private val ZOOM_LEVELS = listOf(24f to "1D", 72f to "3D", 168f to "7D")
-
 /** Days of history on the axis, today included (the right edge). */
 private const val DAYS_BACK = 7
 
 /**
- * The week at a glance: a scrollable, wake-anchored timeline of the
- * last seven days. Scrolling moves time under a fixed center cursor
- * (the fixed-cursor scrub the Health app made familiar) — the readout
- * under the plot describes whatever the cursor points at; a tap on the
- * plot glides there. Zoom chips trade detail for range (1D/3D/7D).
+ * Today's curve is the hero: one cumulative intake path drawn at full
+ * size against its own guide, night band, goal line and now marker.
+ * Below it, a compact week strip of seven daily totals compares the
+ * week instead of stacking three identical curves — the question the
+ * old card never answered ("which days were good?").
  *
  * The ideal guide is a curve, not a ruler: the body is at its most
  * concentrated after the night, so the guide leans forward in the
  * morning and eases into the wind-down hour (guideFraction — a pacing
- * aid, not a physiological model). One stable y-scale across the week,
- * so zooming never rescales yesterday under the cursor. Canvas only,
- * no chart dependency.
+ * aid, not a physiological model). One stable y-scale across the week
+ * strip, so today's bar reads against the same goal as every other day.
+ * Canvas only, no chart dependency.
  */
 @Composable
 fun PaceTimelineCard(
@@ -117,6 +113,8 @@ fun PaceTimelineCard(
     // Today's progress in elapsed-since-wake hours (0 at wake).
     val nowElapsed = ((nowMs - dayStartMs) / 3_600_000f).coerceIn(0f, DAY_HOURS)
 
+    // Seven wake-anchored days ending with today — yesterday through
+    // today for the week strip; only today gets the hero curve above.
     val days = remember(dayStartMs) { wakeDays(dayStartMs, DAYS_BACK) }
     // Per-day drinks as (elapsed hours since wake, effective ml), oldest
     // sip first. Recomputed only when the data or the day windows move.
@@ -134,8 +132,7 @@ fun PaceTimelineCard(
     val dayTotals = remember(dayDrinks) {
         dayDrinks.map { drinks -> drinks.sumOf { it.second } }
     }
-    // One stable y-scale for every day on the axis: zooming must not
-    // rescale yesterday under the cursor.
+    // One stable y-scale for the whole week strip.
     val maxMl = maxOf(goalMl, dayTotals.maxOrNull() ?: 0, 1).toFloat()
     val dayLabels = remember(days) {
         val fmt = java.text.SimpleDateFormat(
@@ -146,64 +143,13 @@ fun PaceTimelineCard(
         }
     }
 
-    // Zoom: how many hours fill the viewport. Opens at 3D — wider than
-    // one day is the whole point of the timeline.
-    var visibleHours by rememberSaveable { mutableStateOf(72f) }
-    val scrollState = rememberScrollState(initial = Int.MAX_VALUE)
-    var viewportPx by remember { mutableFloatStateOf(0f) }
-    val pxPerHour = if (viewportPx <= 0f) 1f else viewportPx / visibleHours
-    val contentWidthPx = (days.size * DAY_HOURS * pxPerHour).coerceAtLeast(1f)
-    val maxScrollPx = (contentWidthPx - viewportPx).coerceAtLeast(0f)
-    val density = LocalDensity.current
-    val scope = rememberCoroutineScope()
-
-    // Anchor rule: first layout centers "now"; a zoom change keeps the
-    // time that was under the cursor centered instead of yanking the
-    // page back to today.
-    var anchorHours by remember { mutableStateOf<Float?>(null) }
-    LaunchedEffect(visibleHours, viewportPx) {
-        if (viewportPx <= 0f) return@LaunchedEffect
-        val target = anchorHours
-            ?: ((nowMs - days.first().startMs) / 3_600_000f)
-        anchorHours = null
-        scrollState.scrollTo(
-            (target * pxPerHour - viewportPx / 2f)
-                .coerceIn(0f, maxScrollPx)
-                .roundToInt()
-        )
-    }
-
-    // Center cursor: what the readout below the plot is describing.
-    val spot = cursorSpot(
-        scrollState.value.toFloat(), viewportPx, pxPerHour, days.size
-    )
-    val spotIndex = days.size - 1 - spot.dayBack
-    val spotDay = days[spotIndex]
-    val spotDrinks = dayDrinks[spotIndex]
-    // Everything at the cursor is pre-filtered to "happened by then":
-    // a past day reads like the diary it is.
-    val absorbedAtCursor = absorbedMl(
-        spotDrinks.filter { it.first <= spot.elapsedHours },
-        spot.elapsedHours
-    )
-    val guideAtCursor = guideMlAt(goalMl, span, spot.elapsedHours)
     fun clockOf(hour: Float): String {
         val h = ((hour % 24 + 24) % 24)
         return "%02d:%02d".format(h.toInt(), ((h - h.toInt()) * 60).toInt())
     }
-    val cursorClock = clockOf((wakeHour + spot.elapsedHours) % 24f)
-    val readout = if (spot.elapsedHours > span) {
-        "${dayLabels[spotIndex]} · $cursorClock · asleep — up %02d:00"
-            .format(wakeHour)
-    } else {
-        "${dayLabels[spotIndex]} · $cursorClock · " +
-            "${absorbedAtCursor.roundToInt()} in system / " +
-            "${guideAtCursor.roundToInt()} guide"
-    }
 
-    // Second line: today keeps the actionable caption (verdict, next
-    // sip, lights-out); a past day gets its scored sheet instead.
-    val todayDrinks = dayDrinks.last()
+    val todayIndex = days.size - 1
+    val todayDrinks = dayDrinks[todayIndex]
     val drunkNow = absorbedMl(
         todayDrinks.filter { it.first <= nowElapsed }, nowElapsed
     ).roundToInt()
@@ -252,18 +198,11 @@ fun PaceTimelineCard(
             nextText, bedText, wakeText
         ).joinToString(" · ")
     }
-    val spotTotal = dayTotals[spotIndex]
-    val caption = if (spotDay.isToday) {
-        todayCaption
-    } else if (spotTotal >= goalMl) {
-        "$spotTotal of $goalMl ml · goal met"
-    } else {
-        "$spotTotal of $goalMl ml · ${goalMl - spotTotal} short"
-    }
+    val nowClock = clockOf((wakeHour + nowElapsed) % 24f)
+    val readout = "$nowClock · $drunkNow in system / $guideNow guide"
 
-    // Reveal sweep: today's curve draws left to right every time Home
-    // (re)appears; past days are history and appear whole. Calm mode
-    // renders everything at once.
+    // Reveal sweep: today's curve draws left to right when Home
+    // (re)appears; calm mode renders at once.
     val reveal = remember { Animatable(0f) }
     val calmResolver = LocalContext.current.contentResolver
     val calmReveal = try {
@@ -311,35 +250,9 @@ fun PaceTimelineCard(
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Title + zoom: the header carries the range control so the
-            // plot itself needs no chrome.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                SectionHeader(text = "Pace", modifier = Modifier.weight(1f))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    modifier = Modifier.padding(end = Spacing.xs)
-                ) {
-                    for ((hours, label) in ZOOM_LEVELS) {
-                        ZoomChip(
-                            label = label,
-                            selected = visibleHours == hours,
-                            onClick = {
-                                // Keep the cursor's time: zooming is
-                                // about detail, not about losing your
-                                // place in the week.
-                                anchorHours =
-                                    ((scrollState.value + viewportPx / 2f) / pxPerHour)
-                                        .coerceIn(0f, days.size * DAY_HOURS)
-                                visibleHours = hours
-                            }
-                        )
-                    }
-                }
-            }
-            // Plot veil: the strong frost plate the data sits on.
+            SectionHeader(text = "Pace", modifier = Modifier.weight(1f))
+
+            // Hero plot: one day — today — at full height.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -348,374 +261,226 @@ fun PaceTimelineCard(
                         RoundedCornerShape(12.dp)
                     )
                     .clip(RoundedCornerShape(12.dp))
+                    .padding(Spacing.sm)
             ) {
-                Box(
+                val density = LocalDensity.current.density
+                Canvas(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(Spacing.sm)
-                        .onSizeChanged { viewportPx = it.width.toFloat() }
-                        .horizontalScroll(scrollState)
-                        .semantics {
-                            contentDescription =
-                                "Pace graph, seven wake-anchored days. " +
-                                    "Scroll to move time under the center " +
-                                    "cursor; the readout below follows."
-                        }
+                        .height(150.dp)
                 ) {
-                    Box(
-                        modifier = Modifier.width(
-                            with(density) { contentWidthPx.toDp() }
+                    val h = size.height
+                    val pxPerHour = size.width / DAY_HOURS
+                    fun yOf(ml: Float) =
+                        h * (1f - (ml / maxMl).coerceIn(0f, 1f))
+                    val goalY = yOf(goalMl.toFloat())
+                    val xSleep = span * pxPerHour
+
+                // Night: purple sleep to the next wake.
+                drawRect(
+                    color = purple.copy(alpha = 0.12f),
+                    topLeft = Offset(xSleep, 0f),
+                    size = Size(size.width - xSleep, h)
+                )
+                // Wind-down band: the last hour before sleep, muted —
+                // the plan holds no big glass here.
+                val windX = (span - 1f).coerceAtLeast(0f) * pxPerHour
+                drawRect(
+                    color = onVariant.copy(alpha = 0.08f),
+                    topLeft = Offset(windX, 0f),
+                    size = Size((xSleep - windX).coerceAtLeast(0f), h)
+                )
+                // Sleep boundary: dotted divider + moon.
+                drawLine(
+                    color = purple.copy(alpha = 0.8f),
+                    start = Offset(xSleep, 0f),
+                    end = Offset(xSleep, h),
+                    strokeWidth = 1.5f * density,
+                    pathEffect = PathEffect.dashPathEffect(
+                        floatArrayOf(3f * density, 4f * density)
+                    )
+                )
+                drawCircle(
+                    purple.copy(alpha = 0.9f), 4f * density,
+                    Offset(xSleep, 5f * density)
+                )
+                // Goal reference across the wake part of the day.
+                drawLine(
+                    color = refLine,
+                    start = Offset(0f, goalY),
+                    end = Offset(xSleep, goalY),
+                    strokeWidth = 1.5f * density,
+                    pathEffect = PathEffect.dashPathEffect(
+                        floatArrayOf(6f * density, 4f * density)
+                    )
+                )
+                // Wake boundary: where the day begins — hairline.
+                drawLine(
+                    color = onVariant.copy(alpha = 0.12f),
+                    start = Offset(0f, 0f),
+                    end = Offset(0f, h),
+                    strokeWidth = 1f * density
+                )
+                // The guide: a curve, not a ruler. Same shape every day
+                // — the ideal is a shape, not a schedule.
+                val guidePath = Path().apply {
+                    moveTo(0f, yOf(0f))
+                    val steps = 40
+                    for (i in 1..steps) {
+                        val elapsed = span * i / steps
+                        lineTo(
+                            elapsed * pxPerHour,
+                            yOf(guideMlAt(goalMl, span, elapsed))
                         )
-                    ) {
-                        Canvas(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(150.dp)
-                                // Tap = jump: scrolling is the scrub,
-                                // a tap is "take me there".
-                                .pointerInput(pxPerHour, viewportPx) {
-                                    detectTapGestures { offset ->
-                                        val target = (offset.x - viewportPx / 2f)
-                                            .coerceIn(0f, maxScrollPx)
-                                        scope.launch {
-                                            scrollState.animateScrollTo(
-                                                target.roundToInt()
-                                            )
-                                        }
-                                    }
-                                }
-                        ) {
-                            val h = size.height
-                            val dayW = DAY_HOURS * pxPerHour
-                            fun yOf(ml: Float) =
-                                h * (1f - (ml / maxMl).coerceIn(0f, 1f))
-                            val goalY = yOf(goalMl.toFloat())
-                            val scroll = scrollState.value.toFloat()
-                            // Draw only days intersecting the viewport
-                            // (a day of margin), never the whole week.
-                            val firstK = ((scroll - dayW) / dayW).toInt()
-                                .coerceIn(0, days.size - 1)
-                            val lastK = ((scroll + viewportPx + dayW) / dayW)
-                                .toInt().coerceIn(firstK, days.size - 1)
-                            val dashGoal = PathEffect.dashPathEffect(
-                                floatArrayOf(6.dp.toPx(), 4.dp.toPx())
-                            )
-                            val dashGuide = PathEffect.dashPathEffect(
-                                floatArrayOf(7.dp.toPx(), 5.dp.toPx())
-                            )
-                            val dashSleep = PathEffect.dashPathEffect(
-                                floatArrayOf(3.dp.toPx(), 4.dp.toPx())
-                            )
-                            for (k in firstK..lastK) {
-                                val day = days[k]
-                                val x0 = k * dayW
-                                val xSleep = x0 + span * pxPerHour
-                                val xEnd = x0 + dayW
-
-                                // Night: purple sleep to the next wake.
-                                // The curve keeps absorbing into it, so
-                                // the band carries the day's tail
-                                // instead of cutting the story off.
-                                drawRect(
-                                    color = purple.copy(alpha = 0.12f),
-                                    topLeft = Offset(xSleep, 0f),
-                                    size = Size(xEnd - xSleep, h)
-                                )
-                                // Wind-down band: the last hour before
-                                // sleep, muted — the plan holds no big
-                                // glass here.
-                                val windX = x0 +
-                                    (span - 1f).coerceAtLeast(0f) * pxPerHour
-                                drawRect(
-                                    color = onVariant.copy(alpha = 0.08f),
-                                    topLeft = Offset(windX, 0f),
-                                    size = Size(
-                                        (xSleep - windX).coerceAtLeast(0f), h
-                                    )
-                                )
-                                // Sleep boundary: dotted divider + moon.
-                                drawLine(
-                                    color = purple.copy(alpha = 0.8f),
-                                    start = Offset(xSleep, 0f),
-                                    end = Offset(xSleep, h),
-                                    strokeWidth = 1.5.dp.toPx(),
-                                    pathEffect = dashSleep
-                                )
-                                drawCircle(
-                                    purple.copy(alpha = 0.9f), 4.dp.toPx(),
-                                    Offset(xSleep, 5.dp.toPx())
-                                )
-                                // Goal reference across the day part.
-                                drawLine(
-                                    color = refLine,
-                                    start = Offset(x0, goalY),
-                                    end = Offset(xSleep, goalY),
-                                    strokeWidth = 1.5.dp.toPx(),
-                                    pathEffect = dashGoal
-                                )
-                                // Wake boundary: where one day hands off
-                                // to the next — hairline, countable.
-                                drawLine(
-                                    color = onVariant.copy(alpha = 0.12f),
-                                    start = Offset(x0, 0f),
-                                    end = Offset(x0, h),
-                                    strokeWidth = 1.dp.toPx()
-                                )
-                                // The guide: a curve, not a ruler. Same
-                                // shape every day — the ideal is a
-                                // shape, not a schedule.
-                                val guidePath = Path().apply {
-                                    moveTo(x0, yOf(0f))
-                                    val steps = 40
-                                    for (i in 1..steps) {
-                                        val elapsed = span * i / steps
-                                        lineTo(
-                                            x0 + elapsed * pxPerHour,
-                                            yOf(
-                                                guideMlAt(
-                                                    goalMl, span, elapsed
-                                                )
-                                            )
-                                        )
-                                    }
-                                }
-                                drawPath(
-                                    guidePath,
-                                    color = onVariant.copy(alpha = 0.85f),
-                                    style = Stroke(
-                                        width = 2.dp.toPx(),
-                                        pathEffect = dashGuide
-                                    )
-                                )
-                                // Today's sip times ride the guide as
-                                // small ticks: when to drink, not how
-                                // much — amounts stay in the plan.
-                                if (day.isToday) {
-                                    for (slot in plan) {
-                                        val elapsed =
-                                            ((((slot.hour - wakeHour) % 24) + 24) % 24)
-                                                .coerceIn(0f, span)
-                                        drawCircle(
-                                            onVariant.copy(alpha = 0.9f),
-                                            2.5.dp.toPx(),
-                                            Offset(
-                                                x0 + elapsed * pxPerHour,
-                                                yOf(
-                                                    guideMlAt(
-                                                        goalMl, span, elapsed
-                                                    )
-                                                )
-                                            )
-                                        )
-                                    }
-                                }
-                                // Day-start marker: the day begins at
-                                // wake — one prominent dot.
-                                val wakeDot = Offset(x0, yOf(0f))
-                                drawCircle(
-                                    Color.White.copy(alpha = 0.9f),
-                                    6.dp.toPx(), wakeDot
-                                )
-                                drawCircle(primary, 4.dp.toPx(), wakeDot)
-
-                                // You: absorption to now (today) or the
-                                // full window (past days), area fill
-                                // under the line, dots where sips landed.
-                                val drinks = dayDrinks[k]
-                                val drawEnd =
-                                    if (day.isToday) nowElapsed else DAY_HOURS
-                                val progress =
-                                    if (day.isToday) reveal.value else 1f
-                                if (drinks.isNotEmpty() &&
-                                    drawEnd > 0f && progress > 0f
-                                ) {
-                                    val samples = 96
-                                    val drawn = (
-                                        samples * (drawEnd / DAY_HOURS) *
-                                            progress
-                                        ).toInt().coerceIn(0, samples)
-                                    if (drawn > 0) {
-                                        fun elapsedAt(i: Int) =
-                                            drawEnd * i / drawn
-                                        fun absorbedAt(elapsed: Float) =
-                                            absorbedMl(
-                                                drinks.filter {
-                                                    it.first <= elapsed
-                                                },
-                                                elapsed
-                                            )
-                                        val fill = Path().apply {
-                                            moveTo(x0, h)
-                                            lineTo(x0, yOf(0f))
-                                            for (i in 1..drawn) {
-                                                val e = elapsedAt(i)
-                                                lineTo(
-                                                    x0 + e * pxPerHour,
-                                                    yOf(absorbedAt(e))
-                                                )
-                                            }
-                                            lineTo(
-                                                x0 + elapsedAt(drawn) *
-                                                    pxPerHour,
-                                                h
-                                            )
-                                            close()
-                                        }
-                                        drawPath(
-                                            fill,
-                                            Brush.verticalGradient(
-                                                listOf(
-                                                    primary.copy(alpha = 0.28f),
-                                                    primary.copy(alpha = 0f)
-                                                )
-                                            )
-                                        )
-                                        var prevX = x0
-                                        var prevY = yOf(0f)
-                                        for (i in 1..drawn) {
-                                            val e = elapsedAt(i)
-                                            val cx = x0 + e * pxPerHour
-                                            val cy = yOf(absorbedAt(e))
-                                            drawLine(
-                                                primary,
-                                                Offset(prevX, prevY),
-                                                Offset(cx, cy),
-                                                3.5.dp.toPx(),
-                                                cap = StrokeCap.Round
-                                            )
-                                            prevX = cx
-                                            prevY = cy
-                                        }
-                                        // Drink dots join the reveal as
-                                        // it passes them.
-                                        for ((e, _) in drinks) {
-                                            if (e > drawEnd * progress)
-                                                continue
-                                            val dot = Offset(
-                                                x0 + e * pxPerHour,
-                                                yOf(absorbedAt(e))
-                                            )
-                                            drawCircle(
-                                                primary, 4.5.dp.toPx(), dot
-                                            )
-                                            drawCircle(
-                                                Color.White.copy(
-                                                    alpha = 0.85f
-                                                ),
-                                                2.dp.toPx(),
-                                                dot
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // Now marker, today only: red under the
-                                // guide (needs attention), green
-                                // on-or-ahead; purple once asleep. The
-                                // vertical reads the standing, so the
-                                // curve never has to shout.
-                                if (day.isToday) {
-                                    val nx = x0 + nowElapsed * pxPerHour
-                                    val nowIn = absorbedMl(
-                                        drinks.filter {
-                                            it.first <= nowElapsed
-                                        },
-                                        nowElapsed
-                                    )
-                                    val nowColor = when {
-                                        !awake -> purple
-                                        nowIn < guideMlAt(
-                                            goalMl, span, nowElapsed
-                                        ) -> red
-                                        else -> green
-                                    }
-                                    drawLine(
-                                        color = nowColor.copy(
-                                            alpha = if (awake) 0.85f else 0.55f
-                                        ),
-                                        start = Offset(nx, 0f),
-                                        end = Offset(nx, h),
-                                        strokeWidth = 2.dp.toPx(),
-                                        pathEffect = PathEffect.dashPathEffect(
-                                            floatArrayOf(
-                                                4.dp.toPx(), 4.dp.toPx()
-                                            )
-                                        )
-                                    )
-                                    drawCircle(
-                                        nowColor, 3.5.dp.toPx(),
-                                        Offset(nx, 0f)
-                                    )
-                                }
-                            }
-                            // Center cursor over everything: the time
-                            // the readout below is describing. Neutral
-                            // locator line + standing dot.
-                            val cursorX = scroll + viewportPx / 2f
-                            drawLine(
-                                color = Color.White.copy(alpha = 0.25f),
-                                start = Offset(cursorX, 0f),
-                                end = Offset(cursorX, h),
-                                strokeWidth = 3.dp.toPx()
-                            )
-                            drawLine(
-                                color = onVariant.copy(alpha = 0.75f),
-                                start = Offset(cursorX, 0f),
-                                end = Offset(cursorX, h),
-                                strokeWidth = 1.5.dp.toPx()
-                            )
-                            if (spot.elapsedHours <= span) {
-                                val cy = yOf(absorbedAtCursor)
-                                val cur = if (absorbedAtCursor < guideAtCursor)
-                                    red else green
-                                drawCircle(
-                                    Color.White, 6.dp.toPx(),
-                                    Offset(cursorX, cy)
-                                )
-                                drawCircle(
-                                    cur, 4.dp.toPx(), Offset(cursorX, cy)
-                                )
-                            } else {
-                                drawCircle(
-                                    purple, 4.dp.toPx(),
-                                    Offset(cursorX, 5.dp.toPx())
-                                )
-                            }
-                        }
-                        // Day chips: real type, scrolled with the plot.
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            for (label in dayLabels) {
-                                Box(
-                                    modifier = Modifier.weight(1f),
-                                    contentAlignment = Alignment.TopStart
-                                ) {
-                                    Text(
-                                        text = label,
-                                        fontSize = 10.sp,
-                                        color = onVariant,
-                                        modifier = Modifier
-                                            .padding(
-                                                start = Spacing.sm,
-                                                top = 6.dp
-                                            )
-                                            .background(
-                                                MaterialTheme.colorScheme
-                                                    .surface.copy(alpha = 0.55f),
-                                                RoundedCornerShape(Radii.sm)
-                                            )
-                                            .padding(
-                                                horizontal = 6.dp,
-                                                vertical = 2.dp
-                                            )
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
+                drawPath(
+                    guidePath,
+                    color = onVariant.copy(alpha = 0.85f),
+                    style = Stroke(
+                        width = 2f * density,
+                        pathEffect = PathEffect.dashPathEffect(
+                            floatArrayOf(7f * density, 5f * density)
+                        )
+                    )
+                )
+                // Today's sip times ride the guide as small ticks:
+                // when to drink, not how much — amounts stay in the plan.
+                for (slot in plan) {
+                    val elapsed =
+                        ((((slot.hour - wakeHour) % 24) + 24) % 24)
+                            .coerceIn(0f, span)
+                    drawCircle(
+                        onVariant.copy(alpha = 0.9f),
+                        2.5f * density,
+                        Offset(
+                            elapsed * pxPerHour,
+                            yOf(guideMlAt(goalMl, span, elapsed))
+                        )
+                    )
+                }
+                // Day-start marker: the day begins at wake — one dot.
+                val wakeDot = Offset(0f, yOf(0f))
+                drawCircle(
+                    Color.White.copy(alpha = 0.9f),
+                    6f * density, wakeDot
+                )
+                drawCircle(primary, 4f * density, wakeDot)
+
+                // You: absorption to now, area fill under the line,
+                // dots where sips landed. The reveal sweep gates how
+                // far into today is drawn.
+                val drawEnd = nowElapsed
+                val progress = reveal.value
+                val samples = 96
+                val drawn = (samples * (drawEnd / DAY_HOURS) * progress)
+                    .toInt().coerceIn(0, samples)
+                if (drawn > 0) {
+                    fun elapsedAt(i: Int) = drawEnd * i / drawn
+                    fun absorbedAt(elapsed: Float) =
+                        absorbedMl(
+                            todayDrinks.filter { it.first <= elapsed },
+                            elapsed
+                        )
+                    val fill = Path().apply {
+                        moveTo(0f, h)
+                        lineTo(0f, yOf(0f))
+                        for (i in 1..drawn) {
+                            val e = elapsedAt(i)
+                            lineTo(
+                                e * pxPerHour,
+                                yOf(absorbedAt(e))
+                            )
+                        }
+                        lineTo(elapsedAt(drawn) * pxPerHour, h)
+                        close()
+                    }
+                    drawPath(
+                        fill,
+                        Brush.verticalGradient(
+                            listOf(
+                                primary.copy(alpha = 0.28f),
+                                primary.copy(alpha = 0f)
+                            )
+                        )
+                    )
+                    var prevX = 0f
+                    var prevY = yOf(0f)
+                    for (i in 1..drawn) {
+                        val e = elapsedAt(i)
+                        val cx = e * pxPerHour
+                        val cy = yOf(absorbedAt(e))
+                        drawLine(
+                            primary,
+                            Offset(prevX, prevY),
+                            Offset(cx, cy),
+                            3.5f * density,
+                            cap = StrokeCap.Round
+                        )
+                        prevX = cx
+                        prevY = cy
+                    }
+                    // Drink dots join the reveal as it passes them.
+                    for ((e, _) in todayDrinks) {
+                        if (e > drawEnd * progress) continue
+                        val dot = Offset(
+                            e * pxPerHour,
+                            yOf(absorbedAt(e))
+                        )
+                        drawCircle(
+                            primary, 4.5f * density, dot
+                        )
+                        drawCircle(
+                            Color.White.copy(alpha = 0.85f),
+                            2f * density, dot
+                        )
+                    }
+                }
+
+                // Now marker: red under the guide (needs attention),
+                // green on-or-ahead; purple once asleep. The vertical
+                // reads the standing, so the curve never has to shout.
+                val nx = nowElapsed * pxPerHour
+                val nowIn = absorbedMl(
+                    todayDrinks.filter { it.first <= nowElapsed },
+                    nowElapsed
+                )
+                val nowColor = when {
+                    !awake -> purple
+                    nowIn < guideMlAt(goalMl, span, nowElapsed) -> red
+                    else -> green
+                }
+                drawLine(
+                    color = nowColor.copy(
+                        alpha = if (awake) 0.85f else 0.55f
+                    ),
+                    start = Offset(nx, 0f),
+                    end = Offset(nx, h),
+                    strokeWidth = 2f * density,
+                    pathEffect = PathEffect.dashPathEffect(
+                        floatArrayOf(
+                            4f * density, 4f * density
+                        )
+                    )
+                )
+                drawCircle(
+                    nowColor, 3.5f * density,
+                    Offset(nx, 0f)
+                )
+                }
             }
-            // Readout follows the center cursor; the caption scores the
-            // day under it (today: verdict + next step; past: the sheet).
+
+            // Week strip: seven daily-total bars vs the goal, one
+            // y-scale for every day.
+            WeekStrip(
+                days = days,
+                dayTotals = dayTotals,
+                dayLabels = dayLabels,
+                goalMl = goalMl,
+                maxMl = maxMl,
+                todayIndex = todayIndex
+            )
+
             Text(
                 text = readout,
                 fontSize = 13.sp,
@@ -723,7 +488,7 @@ fun PaceTimelineCard(
                 modifier = Modifier.padding(horizontal = 6.dp)
             )
             Text(
-                text = caption,
+                text = todayCaption,
                 fontSize = 12.sp,
                 color = onVariant.copy(alpha = 0.85f),
                 modifier = Modifier.padding(horizontal = 6.dp)
@@ -782,39 +547,93 @@ fun PaceTimelineCard(
     }
 }
 
-/** One zoom step: 1D / 3D / 7D. Tokens only, capsule hit area. */
+/** Seven daily-total bars vs the goal, one y-scale for the whole week. */
 @Composable
-private fun ZoomChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
+private fun WeekStrip(
+    days: List<WakeDay>,
+    dayTotals: List<Int>,
+    dayLabels: List<String>,
+    goalMl: Int,
+    maxMl: Float,
+    todayIndex: Int
 ) {
-    val shape = RoundedCornerShape(Radii.sm)
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelMedium,
-        color = if (selected) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
-        },
-        modifier = Modifier
-            .clip(shape)
-            .background(
-                if (selected) {
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                } else {
-                    Color.Transparent
-                },
-                shape
-            )
-            .clickable(
-                onClickLabel = "Show $label of timeline",
-                role = Role.Button,
-                onClick = onClick
-            )
-            .padding(horizontal = Spacing.sm, vertical = 3.dp)
-    )
+    val primary = MaterialTheme.colorScheme.primary
+    val green = Color(0xFF43A047)
+    val onVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val dark = isDarkScheme()
+    val refLine = Color.Black.copy(alpha = if (dark) 0.65f else 0.45f)
+    val barHdp = 28f
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        days.forEachIndexed { index, day ->
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = dayLabels[index],
+                    fontSize = 9.sp,
+                    color = onVariant.copy(alpha = if (index == todayIndex) 1f else 0.7f),
+                    fontWeight = if (index == todayIndex) FontWeight.Bold else FontWeight.Normal
+                )
+                val total = dayTotals[index]
+                val isToday = index == todayIndex
+                val met = total >= goalMl
+                val fillFraction = (total.toFloat() / maxMl).coerceIn(0f, 1f)
+                val fillHeight = fillFraction * barHdp
+                val goalY = (goalMl.toFloat() / maxMl).coerceIn(0f, 1f) * barHdp
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(barHdp.dp)
+                        .background(
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
+                            RoundedCornerShape(6.dp)
+                        )
+                        .border(
+                            if (isToday) 2.dp else 0.dp,
+                            primary,
+                            RoundedCornerShape(6.dp)
+                        )
+                        .clip(RoundedCornerShape(6.dp))
+                ) {
+                    Canvas(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .height(fillHeight.dp)
+                    ) {
+                        drawRect(
+                            color = if (met) green.copy(alpha = 0.4f)
+                            else primary.copy(alpha = 0.25f),
+                            size = size
+                        )
+                    }
+                    Canvas(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .height((goalY + 1f).dp)
+                    ) {
+                        drawLine(
+                            color = refLine,
+                            start = Offset(0f, size.height - 1f),
+                            end = Offset(size.width, size.height - 1f),
+                            strokeWidth = 1f
+                        )
+                    }
+                }
+                Text(
+                    text = "${total} ml",
+                    fontSize = 9.sp,
+                    color = onVariant.copy(alpha = 0.85f)
+                )
+            }
+        }
+    }
 }
 
 /**
