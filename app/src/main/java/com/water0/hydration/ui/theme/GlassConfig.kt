@@ -19,7 +19,9 @@ import androidx.compose.ui.unit.dp
 data class GlassConfig(
     val blurRadius: Dp = Defaults.BLUR,
     val tintAlpha: Float = Defaults.TINT_ALPHA,
-    val backgroundOn: Boolean = true,
+    // 0 = invisible … 1 = fully opaque. Replaces the old backgroundOn
+    // switch — slider lets the user dial the living background strength.
+    val backgroundOpacity: Float = 1.0f,
     val cardGlass: Boolean = true,
     // 0 = milky … 1 = near-clear. Read in glass mode.
     val glassClarity: Float = 0.5f,

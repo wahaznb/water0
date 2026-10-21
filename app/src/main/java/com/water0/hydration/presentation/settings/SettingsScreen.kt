@@ -916,12 +916,17 @@ private fun GlassLabSection(
         TextButton(onClick = { onChange(com.water0.hydration.ui.theme.GlassConfig()) }) {
             Text("Reset defaults (6dp)")
         }
-        // Show switches: calm mode kills motion for weak GPUs and low
-        // battery without touching the tuned look (one tap restores).
-        ShowRow(
-            label = "Living background",
-            checked = config.backgroundOn,
-            onChange = { onChange(config.copy(backgroundOn = it)) }
+        // Living background: slider lets the user dim the aurora field
+        // instead of killing it with a switch. 0 = flat theme background.
+        Text(
+            text = "Background: ${(config.backgroundOpacity * 100).toInt()}%",
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Slider(
+            value = config.backgroundOpacity,
+            onValueChange = { onChange(config.copy(backgroundOpacity = it)) },
+            valueRange = 0f..1f
         )
         ShowRow(
             label = "Bubble lens (off = frost bubble)",

@@ -284,11 +284,12 @@ class MainActivity : ComponentActivity() {
                 // Full-bleed living background behind EVERYTHING (including
                 // the lens bar zone) so the lens always samples real pixels.
                 Box(modifier = Modifier.fillMaxSize()) {
-                    if (glassConfig.backgroundOn) {
+                    if (glassConfig.backgroundOpacity > 0f) {
                         AuroraBackground(
                             modifier = Modifier.fillMaxSize(),
                             hydrationTint = rootTint,
-                            energy = rootEnergy
+                            energy = rootEnergy,
+                            backgroundOpacity = glassConfig.backgroundOpacity
                         )
                     } else {
                         // Calm mode: flat theme background, zero motion cost.
@@ -322,11 +323,11 @@ class MainActivity : ComponentActivity() {
                     ) {
                         HorizontalPager(
                             state = pagerState,
-                            // Home owns horizontal swipes (the stats card
-                            // carousel needs them); two nested pagers can't
-                            // share one gesture and the outer always wins.
-                            // Dock still navigates everywhere.
-                            userScrollEnabled = pagerState.currentPage != 0,
+                            // Always scrollable: swiping on any tab (Home
+                            // included) moves between tabs. The stats carousel
+                            // on Home is still reachable via its dots; tapping
+                            // a dock icon navigates too.
+                            userScrollEnabled = true,
                             modifier = Modifier.fillMaxSize()
                         ) { page ->
                             // Page glide: fade + slight parallax while dragging.

@@ -17,7 +17,13 @@ class GlassPrefs(private val prefs: SharedPreferences) {
         // No tint UI anymore: fixed default, so a stale stored value
         // can't linger invisibly.
         tintAlpha = GlassConfig.Defaults.TINT_ALPHA,
-        backgroundOn = prefs.getBoolean(KEY_BG_ON, true),
+        // Migrate: old installs stored backgroundOn (boolean). New field
+        // is backgroundOpacity (0..1). Default on -> 1f, off -> 0f.
+        backgroundOpacity = if (prefs.contains(KEY_BG_OPACITY)) {
+            prefs.getFloat(KEY_BG_OPACITY, 1.0f)
+        } else {
+            if (prefs.getBoolean(KEY_BG_ON, true)) 1.0f else 0.0f
+        },
         cardGlass = prefs.getBoolean(KEY_CARD_GLASS, true),
         glassClarity = prefs.getFloat(KEY_GLASS_CLARITY, 0.5f),
         dockLens = prefs.getBoolean(KEY_DOCK_LENS, true)
@@ -27,7 +33,7 @@ class GlassPrefs(private val prefs: SharedPreferences) {
         prefs.edit()
             .putInt(KEY_BLUR_DP, config.blurRadius.value.toInt())
             .putFloat(KEY_TINT, config.tintAlpha)
-            .putBoolean(KEY_BG_ON, config.backgroundOn)
+            .putFloat(KEY_BG_OPACITY, config.backgroundOpacity)
             .putBoolean(KEY_CARD_GLASS, config.cardGlass)
             .putFloat(KEY_GLASS_CLARITY, config.glassClarity)
             .putBoolean(KEY_DOCK_LENS, config.dockLens)
@@ -44,6 +50,7 @@ class GlassPrefs(private val prefs: SharedPreferences) {
         private const val KEY_BLUR_DP = "glass_blur_dp"
         private const val KEY_TINT = "glass_tint"
         private const val KEY_BG_ON = "glass_bg_on"
+        private const val KEY_BG_OPACITY = "glass_bg_opacity"
         private const val KEY_CARD_GLASS = "glass_card_glass"
         private const val KEY_GLASS_CLARITY = "glass_clarity"
         private const val KEY_DOCK_LENS = "glass_dock_lens"
