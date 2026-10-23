@@ -4,25 +4,15 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.ui.unit.dp
 
-/**
- * Glass Lab persistence. Sliders apply LIVE (the lens uniforms are just
- * floats recomposed into the shader block — no re-init cost), so there is
- * no draft/restart split: every change writes straight through and the UI
- * recomposes around it.
- */
 class GlassPrefs(private val prefs: SharedPreferences) {
 
     fun applied(): GlassConfig = GlassConfig(
         blurRadius = prefs.getInt(KEY_BLUR_DP, 6).dp,
-        // No tint UI anymore: fixed default, so a stale stored value
-        // can't linger invisibly.
         tintAlpha = GlassConfig.Defaults.TINT_ALPHA,
-        // Migrate: old installs stored backgroundOn (boolean). New field
-        // is backgroundOpacity (0..1). Default on -> 1f, off -> 0f.
         backgroundOpacity = if (prefs.contains(KEY_BG_OPACITY)) {
-            prefs.getFloat(KEY_BG_OPACITY, 1.0f)
+            prefs.getFloat(KEY_BG_OPACITY, 1f)
         } else {
-            if (prefs.getBoolean(KEY_BG_ON, true)) 1.0f else 0.0f
+            if (prefs.getBoolean(KEY_BG_ON, true)) 1f else 0f
         },
         cardGlass = prefs.getBoolean(KEY_CARD_GLASS, true),
         glassClarity = prefs.getFloat(KEY_GLASS_CLARITY, 0.5f),
@@ -54,10 +44,6 @@ class GlassPrefs(private val prefs: SharedPreferences) {
         private const val KEY_CARD_GLASS = "glass_card_glass"
         private const val KEY_GLASS_CLARITY = "glass_clarity"
         private const val KEY_DOCK_LENS = "glass_dock_lens"
-        // Bumped when the defaults change (v0.3: 6dp / 27% / 42dp, bevel
-        // removed; glass cards always on): existing installs re-seed
-        // once so the phone actually shows the new look instead of the
-        // stored old values.
         private const val KEY_VERSION = "glass_defaults_version"
         private const val CURRENT_VERSION = 2
 

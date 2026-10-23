@@ -87,15 +87,10 @@ import com.water0.hydration.ui.theme.liquidglass.GlassBoxScope
 import com.water0.hydration.ui.theme.liquidglass.LiquidGlassBox
 import com.water0.hydration.ui.theme.liquidglass.toLiquidParams
 
-/** Brand wordmark cycle cadence: forms swap every 2.8 s. */
 internal const val BRAND_CYCLE_DELAY_MS = 2800
-/** One focus-pull beat: blur and alpha finish together. */
 internal const val BRAND_CYCLE_DURATION_MS = 600
-/** Mid-swap softness, in dp — big enough to read as "defocus", small
- *  enough that the incoming form is still recognisable at 600 ms. */
 internal const val BRAND_BLUR_RADIUS_DP = 10f
 
-/** System-wide calm mode (animator duration scale is zero). */
 internal fun isCalmMode(context: android.content.Context): Boolean = try {
     android.provider.Settings.Global.getFloat(
         context.contentResolver,
@@ -566,39 +561,24 @@ private fun GlassTab(
 }
 
 
-/**
- * Floating lens title plate for every tab, with an optional options slot
- * (used by Logs for the 7/14/30-day range, sitting beside the title). A
- * real backdrop lens like the dock. Call from glassContent; the caller
- * measures it for the content top gutter.
- */
 @Composable
 fun GlassBoxScope.LensPlate(
     title: String,
     config: GlassConfig,
     modifier: Modifier = Modifier,
-    // Home only: big centered brand title. Other tabs stay left-aligned.
     centeredTitle: Boolean = false,
-    // Home brand cycle: hy2ox1 → hy²ox¹ → H²O every ~3s.
-    // TalkBack always hears "hy2ox1", never the chase.
     brandCycle: Boolean = false,
     options: (@Composable RowScope.() -> Unit)? = null
 ) {
-    // Plate lens, blur cut: the top bar keeps its bend and rim (it
-    // reads as glass because it distorts), but zero blur — text over
-    // a bent-sharp backdrop instead of a smeared one.
     val params = remember(config) {
         config.toLiquidParams(Color(0xFF0351A3)).copy(
             elevation = 0.dp,
             blur = 0f
         )
     }
-    // Title: TV Girl blue in dark, pure black in light.
     val titleColor = if (isDarkScheme()) Color(0xFF0351A3) else Color.Black
     val brandForms = remember { listOf("hy2ox1", "hy²ox¹", "H²O") }
     var brandIdx by remember { mutableIntStateOf(0) }
-    // Calm mode (animations off system-wide): hold the plain ASCII
-    // form instead of cycling.
     val calmBrand = isCalmMode(LocalContext.current)
     LaunchedEffect(brandCycle, calmBrand) {
         if (!brandCycle || calmBrand) {
@@ -610,11 +590,7 @@ fun GlassBoxScope.LensPlate(
             brandIdx = (brandIdx + 1) % brandForms.size
         }
     }
-    // Static brand when cycling is off or the plate is tucked; the
-    // cycling wordmark only when full-size on Home.
     val shownTitle = if (brandCycle) brandForms[brandIdx] else title
-    // Fixed chrome: the plate never resizes (scroll-minimize removed —
-    // the bar stays the same, always).
     val titleSp = if (centeredTitle) 26f else 20f
     val vPad = 12.dp
     this@LensPlate.LiquidGlassBox(
@@ -661,7 +637,6 @@ fun GlassBoxScope.LensPlate(
 /**
  * Plate title with the cycling brand wordmark: hy2ox1 → hy²ox¹ → H²O,
  * blur-crossfading every cycle. Screen readers get one stable "hy2ox1"
- * heading — never the chase.
  */
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
@@ -704,9 +679,6 @@ private fun PlateTitle(
             },
             label = "brandCycle"
         ) { form ->
-            // Focus pull between forms: the outgoing name softens as
-            // it fades, the incoming name sharpens in — same beat as
-            // the fade so blur and alpha move as one gesture.
             val blurDp by transition.animateFloat(
                 transitionSpec = { tween(BRAND_CYCLE_DURATION_MS) },
                 label = "brandBlur"
@@ -719,15 +691,8 @@ private fun PlateTitle(
                 textAlign = if (centered) androidx.compose.ui.text.style.TextAlign.Center
                 else androidx.compose.ui.text.style.TextAlign.Start,
                 modifier = Modifier.then(
-                    // RenderEffect blur is API 31+ only; on older
-                    // devices the crossfade runs without blur.
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                        Modifier.blur(
-                            radius = blurDp.dp,
-                            // Let the halo bleed past the glyph bounds; a
-                            // rectangle edge would slice the soft frames.
-                            edgeTreatment = BlurredEdgeTreatment.Unbounded
-                        )
+                        Modifier.blur(radius = blurDp.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
                     } else {
                         Modifier
                     }
@@ -737,11 +702,6 @@ private fun PlateTitle(
     }
 }
 
-/**
- * Blur radius for one wordmark form during its enter/exit transition:
- * soft at the edges (PreEnter / PostExit), sharp when settled
- * (Visible). Pure so it can be unit-tested without composing anything.
- */
 @OptIn(ExperimentalAnimationApi::class)
 internal fun blurRadiusForState(state: EnterExitState): Float = when (state) {
     EnterExitState.PreEnter -> BRAND_BLUR_RADIUS_DP
