@@ -2,6 +2,7 @@ package com.water0.hydration.presentation.home.components
 
 import com.water0.hydration.data.local.entity.HydrationEntry
 import com.water0.hydration.domain.engine.RecommendationEngine
+import kotlin.math.roundToInt
 
 /**
  * Pure math behind the week timeline (PaceTimeline): the curved guide,
@@ -81,6 +82,49 @@ internal fun guideFraction(t: Float): Float {
 internal fun guideMlAt(goalMl: Int, spanHours: Float, elapsedHours: Float): Float {
     if (spanHours <= 0f) return 0f
     return goalMl * guideFraction(elapsedHours / spanHours)
+}
+
+/**
+ * The "track record" line: for each sample hour, the MEAN absorbed ml
+ * across the given past days. Averaging (not summing) keeps two normal
+ * days from reading like one double-goal day, and days with no drinks
+ * are skipped — an unlogged day is not a zero-intake day.
+ */
+internal fun trackAverageByHour(
+    days: List<List<Pair<Float, Int>>>,
+    spanHours: Float,
+    samples: Int = 49
+): FloatArray {
+    val logged = days.filter { it.isNotEmpty() }
+    if (logged.isEmpty() || samples <= 1 || spanHours <= 0f) return FloatArray(samples.coerceAtLeast(0))
+    val out = FloatArray(samples)
+    for (i in 0 until samples) {
+        val hour = i * spanHours / (samples - 1)
+        // Pre-filter to drinks already in the window at this hour: absorbedMl
+        // is overnight-aware and would otherwise count a 16:00 drink at 06:00
+        // as fully absorbed from the previous night.
+        val sum = logged.sumOf { day ->
+            absorbedMl(day.filter { it.first <= hour + 1e-6f }, hour).toDouble()
+        }
+        out[i] = (sum / logged.size).toFloat()
+    }
+    return out
+}
+
+/**
+ * Where a released scroll should rest: the nearest whole-day offset,
+ * clamped to the scrollable range. The timeline is day-sized columns,
+ * so a half-day park reads as a broken graph.
+ */
+internal fun snapToDayOffset(
+    scrollPx: Float,
+    dayWidthPx: Float,
+    maxScrollPx: Float
+): Float {
+    val max = maxScrollPx.coerceAtLeast(0f)
+    if (dayWidthPx <= 0f) return scrollPx.coerceIn(0f, max)
+    val snapped = (scrollPx / dayWidthPx).roundToInt() * dayWidthPx
+    return snapped.coerceIn(0f, max)
 }
 
 /**

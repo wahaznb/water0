@@ -49,13 +49,13 @@ val LocalCardStyle = androidx.compose.runtime.compositionLocalOf { CardStyle() }
 @Composable
 fun glassCardContainer(): Color {
     val style = LocalCardStyle.current
-    // Same fill as the Update buttons (primaryContainer 0.16): cards
-    // and buttons share one transparency, frost or glass.
+    // Frostier default: less glass, more subtle. Clarity reduces opacity.
     if (style.glass) {
-        val a = (0.16f - style.clarity.coerceIn(0f, 1f) * 0.10f).coerceAtLeast(0.04f)
+        val a = (0.12f - style.clarity.coerceIn(0f, 1f) * 0.08f).coerceAtLeast(0.03f)
         return MaterialTheme.colorScheme.primaryContainer.copy(alpha = a)
     }
-    return MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.16f)
+    // Frost default: subtle translucent tint
+    return MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.10f)
 }
 
 /** True when the app theme is dark — one source for every theme branch. */
@@ -67,18 +67,18 @@ fun isDarkScheme(): Boolean {
 
 // Beveled rim: bright top edge fading into the hairline outline, the
 // cheap version of a lens edge. Shared by every card in the app.
-// Glass mode brightens the top light so the edge reads as a lens.
+// Frostier: softer top light, subtler edge.
 @Composable
 fun glassCardBorder(): BorderStroke {
     val style = LocalCardStyle.current
     val topLight = if (style.glass) {
-        0.16f + style.clarity.coerceIn(0f, 1f) * 0.25f
+        0.10f + style.clarity.coerceIn(0f, 1f) * 0.15f
     } else {
-        0.16f
+        0.08f
     }
     // Light field washes edges out: outline runs stronger there so
-    // cards keep a visible rim in both modes.
-    val edgeAlpha = if (isDarkScheme()) Glass.BORDER_ALPHA else 0.38f
+    // cards keep a visible rim in both modes. Frostier: subtler edge.
+    val edgeAlpha = if (isDarkScheme()) 0.18f else 0.28f
     return BorderStroke(
         1.dp,
         Brush.verticalGradient(

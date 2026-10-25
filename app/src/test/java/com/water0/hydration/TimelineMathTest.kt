@@ -5,10 +5,13 @@ import com.water0.hydration.presentation.home.components.CursorSpot
 import com.water0.hydration.presentation.home.components.DAY_HOURS
 import com.water0.hydration.presentation.home.components.DAY_MS
 import com.water0.hydration.presentation.home.components.WakeDay
+import com.water0.hydration.presentation.home.components.absorbedMl
 import com.water0.hydration.presentation.home.components.cursorSpot
 import com.water0.hydration.presentation.home.components.entriesIn
 import com.water0.hydration.presentation.home.components.guideFraction
 import com.water0.hydration.presentation.home.components.guideMlAt
+import com.water0.hydration.presentation.home.components.snapToDayOffset
+import com.water0.hydration.presentation.home.components.trackAverageByHour
 import com.water0.hydration.presentation.home.components.wakeDays
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -109,6 +112,78 @@ class TimelineMathTest {
         val todaySlice = entriesIn(today, all)
         assertEquals(2, todaySlice.size)
         assertTrue(todaySlice.any { it.timestamp == start + threeAm })
+    }
+
+    // --- track record ------------------------------------------------
+
+    @Test
+    fun trackAveragesPastDaysInsteadOfSummingThem() {
+        val day = listOf(8f to 1000)
+        val avg = trackAverageByHour(listOf(day, day), 16f)
+        // Two identical days average back to one day's curve, not double.
+        assertEquals(absorbedMl(day, 12f), avg[36], 1e-2f)
+        assertEquals(1000f, avg[48], 1e-2f)
+    }
+
+    @Test
+    fun trackStartsAtZeroBeforeTheFirstDrink() {
+        // A 14:00 drink must not read as absorbed at 06:00 via the
+        // overnight wrap: the track has to start at the baseline.
+        val day = listOf(8f to 1000)
+        val avg = trackAverageByHour(listOf(day), 16f)
+        assertEquals(0f, avg[0], 1e-3f)
+        assertEquals(0f, avg[12], 1e-3f)   // 4h into the window, before the sip
+        assertEquals(1000f, avg[48], 1e-2f)
+    }
+
+    @Test
+    fun trackIsZeroWithoutHistory() {
+        val empty = trackAverageByHour(emptyList(), 16f)
+        assertEquals(49, empty.size)
+        assertTrue(empty.all { it == 0f })
+    }
+
+    @Test
+    fun trackSkipsDaysWithNoDrinks() {
+        val day = listOf(8f to 1000)
+        // Five unlogged days must not drag the average of two real days down.
+        val avg = trackAverageByHour(
+            listOf(emptyList(), emptyList(), day, emptyList(), day),
+            16f
+        )
+        assertEquals(1000f, avg[48], 1e-2f)
+        assertEquals(absorbedMl(day, 12f), avg[36], 1e-2f)
+    }
+
+    @Test
+    fun trackGuardsDegenerateSpan() {
+        val out = trackAverageByHour(listOf(listOf(8f to 1000)), 0f)
+        assertEquals(49, out.size)
+        assertTrue(out.all { it == 0f })
+    }
+
+    // --- day snap -----------------------------------------------------
+
+    @Test
+    fun snapRestsOnTheNearestWholeDay() {
+        assertEquals(0f, snapToDayOffset(40f, 100f, 500f), 1e-3f)
+        assertEquals(100f, snapToDayOffset(60f, 100f, 500f), 1e-3f)
+        assertEquals(300f, snapToDayOffset(260f, 100f, 500f), 1e-3f)
+    }
+
+    @Test
+    fun snapClampsToTheScrollableRange() {
+        assertEquals(0f, snapToDayOffset(-30f, 100f, 500f), 1e-3f)
+        assertEquals(500f, snapToDayOffset(480f, 100f, 500f), 1e-3f)
+        assertEquals(500f, snapToDayOffset(9_999f, 100f, 500f), 1e-3f)
+    }
+
+    @Test
+    fun snapNeverMovesWithoutADayWidth() {
+        // No column geometry yet: keep the offset, just clamp it.
+        assertEquals(120f, snapToDayOffset(120f, 0f, 500f), 1e-3f)
+        assertEquals(500f, snapToDayOffset(900f, 0f, 500f), 1e-3f)
+        assertEquals(0f, snapToDayOffset(120f, 100f, 0f), 1e-3f)
     }
 
     // --- center cursor --------------------------------------------------

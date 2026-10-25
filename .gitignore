@@ -79,3 +79,6 @@ session-*.md
 
 # Agent working instructions: local-only, like skills.
 /AGENTS.md
+
+# VibeWise learning notes (do not commit)
+.vibe-wise/
