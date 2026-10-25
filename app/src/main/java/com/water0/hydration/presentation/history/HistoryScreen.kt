@@ -99,9 +99,8 @@ fun HistoryScreen(
     bottomGutter: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val daysBack by viewModel.daysBack.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-
-    var range by remember { mutableStateOf(TimeRange.WEEK) }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -120,15 +119,15 @@ fun HistoryScreen(
                     Text(
                         text = r.label,
                         fontSize = 11.sp,
-                        fontWeight = if (range == r) FontWeight.Bold else FontWeight.Normal,
-                        color = if (range == r) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        fontWeight = if (daysBack == r.days) FontWeight.Bold else FontWeight.Normal,
+                        color = if (daysBack == r.days) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         modifier = Modifier
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                             .background(
-                                if (range == r) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent,
+                                if (daysBack == r.days) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent,
                                 RoundedCornerShape(6.dp)
                             )
-                            .clickable { range = r }
+                            .clickable { viewModel.setDaysBack(r.days) }
                     )
                 }
             }
@@ -157,7 +156,7 @@ fun HistoryScreen(
                     }
                 }
                 is HistoryViewModel.UiState.Success -> {
-                    val daysForRange = state.days.takeLast(range.days).reversed()
+                    val daysForRange = state.days.takeLast(daysBack).reversed()
 
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
