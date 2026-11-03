@@ -289,3 +289,103 @@ internal class PaceAxis(
         }
     }
 }
+
+// --- Forward pace: plan/observed blend and the synthetic intake ------
+
+/** Hours of recent intake the observed rate looks at. */
+internal const val OBSERVE_HOURS = 2f
+
+/**
+ * Plan cumulative at an elapsed hour, interpolated between slots and
+ * held flat outside them. Slots carry clock hours, so [wakeHour]
+ * converts them; an overnight window wraps the same way the engine does.
+ */
+internal fun planMlAt(
+    plan: List<RecommendationEngine.Companion.SipSlot>,
+    wakeHour: Int,
+    spanHours: Float,
+    elapsedHour: Float
+): Float {
+    if (plan.isEmpty() || spanHours <= 0f) return 0f
+    val points = plan.map { slot ->
+        val elapsed = (((slot.hour - wakeHour) % 24 + 24) % 24)
+            .coerceIn(0f, spanHours)
+        elapsed to slot.cumulativeMl.toFloat()
+    }.sortedBy { it.first }
+    val h = elapsedHour.coerceIn(0f, spanHours)
+    if (h < points.first().first) {
+        return if (points.first().first <= 0f) points.first().second else 0f
+    }
+    for (i in 1 until points.size) {
+        val (h0, v0) = points[i - 1]
+        val (h1, v1) = points[i]
+        if (h <= h1) {
+            if (h1 <= h0) return v1
+            return v0 + (v1 - v0) * (h - h0) / (h1 - h0)
+        }
+    }
+    return points.last().second
+}
+
+/**
+ * Pace the next hour is drawn at: the plan when the recent window is
+ * empty, the observed rate once it is full, blended in between. A day
+ * with no drinks and no plan reads as zero rather than guessing.
+ */
+internal fun blendPaceMlPerHour(
+    plan: List<RecommendationEngine.Companion.SipSlot>,
+    drinks: List<Pair<Float, Int>>,
+    nowHour: Float,
+    wakeHour: Int,
+    spanHours: Float
+): Float {
+    val planRate = (
+        planMlAt(plan, wakeHour, spanHours, nowHour + 1f) -
+            planMlAt(plan, wakeHour, spanHours, nowHour)
+        ).coerceAtLeast(0f)
+
+    val from = (nowHour - OBSERVE_HOURS).coerceAtLeast(0f)
+    val observedHours = (nowHour - from).coerceAtLeast(0f)
+    if (observedHours <= 0f) return planRate
+
+    val observedMl = drinks
+        .filter { it.first >= from && it.first <= nowHour + 1e-4f }
+        .sumOf { it.second }
+    // An empty window is no evidence, not evidence of zero: fall back
+    // to the plan instead of extrapolating a flat line all day.
+    if (observedMl <= 0) return planRate
+    val observedRate = observedMl / observedHours
+    val confidence = (observedHours / OBSERVE_HOURS).coerceIn(0f, 1f)
+    return planRate + confidence * (observedRate - planRate)
+}
+
+/**
+ * Synthetic intake if [rateMlPerHour] continues from [nowHour] to
+ * [toHour], capped at [capMl] total consumed. Amounts are cumulative
+ * differences, so rounding never drifts the total away from the rate.
+ */
+internal fun futureDrinks(
+    drinks: List<Pair<Float, Int>>,
+    rateMlPerHour: Float,
+    nowHour: Float,
+    toHour: Float,
+    capMl: Float = Float.MAX_VALUE,
+    stepHours: Float = 0.25f
+): List<Pair<Float, Int>> {
+    if (rateMlPerHour <= 0f || stepHours <= 0f || toHour <= nowHour) return emptyList()
+    val startConsumed = drinks.sumOf { it.second }.toFloat()
+    if (startConsumed >= capMl) return emptyList()
+    val out = ArrayList<Pair<Float, Int>>()
+    var prev = startConsumed
+    var t = nowHour + stepHours
+    while (t <= toHour + 1e-4f) {
+        val target = (startConsumed + rateMlPerHour * (t - nowHour)).coerceAtMost(capMl)
+        val amount = (target - prev).roundToInt()
+        if (amount > 0) {
+            out += t to amount
+            prev += amount
+        }
+        t += stepHours
+    }
+    return out
+}

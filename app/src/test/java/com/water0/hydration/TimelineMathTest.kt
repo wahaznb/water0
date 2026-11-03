@@ -1,6 +1,7 @@
 package com.water0.hydration
 
 import com.water0.hydration.data.local.entity.HydrationEntry
+import com.water0.hydration.domain.engine.RecommendationEngine
 import com.water0.hydration.presentation.home.components.CursorSpot
 import com.water0.hydration.presentation.home.components.DAY_HOURS
 import com.water0.hydration.presentation.home.components.DAY_MS
@@ -9,10 +10,13 @@ import com.water0.hydration.presentation.home.components.PaceWindow
 import com.water0.hydration.presentation.home.components.PaceZoom
 import com.water0.hydration.presentation.home.components.WakeDay
 import com.water0.hydration.presentation.home.components.absorbedMl
+import com.water0.hydration.presentation.home.components.blendPaceMlPerHour
 import com.water0.hydration.presentation.home.components.cursorSpot
 import com.water0.hydration.presentation.home.components.entriesIn
+import com.water0.hydration.presentation.home.components.futureDrinks
 import com.water0.hydration.presentation.home.components.guideFraction
 import com.water0.hydration.presentation.home.components.guideMlAt
+import com.water0.hydration.presentation.home.components.planMlAt
 import com.water0.hydration.presentation.home.components.snapToDayOffset
 import com.water0.hydration.presentation.home.components.tickHours
 import com.water0.hydration.presentation.home.components.tickStepHours
@@ -331,5 +335,93 @@ class TimelineMathTest {
     fun zoomWindowClampsToTheDay() {
         assertEquals(PaceWindow(0f, 1.5f), zoomWindow(PaceZoom.HOURS_3, 0.5f, 16f))
         assertEquals(PaceWindow(14f, 16f), zoomWindow(PaceZoom.HOURS_3, 16f, 16f))
+    }
+
+    // --- Forward pace -----------------------------------------------
+
+    private fun planSlots(): List<RecommendationEngine.Companion.SipSlot> = listOf(
+        RecommendationEngine.Companion.SipSlot(7.5f, 250),
+        RecommendationEngine.Companion.SipSlot(15f, 1664),
+        RecommendationEngine.Companion.SipSlot(22.5f, 3328)
+    )
+
+    @Test
+    fun planInterpolatesBetweenSlots() {
+        val plan = planSlots()
+        assertEquals(0f, planMlAt(plan, 7, 16f, 0f), 0.01f)
+        assertEquals(250f, planMlAt(plan, 7, 16f, 0.5f), 0.01f)
+        assertEquals(957f, planMlAt(plan, 7, 16f, 4.25f), 0.01f)
+        assertEquals(1664f, planMlAt(plan, 7, 16f, 8f), 0.01f)
+        assertEquals(3328f, planMlAt(plan, 7, 16f, 20f), 0.01f)
+    }
+
+    @Test
+    fun planWrapsOvernightSlots() {
+        val plan = listOf(
+            RecommendationEngine.Companion.SipSlot(0.5f, 500),
+            RecommendationEngine.Companion.SipSlot(5.5f, 1000)
+        )
+        assertEquals(0f, planMlAt(plan, 22, 8f, 1f), 0.01f)
+        assertEquals(500f, planMlAt(plan, 22, 8f, 2.5f), 0.01f)
+        assertEquals(1000f, planMlAt(plan, 22, 8f, 8f), 0.01f)
+    }
+
+    @Test
+    fun blendFollowsThePlanWithoutRecentDrinks() {
+        // 1664 ml spread over 7.5h of plan is 221.87 ml/h.
+        assertEquals(
+            221.87f,
+            blendPaceMlPerHour(planSlots(), emptyList(), 10f, 7, 16f),
+            0.1f
+        )
+    }
+
+    @Test
+    fun blendFollowsTheObservedRateWhenTheWindowIsFull() {
+        val drinks = listOf(8.5f to 300, 9.5f to 300)
+        assertEquals(300f, blendPaceMlPerHour(planSlots(), drinks, 10f, 7, 16f), 0.01f)
+    }
+
+    @Test
+    fun blendSplitsPlanAndObservationOnAPartialWindow() {
+        // One hour of history: half weight on 100 ml/h observed.
+        assertEquals(
+            144.27f,
+            blendPaceMlPerHour(planSlots(), listOf(0.5f to 100), 1f, 7, 16f),
+            0.5f
+        )
+    }
+
+    @Test
+    fun blendIsZeroWithoutPlanOrDrinks() {
+        assertEquals(0f, blendPaceMlPerHour(emptyList(), emptyList(), 10f, 7, 16f), 0.01f)
+    }
+
+    @Test
+    fun futureDrinksFollowTheRate() {
+        val future = futureDrinks(emptyList(), 100f, 10f, 12f)
+        assertEquals(8, future.size)
+        assertEquals(200, future.sumOf { it.second })
+        assertEquals(10.25f, future.first().first, 0.01f)
+    }
+
+    @Test
+    fun futureDrinksStopAtTheCap() {
+        val future = futureDrinks(listOf(9f to 3000), 1000f, 10f, 12f, capMl = 3200f)
+        assertEquals(200, future.sumOf { it.second })
+    }
+
+    @Test
+    fun futureDrinksGuardDegenerateInput() {
+        assertTrue(futureDrinks(emptyList(), 0f, 10f, 12f).isEmpty())
+        assertTrue(futureDrinks(emptyList(), 100f, 12f, 12f).isEmpty())
+        assertTrue(futureDrinks(listOf(9f to 3200), 100f, 10f, 12f, capMl = 3200f).isEmpty())
+    }
+
+    @Test
+    fun futureDrinksStartAfterNow() {
+        val future = futureDrinks(emptyList(), 400f, 10f, 11f)
+        assertTrue(future.all { it.first > 10f })
+        assertEquals(400, future.sumOf { it.second })
     }
 }
