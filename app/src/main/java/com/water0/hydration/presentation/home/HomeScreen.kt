@@ -106,9 +106,7 @@ fun HomeScreen(
                 goalMl = state.goalMl,
                 wakeHour = state.wakeHour,
                 sleepHour = state.sleepHour,
-                plan = state.sipPlan,
-                bedtimeHour = state.bedtimeHour,
-                wakeEstimate = state.wakeEstimate
+                plan = state.sipPlan
             )
             Column(
                 modifier = Modifier
