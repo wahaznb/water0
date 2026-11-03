@@ -4,6 +4,9 @@ import com.water0.hydration.data.local.entity.HydrationEntry
 import com.water0.hydration.presentation.home.components.CursorSpot
 import com.water0.hydration.presentation.home.components.DAY_HOURS
 import com.water0.hydration.presentation.home.components.DAY_MS
+import com.water0.hydration.presentation.home.components.PaceAxis
+import com.water0.hydration.presentation.home.components.PaceWindow
+import com.water0.hydration.presentation.home.components.PaceZoom
 import com.water0.hydration.presentation.home.components.WakeDay
 import com.water0.hydration.presentation.home.components.absorbedMl
 import com.water0.hydration.presentation.home.components.cursorSpot
@@ -11,9 +14,13 @@ import com.water0.hydration.presentation.home.components.entriesIn
 import com.water0.hydration.presentation.home.components.guideFraction
 import com.water0.hydration.presentation.home.components.guideMlAt
 import com.water0.hydration.presentation.home.components.snapToDayOffset
+import com.water0.hydration.presentation.home.components.tickHours
+import com.water0.hydration.presentation.home.components.tickStepHours
 import com.water0.hydration.presentation.home.components.trackAverageByHour
 import com.water0.hydration.presentation.home.components.wakeDays
+import com.water0.hydration.presentation.home.components.zoomWindow
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -214,5 +221,115 @@ class TimelineMathTest {
         assertEquals(CursorSpot(6, 0f), cursorSpot(0f, 0f, 10f, 7))
         assertEquals(CursorSpot(6, 0f), cursorSpot(0f, 240f, 0f, 7))
         assertEquals(CursorSpot(0, 0f), cursorSpot(0f, 240f, 10f, 0))
+    }
+
+    // --- Day axis ---------------------------------------------------
+
+    @Test
+    fun dayAxisCompressesNightIntoLane() {
+        val axis = PaceAxis(PaceWindow(0f, DAY_HOURS), 1000f, spanHours = 16f)
+        assertEquals(0f, axis.xOf(0f), 0.01f)
+        assertEquals(425f, axis.xOf(8f), 0.01f)
+        assertEquals(850f, axis.xOf(16f), 0.01f)
+        assertEquals(1000f, axis.xOf(24f), 0.01f)
+        assertEquals(850f, axis.seamX!!, 0.01f)
+    }
+
+    @Test
+    fun dayAxisRoundTripsAcrossTheSeam() {
+        val axis = PaceAxis(PaceWindow(0f, DAY_HOURS), 1000f, spanHours = 16f)
+        for (h in listOf(0f, 3.7f, 8f, 15.9f, 16f, 18.25f, 23.9f, 24f)) {
+            assertEquals(h, axis.hourAt(axis.xOf(h)), 0.01f)
+        }
+    }
+
+    @Test
+    fun zoomInsideWakeWindowSpendsNoWidthOnNight() {
+        val axis = PaceAxis(PaceWindow(13f, 16f), 1000f, spanHours = 16f)
+        assertEquals(0f, axis.xOf(13f), 0.01f)
+        assertEquals(1000f, axis.xOf(16f), 0.01f)
+        assertNull(axis.seamX)
+    }
+
+    @Test
+    fun windowCrossingSleepKeepsTheLane() {
+        val axis = PaceAxis(PaceWindow(12f, 20f), 1000f, spanHours = 16f)
+        assertEquals(850f, axis.xOf(16f), 0.01f)
+        assertEquals(1000f, axis.xOf(20f), 0.01f)
+        assertEquals(16f, axis.hourAt(850f), 0.01f)
+    }
+
+    @Test
+    fun nightOnlyWindowFillsTheWidth() {
+        val axis = PaceAxis(PaceWindow(16f, 24f), 1000f, spanHours = 16f)
+        assertEquals(0f, axis.xOf(16f), 0.01f)
+        assertEquals(1000f, axis.xOf(24f), 0.01f)
+        assertEquals(20f, axis.hourAt(500f), 0.01f)
+        assertNull(axis.seamX)
+    }
+
+    @Test
+    fun overnightSpanHasNoNightLane() {
+        val axis = PaceAxis(PaceWindow(0f, DAY_HOURS), 1000f, spanHours = 24f)
+        assertEquals(1000f, axis.xOf(24f), 0.01f)
+        assertNull(axis.seamX)
+    }
+
+    @Test
+    fun zeroSpanFallsBackToNightOnlyAxis() {
+        val axis = PaceAxis(PaceWindow(0f, DAY_HOURS), 1000f, spanHours = 0f)
+        assertEquals(0f, axis.xOf(0f), 0.01f)
+        assertEquals(1000f, axis.xOf(24f), 0.01f)
+    }
+
+    @Test
+    fun axisClampsOutsideTheWindow() {
+        val axis = PaceAxis(PaceWindow(13f, 16f), 1000f, spanHours = 16f)
+        assertEquals(0f, axis.xOf(-5f), 0.01f)
+        assertEquals(1000f, axis.xOf(30f), 0.01f)
+        assertEquals(13f, axis.hourAt(-50f), 0.01f)
+        assertEquals(16f, axis.hourAt(5000f), 0.01f)
+    }
+
+    @Test
+    fun tickSpacingFollowsZoom() {
+        assertEquals(0.5f, tickStepHours(PaceZoom.HOURS_3), 0f)
+        assertEquals(1f, tickStepHours(PaceZoom.HOURS_6), 0f)
+        assertEquals(4f, tickStepHours(PaceZoom.DAY), 0f)
+    }
+
+    @Test
+    fun ticksStayOutOfTheCompressedNight() {
+        assertEquals(
+            listOf(0f, 4f, 8f, 12f, 16f),
+            tickHours(PaceWindow(0f, DAY_HOURS), 4f, spanHours = 16f)
+        )
+        assertEquals(
+            listOf(13f, 14f, 15f, 16f),
+            tickHours(PaceWindow(13f, 19f), 1f, spanHours = 16f)
+        )
+        assertEquals(7, tickHours(PaceWindow(13f, 16f), 0.5f, spanHours = 16f).size)
+    }
+
+    @Test
+    fun ticksAlignToStepBoundaries() {
+        assertEquals(
+            listOf(13.5f, 14f, 14.5f, 15f, 15.5f, 16f),
+            tickHours(PaceWindow(13.3f, 16f), 0.5f, spanHours = 16f)
+        )
+        assertEquals(emptyList<Float>(), tickHours(PaceWindow(0f, DAY_HOURS), 0f))
+    }
+
+    @Test
+    fun zoomWindowEndsOneHourPastNow() {
+        assertEquals(PaceWindow(8f, 11f), zoomWindow(PaceZoom.HOURS_3, 10f, 16f))
+        assertEquals(PaceWindow(5f, 11f), zoomWindow(PaceZoom.HOURS_6, 10f, 16f))
+        assertEquals(PaceWindow(0f, DAY_HOURS), zoomWindow(PaceZoom.DAY, 10f, 16f))
+    }
+
+    @Test
+    fun zoomWindowClampsToTheDay() {
+        assertEquals(PaceWindow(0f, 1.5f), zoomWindow(PaceZoom.HOURS_3, 0.5f, 16f))
+        assertEquals(PaceWindow(14f, 16f), zoomWindow(PaceZoom.HOURS_3, 16f, 16f))
     }
 }

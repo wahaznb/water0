@@ -180,3 +180,112 @@ internal fun cursorSpot(
     val elapsed = (absolute - indexOldestFirst * DAY_HOURS).coerceIn(0f, DAY_HOURS)
     return CursorSpot(daysBack - 1 - indexOldestFirst, elapsed)
 }
+
+// --- Day axis: linear wake window, compressed night lane -------------
+
+/** Share of a day's width the post-sleep hours may take. */
+internal const val NIGHT_LANE = 0.15f
+
+/** Zoom levels, widest last. */
+internal enum class PaceZoom { HOURS_3, HOURS_6, DAY }
+
+/** Visible slice of one day, in elapsed hours since wake. */
+internal data class PaceWindow(val fromHour: Float, val toHour: Float) {
+    val hours: Float get() = (toHour - fromHour).coerceAtLeast(0f)
+}
+
+/**
+ * Window for [level]. It ends one hour past [nowHour] so the next-hour
+ * forecast stays inside the zoomed view. [nowHour] is the day's own
+ * "now": elapsed hours for today, [spanHours] for a closed day.
+ */
+internal fun zoomWindow(level: PaceZoom, nowHour: Float, spanHours: Float): PaceWindow =
+    when (level) {
+        PaceZoom.DAY -> PaceWindow(0f, DAY_HOURS)
+        PaceZoom.HOURS_6 -> PaceWindow(
+            (nowHour - 5f).coerceAtLeast(0f),
+            (nowHour + 1f).coerceAtMost(spanHours)
+        )
+        PaceZoom.HOURS_3 -> PaceWindow(
+            (nowHour - 2f).coerceAtLeast(0f),
+            (nowHour + 1f).coerceAtMost(spanHours)
+        )
+    }
+
+/** Tick spacing per level: half-hours, hours, four hours. */
+internal fun tickStepHours(level: PaceZoom): Float = when (level) {
+    PaceZoom.HOURS_3 -> 0.5f
+    PaceZoom.HOURS_6 -> 1f
+    PaceZoom.DAY -> 4f
+}
+
+/**
+ * Elapsed-hour ticks inside [window], aligned to [stepHours] boundaries
+ * and never past [spanHours]: the night lane is compressed, so a clock
+ * number inside it would point at the wrong time.
+ */
+internal fun tickHours(
+    window: PaceWindow,
+    stepHours: Float,
+    spanHours: Float = DAY_HOURS
+): List<Float> {
+    val to = window.toHour.coerceAtMost(spanHours)
+    if (stepHours <= 0f || to <= window.fromHour) return emptyList()
+    val first = kotlin.math.ceil(window.fromHour / stepHours).toInt()
+    val last = kotlin.math.floor(to / stepHours).toInt()
+    if (last < first) return emptyList()
+    return (first..last).map { it * stepHours }
+}
+
+/**
+ * Hour -> px mapping for one day. The wake window is linear; the
+ * post-sleep hours compress into a fixed [nightLane] so a 01:30 sip
+ * stays placeable without spending a third of the width on sleep.
+ *
+ * The lane only appears when both segments are visible: a zoom inside
+ * the wake window must not reserve width for a night that is off-screen.
+ */
+internal class PaceAxis(
+    val window: PaceWindow,
+    val widthPx: Float,
+    val spanHours: Float,
+    nightLane: Float = NIGHT_LANE
+) {
+    private val wakeFrom = window.fromHour.coerceAtLeast(0f)
+    private val wakeTo = window.toHour.coerceAtMost(spanHours)
+    private val nightFrom = window.fromHour.coerceAtLeast(spanHours)
+    private val nightTo = window.toHour.coerceAtMost(DAY_HOURS)
+
+    private val wakeHours = (wakeTo - wakeFrom).coerceAtLeast(0f)
+    private val nightHours = (nightTo - nightFrom).coerceAtLeast(0f)
+
+    private val laneWidth = when {
+        nightHours <= 0f -> 0f
+        wakeHours <= 0f -> widthPx
+        else -> widthPx * nightLane.coerceIn(0f, 0.5f)
+    }
+    private val wakeWidth = widthPx - laneWidth
+    private val wakePxPerHour = if (wakeHours > 0f) wakeWidth / wakeHours else 0f
+    private val nightPxPerHour = if (nightHours > 0f) laneWidth / nightHours else 0f
+
+    /** Left edge of the night lane, or null when the lane is not drawn. */
+    val seamX: Float? get() = if (laneWidth > 0f && wakeHours > 0f) wakeWidth else null
+
+    fun xOf(hour: Float): Float {
+        val h = hour.coerceIn(window.fromHour, window.toHour)
+        return if (h <= spanHours) {
+            (h - wakeFrom) * wakePxPerHour
+        } else {
+            wakeWidth + (h - nightFrom) * nightPxPerHour
+        }
+    }
+
+    fun hourAt(x: Float): Float {
+        val px = x.coerceIn(0f, widthPx)
+        return if (laneWidth <= 0f || px <= wakeWidth) {
+            wakeFrom + if (wakePxPerHour > 0f) px / wakePxPerHour else 0f
+        } else {
+            nightFrom + (px - wakeWidth) / nightPxPerHour
+        }
+    }
+}
