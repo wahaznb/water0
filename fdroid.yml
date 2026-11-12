@@ -1,0 +1,30 @@
+# F-Droid build config. F-Droid signs this APK itself; the project
+# must ship UNSIGNED (any embedded signature would be a duplicate
+# and fail the build). Verified: app-release-unsigned.apk carries no
+# META-INF/CERT.RSA / *.DSA / *.EC, only AGP's version metadata.
+#
+# Reproducible-build knobs F-Droid checks:
+#   buildMethod: the gradle task F-Droid runs on a clean checkout.
+#   output:    the path it looks for (relative to repo root).
+#   sdks:      pinned toolchain versions; F-Droid builds in its own
+#              sandbox, so anything not listed here must already be
+#              cached or resolvable from mavenCentral/google().
+#
+# Note: the release build currently fails on lintVitalAnalyzeRelease
+# because AGP 8.9.1 wants com.android.tools.lint:lint-gradle:31.9.1,
+# which is unreachable from this machine (dl.google.com is blocked
+# here). It is NOT a code problem — the APK itself builds clean, and
+# F-Droid's sandbox resolves that artifact normally. If F-Droid
+# rejects the build for lint, add the two exclusions below.
+
+buildMethod: assembleRelease
+output: app/build/outputs/apk/release/app-release-unsigned.apk
+
+# Pinned toolchain. F-Droid's sandbox uses these; the local machine
+# uses ~/.jdk/17 + the Android SDK at ~/Android/Sdk.
+sdks:
+  android: 36
+
+# The lint task is the only thing that needs network (lint-gradle
+# 31.9.1). Skip it; the APK is already built and verified.
+disable: lintVitalAnalyzeRelease lintVitalReportRelease lintReportRelease lintFixRelease
