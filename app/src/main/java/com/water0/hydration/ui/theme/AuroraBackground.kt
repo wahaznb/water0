@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 
 // One background bubble's dice roll: spawn x, size, own lifespan, and its
@@ -68,7 +69,11 @@ private data class JellySpawn(
 fun AuroraBackground(
     modifier: Modifier = Modifier,
     hydrationTint: Color = Color.Transparent,
-    energy: Float = 0.4f
+    energy: Float = 0.4f,
+    // Living background opacity: 0 = invisible (theme background shows
+    // through), 1 = full aurora field. Wrapped in graphicsLayer so every
+    // drawn element scales uniformly without touching individual alphas.
+    backgroundOpacity: Float = 1f
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
@@ -234,7 +239,9 @@ fun AuroraBackground(
             }
         }
     }
-    androidx.compose.foundation.Canvas(modifier = modifier) {
+    androidx.compose.foundation.Canvas(
+        modifier = modifier.graphicsLayer { alpha = backgroundOpacity }
+    ) {
         val w = size.width
         val h = size.height
         // Theme background base in both modes (deep navy dark,

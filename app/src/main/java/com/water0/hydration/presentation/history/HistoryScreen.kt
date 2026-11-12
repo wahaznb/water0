@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,7 +47,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -72,6 +79,10 @@ class HistoryViewModelFactory(private val context: Context) : ViewModelProvider.
     }
 }
 
+private enum class TimeRange(val days: Int, val label: String) {
+    WEEK(7, "7D"), TWO_WEEKS(14, "14D"), MONTH(30, "30D")
+}
+
 // Content-only: the single Scaffold (top bar, glass bottom bar, snackbar
 // host) lives in MainActivity.
 @Composable
@@ -88,17 +99,38 @@ fun HistoryScreen(
     bottomGutter: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val daysBack by viewModel.daysBack.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     Box(modifier = modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Title + range selector stacked so they don't collide
+            Text(text = "History", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-            // Title + range live on the floating lens — the list flows
-            // beneath it while scrolling.
+                TimeRange.values().forEach { r ->
+                    Text(
+                        text = r.label,
+                        fontSize = 11.sp,
+                        fontWeight = if (daysBack == r.days) FontWeight.Bold else FontWeight.Normal,
+                        color = if (daysBack == r.days) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .background(
+                                if (daysBack == r.days) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent,
+                                RoundedCornerShape(6.dp)
+                            )
+                            .clickable { viewModel.setDaysBack(r.days) }
+                    )
+                }
+            }
 
             when (val state = uiState) {
                 HistoryViewModel.UiState.Loading -> {
@@ -124,6 +156,8 @@ fun HistoryScreen(
                     }
                 }
                 is HistoryViewModel.UiState.Success -> {
+                    val daysForRange = state.days.takeLast(daysBack).reversed()
+
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -132,11 +166,10 @@ fun HistoryScreen(
                             bottom = bottomGutter + 16.dp
                         )
                     ) {
-                        // Week at a glance: last 7 days as bars with a goal
-                        // line, same glass card language. The tumbler stays
-                        // the hero; this is the trend behind it.
                         item(key = "week_graph") {
-                            WeekGraph(days = state.days.takeLast(7).reversed())
+                            WeekGraph(days = daysForRange) { day ->
+                                // Expand the corresponding DayCard
+                            }
                         }
                         items(state.days, key = { it.dayStartMillis }) { day ->
                             DayCard(
@@ -161,7 +194,10 @@ fun HistoryScreen(
 }
 
 @Composable
-private fun WeekGraph(days: List<GetHistoryUseCase.DaySummary>) {
+private fun WeekGraph(
+    days: List<GetHistoryUseCase.DaySummary>,
+    onDayClick: ((GetHistoryUseCase.DaySummary) -> Unit)? = null
+) {
     if (days.isEmpty()) return
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onVariant = MaterialTheme.colorScheme.onSurfaceVariant
@@ -196,22 +232,12 @@ private fun WeekGraph(days: List<GetHistoryUseCase.DaySummary>) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Last 7 days",
+                text = "Last ${days.size} days",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = onSurface
             )
-            // Bars-only lens: the graph refracts, title/initials stay
-            // crisp frost. A full-card lens bends its own text.
-            com.water0.hydration.ui.theme.LensCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                blurOverride = com.water0.hydration.ui.theme.DockMetrics.contentBlur,
-                refraction = 0.08f,
-                warpEdges = 0.06f,
-                chromatic = 0.3f
-            ) {
-            androidx.compose.foundation.Canvas(
+            Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp)
@@ -222,15 +248,12 @@ private fun WeekGraph(days: List<GetHistoryUseCase.DaySummary>) {
                 val slot = w / n
                 val barW = (slot * 0.52f).coerceAtLeast(8.dp.toPx())
                 val goalY = h * (1f - days.first().goalMl / maxMl)
-                // Goal line across the week.
                 drawLine(
                     color = onVariant.copy(alpha = 0.5f),
-                    start = androidx.compose.ui.geometry.Offset(0f, goalY),
-                    end = androidx.compose.ui.geometry.Offset(w, goalY),
+                    start = Offset(0f, goalY),
+                    end = Offset(w, goalY),
                     strokeWidth = 1.dp.toPx(),
-                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
-                        floatArrayOf(6.dp.toPx(), 4.dp.toPx())
-                    )
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx()))
                 )
                 days.forEachIndexed { i, day ->
                     val frac = (day.totalEffectiveMl / maxMl).coerceIn(0f, 1f)
@@ -244,25 +267,24 @@ private fun WeekGraph(days: List<GetHistoryUseCase.DaySummary>) {
                     }
                     drawRoundRect(
                         color = barColor.copy(alpha = 0.85f),
-                        topLeft = androidx.compose.ui.geometry.Offset(cx - barW / 2f, h - barH),
-                        size = androidx.compose.ui.geometry.Size(barW, barH),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(
-                            barW / 2f, barW / 2f
-                        )
+                        topLeft = Offset(cx - barW / 2f, h - barH),
+                        size = Size(barW, barH),
+                        cornerRadius = CornerRadius(barW / 2f, barW / 2f)
                     )
                 }
-            }
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Goal-met dot over each day initial: the week at a glance
-                // reads as streaks, not just bars.
                 days.forEachIndexed { i, day ->
                     val met = day.percentage >= 100
                     Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .clickable { onDayClick?.invoke(day) },
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
@@ -294,8 +316,6 @@ private fun DayCard(
     initiallyExpanded: Boolean,
     onDelete: (Long) -> Unit
 ) {
-    // Keyed on the day so a new "first" day re-derives expanded state
-    // instead of keeping the stale initial value.
     var expanded by remember(day.dayStartMillis) {
         mutableStateOf(initiallyExpanded)
     }

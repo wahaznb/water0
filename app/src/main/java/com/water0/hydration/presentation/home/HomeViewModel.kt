@@ -51,7 +51,10 @@ class HomeViewModel(
             val sipPlan: List<RecommendationEngine.Companion.SipSlot>,
             val bedtimeHour: Float,
             // How today actually started (tier-labeled, never silent).
-            val wakeEstimate: RecommendationEngine.WakeEstimate
+            val wakeEstimate: RecommendationEngine.WakeEstimate,
+            // Raw 8-day entries for the week timeline (Home slices them
+            // into wake-anchored days at draw time).
+            val recentEntries: List<HydrationEntry>
         ) : UiState
 
         object Loading : UiState
@@ -115,7 +118,8 @@ class HomeViewModel(
                     dayStartMs = result.dayStartMs,
                     sipPlan = result.sipPlan,
                     bedtimeHour = result.bedtimeHour,
-                    wakeEstimate = result.wakeEstimate
+                    wakeEstimate = result.wakeEstimate,
+                    recentEntries = result.recentEntries
                 )
             }
         }

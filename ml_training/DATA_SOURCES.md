@@ -98,9 +98,10 @@ population means by design (only ~30% meet them).
 
 `train_nhanes.py` trains the cross-sectional task on `nhanes_daily.csv`
 (one row per person: predict total water from weight/activity/sex/age/
-weekday/goal). Result (n=4,931, seed 42): regression MAE 1,123 ml at
-R² **−0.08** (worse than predicting the mean, MAE 1,090), classifier
-accuracy 0.70 vs majority baseline 0.72. Only `age_yr` carries signal;
+weekday/goal). Result (n=4,931, seed 42): regression MAE 1,127.3 ml at
+R² **−0.075** (worse than predicting the mean, MAE 1,089.7), classifier
+accuracy 0.694 vs majority baseline 0.698. Both models lose to their trivial
+baselines. Only `age_yr` carries signal;
 the coarse PAQ activity map carries none.
 
 Verdict: single-recall demographics cannot train intake prediction —

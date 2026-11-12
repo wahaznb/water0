@@ -1,8 +1,12 @@
 package com.water0.hydration.presentation.navigation
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.snap
@@ -48,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -81,6 +86,20 @@ import com.water0.hydration.ui.theme.isDarkScheme
 import com.water0.hydration.ui.theme.liquidglass.GlassBoxScope
 import com.water0.hydration.ui.theme.liquidglass.LiquidGlassBox
 import com.water0.hydration.ui.theme.liquidglass.toLiquidParams
+
+internal const val BRAND_CYCLE_DELAY_MS = 2800
+internal const val BRAND_CYCLE_DURATION_MS = 600
+internal const val BRAND_BLUR_RADIUS_DP = 10f
+
+internal fun isCalmMode(context: android.content.Context): Boolean = try {
+    android.provider.Settings.Global.getFloat(
+        context.contentResolver,
+        android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+        1f
+    ) == 0f
+} catch (_: Exception) {
+    false
+}
 
 object Routes {
     const val HOME = "home"
@@ -188,16 +207,7 @@ fun GlassBoxScope.GlassBottomBar(
         label = "pressGlowIn"
     )
     // Calm mode (system animator off): static pill, no glow, no bounce.
-    val contentResolver = LocalContext.current.contentResolver
-    val calmMode = try {
-        android.provider.Settings.Global.getFloat(
-            contentResolver,
-            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
-            1f
-        ) == 0f
-    } catch (_: Exception) {
-        false
-    }
+    val calmMode = isCalmMode(LocalContext.current)
     // Selected bubble: a lens in its own right (reference behavior) —
     // follows the finger 1:1 while pressed/scrubbing, grows and goes
     // more rectangular under the finger, glides home on release.
@@ -551,64 +561,36 @@ private fun GlassTab(
 }
 
 
-/**
- * Floating lens title plate for every tab, with an optional options slot
- * (used by Logs for the 7/14/30-day range, sitting beside the title). A
- * real backdrop lens like the dock. Call from glassContent; the caller
- * measures it for the content top gutter.
- */
 @Composable
 fun GlassBoxScope.LensPlate(
     title: String,
     config: GlassConfig,
     modifier: Modifier = Modifier,
-    // Home only: big centered brand title. Other tabs stay left-aligned.
     centeredTitle: Boolean = false,
-    // Home brand cycle: hy2ox1 → hy²ox¹ → H²O every ~3s.
-    // TalkBack always hears "hy2ox1", never the chase.
     brandCycle: Boolean = false,
     options: (@Composable RowScope.() -> Unit)? = null
 ) {
-    // Plate lens, blur cut: the top bar keeps its bend and rim (it
-    // reads as glass because it distorts), but zero blur — text over
-    // a bent-sharp backdrop instead of a smeared one.
     val params = remember(config) {
         config.toLiquidParams(Color(0xFF0351A3)).copy(
             elevation = 0.dp,
             blur = 0f
         )
     }
-    // Title: TV Girl blue in dark, pure black in light.
     val titleColor = if (isDarkScheme()) Color(0xFF0351A3) else Color.Black
     val brandForms = remember { listOf("hy2ox1", "hy²ox¹", "H²O") }
     var brandIdx by remember { mutableIntStateOf(0) }
-    // Calm mode (animations off system-wide): hold the plain ASCII
-    // form instead of cycling.
-    val calmResolver = androidx.compose.ui.platform.LocalContext.current.contentResolver
-    val calmBrand = try {
-        android.provider.Settings.Global.getFloat(
-            calmResolver,
-            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
-            1f
-        ) == 0f
-    } catch (_: Exception) {
-        false
-    }
+    val calmBrand = isCalmMode(LocalContext.current)
     LaunchedEffect(brandCycle, calmBrand) {
         if (!brandCycle || calmBrand) {
             brandIdx = 0
             return@LaunchedEffect
         }
         while (true) {
-            kotlinx.coroutines.delay(2800)
+            kotlinx.coroutines.delay(BRAND_CYCLE_DELAY_MS.toLong())
             brandIdx = (brandIdx + 1) % brandForms.size
         }
     }
-    // Static brand when cycling is off or the plate is tucked; the
-    // cycling wordmark only when full-size on Home.
     val shownTitle = if (brandCycle) brandForms[brandIdx] else title
-    // Fixed chrome: the plate never resizes (scroll-minimize removed —
-    // the bar stays the same, always).
     val titleSp = if (centeredTitle) 26f else 20f
     val vPad = 12.dp
     this@LensPlate.LiquidGlassBox(
@@ -654,9 +636,9 @@ fun GlassBoxScope.LensPlate(
 
 /**
  * Plate title with the cycling brand wordmark: hy2ox1 → hy²ox¹ → H²O,
- * crossfading every cycle. Screen readers get one stable "hy2ox1"
- * heading — never the chase.
+ * blur-crossfading every cycle. Screen readers get one stable "hy2ox1"
  */
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 private fun PlateTitle(
     text: String,
@@ -688,20 +670,43 @@ private fun PlateTitle(
         AnimatedContent(
             targetState = text,
             transitionSpec = {
-                fadeIn(tween(600)) togetherWith fadeOut(tween(600))
+                (fadeIn(tween(BRAND_CYCLE_DURATION_MS)) togetherWith fadeOut(
+                    tween(BRAND_CYCLE_DURATION_MS)
+                ))
+                    // The soft blur must not be cut by the container's
+                    // size animation — clip off, fade carries the swap.
+                    .using(SizeTransform(clip = false))
             },
             label = "brandCycle"
         ) { form ->
+            val blurDp by transition.animateFloat(
+                transitionSpec = { tween(BRAND_CYCLE_DURATION_MS) },
+                label = "brandBlur"
+            ) { blurRadiusForState(it) }
             Text(
                 text = form,
                 fontSize = fontSizeSp.sp,
                 fontWeight = FontWeight.Bold,
                 color = color,
                 textAlign = if (centered) androidx.compose.ui.text.style.TextAlign.Center
-                else androidx.compose.ui.text.style.TextAlign.Start
+                else androidx.compose.ui.text.style.TextAlign.Start,
+                modifier = Modifier.then(
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                        Modifier.blur(radius = blurDp.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    } else {
+                        Modifier
+                    }
+                )
             )
         }
     }
+}
+
+@OptIn(ExperimentalAnimationApi::class)
+internal fun blurRadiusForState(state: EnterExitState): Float = when (state) {
+    EnterExitState.PreEnter -> BRAND_BLUR_RADIUS_DP
+    EnterExitState.Visible -> 0f
+    EnterExitState.PostExit -> BRAND_BLUR_RADIUS_DP
 }
 
 /** Segmented glass range switch for the Logs plate: one frosted track

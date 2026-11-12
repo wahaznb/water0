@@ -36,7 +36,12 @@ class GetTodayProgressUseCase(
         // Best lights-out for an 8h night before the wake hour.
         val bedtimeHour: Float,
         // How today actually started: measured/observed/learned/profile.
-        val wakeEstimate: RecommendationEngine.WakeEstimate
+        val wakeEstimate: RecommendationEngine.WakeEstimate,
+        // Raw entries for the week timeline on Home: 8 fixed days from
+        // today's midnight with an open end (a just-logged sip must ride
+        // the same tick as the tank). Home slices them into wake-anchored
+        // days at draw time.
+        val recentEntries: List<HydrationEntry> = emptyList()
     )
 
     operator fun invoke(): Flow<ProgressResult> {
@@ -60,9 +65,21 @@ class GetTodayProgressUseCase(
             System.currentTimeMillis() - 15 * DAY_MILLIS,
             System.currentTimeMillis()
         )
+        // Week-timeline feed: fixed lookback from today's midnight, open
+        // end — logging a sip re-emits the whole Home state.
+        val timelineFlow = repository.getEntriesInRange(
+            todayStart - 8 * DAY_MILLIS, Long.MAX_VALUE
+        )
+        // combine() stays typed up to five flows; the two history feeds
+        // ride as one pair so the main chain never falls back to arrays.
+        val historyFlow = combine(estimatorFlow, timelineFlow) { estimator, timeline ->
+            estimator to timeline
+        }
 
-        return combine(profileFlow, entriesFlow, behaviorFlow, pastWeekFlow, estimatorFlow) {
-                profile, entries, behavior, pastWeek, estimatorEntries ->
+        return combine(
+            profileFlow, entriesFlow, behaviorFlow, pastWeekFlow, historyFlow
+        ) { profile, entries, behavior, pastWeek, history ->
+            val (estimatorEntries, timelineEntries) = history
             val goal = recommendationEngine.calculateDailyGoal(profile).totalMl
             // Wake-anchored day: the day starts at wake-up, so entries
             // before today's wake boundary belong to yesterday. Midnight
@@ -154,7 +171,8 @@ class GetTodayProgressUseCase(
                 bedtimeHour = RecommendationEngine.recommendedBedtime(
                     profile.wakeUpHour
                 ),
-                wakeEstimate = wakeEstimate
+                wakeEstimate = wakeEstimate,
+                recentEntries = timelineEntries
             )
         }
     }

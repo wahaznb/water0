@@ -26,18 +26,19 @@ app/src/
 │   │   │   ├── MainActivity.kt
 │   │   │   ├── health/       # HealthRationaleActivity.kt
 │   │   │   ├── history/      # HistoryScreen.kt, HistoryViewModel.kt
-│   │   │   ├── home/         # HomeScreen.kt, HomeViewModel.kt, LogScreen.kt, components/ x7
+│   │   │   ├── home/         # HomeScreen.kt, HomeViewModel.kt, LogScreen.kt, components/ x8
 │   │   │   ├── navigation/   # BottomNav.kt
 │   │   │   ├── notification/ # NotificationWorker/Scheduler/Display, Boot/WaterLog receivers
 │   │   │   ├── onboarding/   # OnboardingScreen.kt
 │   │   │   └── settings/     # SettingsScreen.kt, SettingsViewModel.kt
-│   │   └── ui/theme/         # Color, DesignTokens, GlassChrome/Config/Prefs, LensCard,
-│   │                         # LiquidGlassTheme, PressGlass, Type, liquidglass/LiquidGlass.kt
+│   │   └── ui/theme/         # AuroraBackground, Color, DesignTokens, GlassChrome/Config/Prefs,
+│   │                         # GlassColors, GlassHelpers, LensCard, LiquidGlassTheme,
+│   │                         # PressGlass, Type, liquidglass/LiquidGlass.kt
 │   ├── assets/               # sequence_tcn.tflite
 │   └── res/                  # drawable, font, layout, mipmap-*, values, xml
 │       └── AndroidManifest.xml (in src/main/)
 ├── androidTest/java/com/water0/hydration/  # HomeScreenTest.kt
-└── test/java/com/water0/hydration/          # 11 unit-test files
+└── test/java/com/water0/hydration/          # 14 unit-test files
 ml_training/  # generate_data, train_model/sequence/tcn/nhanes, convert_sequence,
               # simulate_coach, load_nhanes, requirements.txt, data/, model/, reports/
 ```
@@ -89,7 +90,7 @@ ml_training/  # generate_data, train_model/sequence/tcn/nhanes, convert_sequence
 | `domain/usecase/ExportTrainingDataUseCase.kt` | 90-day training CSV export |
 | `domain/usecase/ExportDrinkWindowUseCase.kt` | Drink-window CSV export |
 
-### Presentation — home (10)
+### Presentation — home (11)
 
 | File | Purpose |
 |------|---------|
@@ -97,7 +98,8 @@ ml_training/  # generate_data, train_model/sequence/tcn/nhanes, convert_sequence
 | `presentation/home/HomeViewModel.kt` | Home `UiState` + log/delete/rec intents |
 | `presentation/home/LogScreen.kt` | Drink-type + amount + backdate logging |
 | `presentation/home/components/TankMath.kt` | Tumbler geometry/level math |
-| `presentation/home/components/PaceCurve.kt` | Pace-curve chart |
+| `presentation/home/components/PaceTimeline.kt` | Week pace timeline card |
+| `presentation/home/components/TimelineMath.kt` | Week/window/guide/cursor math |
 | `presentation/home/components/QuickAddButtons.kt` | Quick-add drops + custom ml |
 | `presentation/home/components/AddWaterDialog.kt` | Amount dialog |
 | `presentation/home/components/RecommendationCard.kt` | Range-rec card |
@@ -121,11 +123,14 @@ ml_training/  # generate_data, train_model/sequence/tcn/nhanes, convert_sequence
 | `presentation/notification/WaterLogReceiver.kt` | Shade +250 quick-log |
 | `presentation/health/HealthRationaleActivity.kt` | Health Connect rationale screens |
 
-### Theme (10)
+### Theme (13)
 
 | File | Purpose |
 |------|---------|
-| `ui/theme/LiquidGlassTheme.kt` | Theme, palette, dock metrics, aurora bg |
+| `ui/theme/LiquidGlassTheme.kt` | `MaterialTheme` wrapper |
+| `ui/theme/GlassColors.kt` | Dark/light glass color schemes |
+| `ui/theme/GlassHelpers.kt` | Glass/dock/card-style helpers |
+| `ui/theme/AuroraBackground.kt` | Living background: bubbles/orbs/jellyfish |
 | `ui/theme/LensCard.kt` | Refractive lens card + composition locals |
 | `ui/theme/liquidglass/LiquidGlass.kt` | `LiquidGlassBox` renderer |
 | `ui/theme/GlassChrome.kt` | Glass snackbar |

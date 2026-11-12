@@ -15,6 +15,10 @@ All notable changes to Water0 are documented here. Format follows
 - Pace curve draws left-to-right when Home (re)appears (calm-aware)
 - Health Connect Fitness diagnostics: provider status, permission
   request route, granted set (for ROM-specific failures)
+- Home pace graph is now a scrollable week: seven wake-anchored days,
+  1D/3D/7D zoom (opens at 3D), fixed center cursor with a live
+  readout, tap-to-jump; past days draw whole, today still reveals
+  left-to-right (calm-aware)
 
 ### Changed
 - Lens scope shared by both layers: graphs, buttons, and chips
@@ -26,6 +30,18 @@ All notable changes to Water0 are documented here. Format follows
 - Shade status line posts synchronously on every log/delete
 - Overscroll stretch disabled (content used to stretch past the end
   while the lens stayed put)
+- Pace guide is a curve, not a ruler: morning-leaning start, calm
+  wind-down (a pacing aid, documented as such); night bands carry
+  each day's absorption tail instead of cutting off at sleep
+- Pace card says "guide" everywhere (was "plan"/"ghost"); the
+  wake→sleep→wake feet row is gone — the cursor readout names the day
+  and time instead
+- Home wordmark blur-crossfades between forms: outgoing name softens
+  out, incoming sharpens in, same 600 ms beat as the fade
+- Home pace graph reworked (Option 1): today's cumulative curve is the
+  hero at full size against its guide, night band, goal line and now
+  marker; below it a seven-day totals strip compares the week instead
+  of stacking three identical curves. No new deps — canvas only.
 
 ### Fixed
 - Fullscreen dock bug (tab row parked at the top covering the screen)

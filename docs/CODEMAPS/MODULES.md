@@ -154,7 +154,7 @@ val start = RecommendationEngine.dayStartMillis(profile.wakeUpHour, profile.slee
 
 ### Home
 
-**Purpose**: Dashboard (tumbler tank, pace curve, quips), logging, recs.
+**Purpose**: Dashboard (tumbler tank, pace timeline, quips), logging, recs.
 
 **Location**: `app/src/main/java/com/water0/hydration/presentation/home/`
 
@@ -163,7 +163,8 @@ val start = RecommendationEngine.dayStartMillis(profile.wakeUpHour, profile.slee
 - `HomeViewModel.kt` — `class HomeViewModel` + `UiState` (progress, recs, recent shortcuts)
 - `LogScreen.kt` — `LogScreen` (drink types, quick-add, backdated Now/1h/3h/pick)
 - `components/TankMath.kt` — tank level/geometry math
-- `components/PaceCurve.kt` — expected-vs-actual curve + now-marker + goal line
+- `components/PaceTimeline.kt` — scrollable week pace card (cursor, zoom, canvas)
+- `components/TimelineMath.kt` — wake-day windows, curved guide, absorption, cursor math
 - `components/QuickAddButtons.kt` — sized drops + custom ml
 - `components/AddWaterDialog.kt` — amount entry dialog
 - `components/RecommendationCard.kt` — range rec display
@@ -250,7 +251,10 @@ val start = RecommendationEngine.dayStartMillis(profile.wakeUpHour, profile.slee
 **Location**: `app/src/main/java/com/water0/hydration/ui/theme/` (+ `liquidglass/`)
 
 **Key Files**:
-- `LiquidGlassTheme.kt` — theme + `GlassColors`, `Glass`, `DockMetrics`, `AuroraBackground`, card-style helpers
+- `LiquidGlassTheme.kt` — `MaterialTheme` wrapper + `LocalContentColor` fix
+- `GlassColors.kt` — `GlassColors.dark` / `.light` schemes
+- `GlassHelpers.kt` — `Glass`, `DockMetrics`, `CardStyle`, `glassCardContainer/Border`, `isDarkScheme()`
+- `AuroraBackground.kt` — living background: bubbles, glow orbs, jellyfish, grain
 - `LensCard.kt` — `LensCard`, `LocalLensScope/Config/Visible`, `isLensActive`
 - `liquidglass/LiquidGlass.kt` — `LiquidGlassBox`, `toLiquidParams`, `LocalGlassScope`
 - `GlassChrome.kt` — `GlassSnackbar`
