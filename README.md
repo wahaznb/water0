@@ -125,8 +125,9 @@ modeled sex gap (2 ml/kg) sits near the empirical gap (1.3 ml/kg).
 
 The shipped on-device net reads the week's shape (7 daily totals in, one
 number out): MAE 484 ml vs 555 for aggregates and 837 for guessing the
-goal — a ~40% error cut for 7.6 KB. It advises; rules decide. A direct
-NHANES training attempt scored R² −0.08 (demographics can't predict a
+goal — a 13% error cut against the aggregate baseline and 42% against the
+mean guess, for 7.6 KB. It advises; rules decide. A direct
+NHANES training attempt scored R² −0.075 (demographics can't predict a
 day's intake — day noise dominates), kept in the repo as an honest
 negative result. Details in `ml_training/`.
 
