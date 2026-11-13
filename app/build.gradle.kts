@@ -68,6 +68,16 @@ android {
 composeOptions {
         kotlinCompilerExtensionVersion = "1.5.13"
     }
+
+    // assembleRelease must not depend on lintVitalAnalyzeRelease: AGP 8.9.1
+    // resolves com.android.tools.lint:lint-gradle:31.9.1 from dl.google.com,
+    // which is unreachable on F-Droid's build sandbox. The APK itself builds
+    // clean; F-Droid runs its own fdroid lint, so the in-build lint gate is
+    // redundant. Without this the release task fails before it produces an
+    // APK, and F-Droid never gets a binary to sign.
+    lint {
+        checkReleaseBuilds = false
+    }
     
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1,LICENSE,NOTICE}/*"
